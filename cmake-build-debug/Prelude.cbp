@@ -24,9 +24,12 @@
 				<Option type="1"/>
 				<Option compiler="msvc8"/>
 				<Compiler>
+					<Add directory="C:/Users/saurav/Desktop/Prelude/src"/>
+					<Add directory="C:/Users/saurav/Desktop/Prelude/src/ECS"/>
 					<Add directory="C:/Dev/SDL2/include"/>
 					<Add directory="C:/Dev/SDL2_image/include"/>
 					<Add directory="C:/Dev/SDL2_ttf/include"/>
+					<Add directory="C:/Dev/SDL2_mixer/include"/>
 					<Add directory="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Tools\MSVC\14.28.29910\ATLMFC\include"/>
 					<Add directory="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Tools\MSVC\14.28.29910\include"/>
 					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.19041.0\ucrt"/>
@@ -49,9 +52,12 @@
 				<Option type="1"/>
 				<Option compiler="msvc8"/>
 				<Compiler>
+					<Add directory="C:/Users/saurav/Desktop/Prelude/src"/>
+					<Add directory="C:/Users/saurav/Desktop/Prelude/src/ECS"/>
 					<Add directory="C:/Dev/SDL2/include"/>
 					<Add directory="C:/Dev/SDL2_image/include"/>
 					<Add directory="C:/Dev/SDL2_ttf/include"/>
+					<Add directory="C:/Dev/SDL2_mixer/include"/>
 					<Add directory="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Tools\MSVC\14.28.29910\ATLMFC\include"/>
 					<Add directory="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Tools\MSVC\14.28.29910\include"/>
 					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.19041.0\ucrt"/>
@@ -88,76 +94,79 @@
 				</MakeCommands>
 			</Target>
 		</Build>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/Animation.h">
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/AssetManager.cpp">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/AssetManager.cpp">
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/AssetManager.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/AssetManager.h">
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/Collision.cpp">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/ColliderComponent.h">
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/Collision.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/Collision.cpp">
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/ECS/Animation.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/Collision.h">
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/ECS/ColliderComponent.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/Components.h">
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/ECS/Components.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/ECS.cpp">
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/ECS/ECS.cpp">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/ECS.h">
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/ECS/ECS.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/Game.cpp">
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/ECS/ProjectileComponent.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/Game.h">
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/ECS/RigidBodyComponent.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/KeyboardController.h">
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/ECS/ScriptComponent.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/Map.cpp">
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/ECS/SpriteComponent.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/Map.h">
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/ECS/TileComponent.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/ProjectileComponent.h">
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/ECS/TransformComponent.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/SpriteComponent.h">
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/ECS/UILabel.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/TextureManager.cpp">
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/Game.cpp">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/TextureManager.h">
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/Game.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/TileComponent.h">
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/Map.cpp">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/TransformComponent.h">
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/Map.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/UILabel.h">
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/TextureManager.cpp">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/Vector2D.cpp">
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/TextureManager.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/Vector2D.h">
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/Vector2D.cpp">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/main.cpp">
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/Vector2D.h">
+			<Option target="Prelude"/>
+		</Unit>
+		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/main.cpp">
 			<Option target="Prelude"/>
 		</Unit>
 		<Unit filename="C:/Users/saurav/Desktop/Prelude/CMakeLists.txt">

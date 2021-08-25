@@ -118,197 +118,197 @@ Prelude\fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\build
 .PHONY : Prelude\fast
 
-AssetManager.obj: AssetManager.cpp.obj
-.PHONY : AssetManager.obj
+src\AssetManager.obj: src\AssetManager.cpp.obj
+.PHONY : src\AssetManager.obj
 
 # target to build an object file
-AssetManager.cpp.obj:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\AssetManager.cpp.obj
-.PHONY : AssetManager.cpp.obj
+src\AssetManager.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\src\AssetManager.cpp.obj
+.PHONY : src\AssetManager.cpp.obj
 
-AssetManager.i: AssetManager.cpp.i
-.PHONY : AssetManager.i
+src\AssetManager.i: src\AssetManager.cpp.i
+.PHONY : src\AssetManager.i
 
 # target to preprocess a source file
-AssetManager.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\AssetManager.cpp.i
-.PHONY : AssetManager.cpp.i
+src\AssetManager.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\src\AssetManager.cpp.i
+.PHONY : src\AssetManager.cpp.i
 
-AssetManager.s: AssetManager.cpp.s
-.PHONY : AssetManager.s
+src\AssetManager.s: src\AssetManager.cpp.s
+.PHONY : src\AssetManager.s
 
 # target to generate assembly for a file
-AssetManager.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\AssetManager.cpp.s
-.PHONY : AssetManager.cpp.s
+src\AssetManager.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\src\AssetManager.cpp.s
+.PHONY : src\AssetManager.cpp.s
 
-Collision.obj: Collision.cpp.obj
-.PHONY : Collision.obj
+src\Collision.obj: src\Collision.cpp.obj
+.PHONY : src\Collision.obj
 
 # target to build an object file
-Collision.cpp.obj:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\Collision.cpp.obj
-.PHONY : Collision.cpp.obj
+src\Collision.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\src\Collision.cpp.obj
+.PHONY : src\Collision.cpp.obj
 
-Collision.i: Collision.cpp.i
-.PHONY : Collision.i
+src\Collision.i: src\Collision.cpp.i
+.PHONY : src\Collision.i
 
 # target to preprocess a source file
-Collision.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\Collision.cpp.i
-.PHONY : Collision.cpp.i
+src\Collision.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\src\Collision.cpp.i
+.PHONY : src\Collision.cpp.i
 
-Collision.s: Collision.cpp.s
-.PHONY : Collision.s
+src\Collision.s: src\Collision.cpp.s
+.PHONY : src\Collision.s
 
 # target to generate assembly for a file
-Collision.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\Collision.cpp.s
-.PHONY : Collision.cpp.s
+src\Collision.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\src\Collision.cpp.s
+.PHONY : src\Collision.cpp.s
 
-ECS.obj: ECS.cpp.obj
-.PHONY : ECS.obj
+src\ECS\ECS.obj: src\ECS\ECS.cpp.obj
+.PHONY : src\ECS\ECS.obj
 
 # target to build an object file
-ECS.cpp.obj:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\ECS.cpp.obj
-.PHONY : ECS.cpp.obj
+src\ECS\ECS.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\src\ECS\ECS.cpp.obj
+.PHONY : src\ECS\ECS.cpp.obj
 
-ECS.i: ECS.cpp.i
-.PHONY : ECS.i
+src\ECS\ECS.i: src\ECS\ECS.cpp.i
+.PHONY : src\ECS\ECS.i
 
 # target to preprocess a source file
-ECS.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\ECS.cpp.i
-.PHONY : ECS.cpp.i
+src\ECS\ECS.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\src\ECS\ECS.cpp.i
+.PHONY : src\ECS\ECS.cpp.i
 
-ECS.s: ECS.cpp.s
-.PHONY : ECS.s
+src\ECS\ECS.s: src\ECS\ECS.cpp.s
+.PHONY : src\ECS\ECS.s
 
 # target to generate assembly for a file
-ECS.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\ECS.cpp.s
-.PHONY : ECS.cpp.s
+src\ECS\ECS.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\src\ECS\ECS.cpp.s
+.PHONY : src\ECS\ECS.cpp.s
 
-Game.obj: Game.cpp.obj
-.PHONY : Game.obj
+src\Game.obj: src\Game.cpp.obj
+.PHONY : src\Game.obj
 
 # target to build an object file
-Game.cpp.obj:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\Game.cpp.obj
-.PHONY : Game.cpp.obj
+src\Game.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\src\Game.cpp.obj
+.PHONY : src\Game.cpp.obj
 
-Game.i: Game.cpp.i
-.PHONY : Game.i
+src\Game.i: src\Game.cpp.i
+.PHONY : src\Game.i
 
 # target to preprocess a source file
-Game.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\Game.cpp.i
-.PHONY : Game.cpp.i
+src\Game.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\src\Game.cpp.i
+.PHONY : src\Game.cpp.i
 
-Game.s: Game.cpp.s
-.PHONY : Game.s
+src\Game.s: src\Game.cpp.s
+.PHONY : src\Game.s
 
 # target to generate assembly for a file
-Game.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\Game.cpp.s
-.PHONY : Game.cpp.s
+src\Game.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\src\Game.cpp.s
+.PHONY : src\Game.cpp.s
 
-Map.obj: Map.cpp.obj
-.PHONY : Map.obj
+src\Map.obj: src\Map.cpp.obj
+.PHONY : src\Map.obj
 
 # target to build an object file
-Map.cpp.obj:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\Map.cpp.obj
-.PHONY : Map.cpp.obj
+src\Map.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\src\Map.cpp.obj
+.PHONY : src\Map.cpp.obj
 
-Map.i: Map.cpp.i
-.PHONY : Map.i
+src\Map.i: src\Map.cpp.i
+.PHONY : src\Map.i
 
 # target to preprocess a source file
-Map.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\Map.cpp.i
-.PHONY : Map.cpp.i
+src\Map.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\src\Map.cpp.i
+.PHONY : src\Map.cpp.i
 
-Map.s: Map.cpp.s
-.PHONY : Map.s
+src\Map.s: src\Map.cpp.s
+.PHONY : src\Map.s
 
 # target to generate assembly for a file
-Map.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\Map.cpp.s
-.PHONY : Map.cpp.s
+src\Map.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\src\Map.cpp.s
+.PHONY : src\Map.cpp.s
 
-TextureManager.obj: TextureManager.cpp.obj
-.PHONY : TextureManager.obj
+src\TextureManager.obj: src\TextureManager.cpp.obj
+.PHONY : src\TextureManager.obj
 
 # target to build an object file
-TextureManager.cpp.obj:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\TextureManager.cpp.obj
-.PHONY : TextureManager.cpp.obj
+src\TextureManager.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\src\TextureManager.cpp.obj
+.PHONY : src\TextureManager.cpp.obj
 
-TextureManager.i: TextureManager.cpp.i
-.PHONY : TextureManager.i
+src\TextureManager.i: src\TextureManager.cpp.i
+.PHONY : src\TextureManager.i
 
 # target to preprocess a source file
-TextureManager.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\TextureManager.cpp.i
-.PHONY : TextureManager.cpp.i
+src\TextureManager.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\src\TextureManager.cpp.i
+.PHONY : src\TextureManager.cpp.i
 
-TextureManager.s: TextureManager.cpp.s
-.PHONY : TextureManager.s
+src\TextureManager.s: src\TextureManager.cpp.s
+.PHONY : src\TextureManager.s
 
 # target to generate assembly for a file
-TextureManager.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\TextureManager.cpp.s
-.PHONY : TextureManager.cpp.s
+src\TextureManager.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\src\TextureManager.cpp.s
+.PHONY : src\TextureManager.cpp.s
 
-Vector2D.obj: Vector2D.cpp.obj
-.PHONY : Vector2D.obj
+src\Vector2D.obj: src\Vector2D.cpp.obj
+.PHONY : src\Vector2D.obj
 
 # target to build an object file
-Vector2D.cpp.obj:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\Vector2D.cpp.obj
-.PHONY : Vector2D.cpp.obj
+src\Vector2D.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\src\Vector2D.cpp.obj
+.PHONY : src\Vector2D.cpp.obj
 
-Vector2D.i: Vector2D.cpp.i
-.PHONY : Vector2D.i
+src\Vector2D.i: src\Vector2D.cpp.i
+.PHONY : src\Vector2D.i
 
 # target to preprocess a source file
-Vector2D.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\Vector2D.cpp.i
-.PHONY : Vector2D.cpp.i
+src\Vector2D.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\src\Vector2D.cpp.i
+.PHONY : src\Vector2D.cpp.i
 
-Vector2D.s: Vector2D.cpp.s
-.PHONY : Vector2D.s
+src\Vector2D.s: src\Vector2D.cpp.s
+.PHONY : src\Vector2D.s
 
 # target to generate assembly for a file
-Vector2D.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\Vector2D.cpp.s
-.PHONY : Vector2D.cpp.s
+src\Vector2D.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\src\Vector2D.cpp.s
+.PHONY : src\Vector2D.cpp.s
 
-main.obj: main.cpp.obj
-.PHONY : main.obj
+src\main.obj: src\main.cpp.obj
+.PHONY : src\main.obj
 
 # target to build an object file
-main.cpp.obj:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\main.cpp.obj
-.PHONY : main.cpp.obj
+src\main.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\src\main.cpp.obj
+.PHONY : src\main.cpp.obj
 
-main.i: main.cpp.i
-.PHONY : main.i
+src\main.i: src\main.cpp.i
+.PHONY : src\main.i
 
 # target to preprocess a source file
-main.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\main.cpp.i
-.PHONY : main.cpp.i
+src\main.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\src\main.cpp.i
+.PHONY : src\main.cpp.i
 
-main.s: main.cpp.s
-.PHONY : main.s
+src\main.s: src\main.cpp.s
+.PHONY : src\main.s
 
 # target to generate assembly for a file
-main.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\main.cpp.s
-.PHONY : main.cpp.s
+src\main.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Prelude.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\Prelude.dir\src\main.cpp.s
+.PHONY : src\main.cpp.s
 
 # Help Target
 help:
@@ -319,30 +319,30 @@ help:
 	@echo ... edit_cache
 	@echo ... rebuild_cache
 	@echo ... Prelude
-	@echo ... AssetManager.obj
-	@echo ... AssetManager.i
-	@echo ... AssetManager.s
-	@echo ... Collision.obj
-	@echo ... Collision.i
-	@echo ... Collision.s
-	@echo ... ECS.obj
-	@echo ... ECS.i
-	@echo ... ECS.s
-	@echo ... Game.obj
-	@echo ... Game.i
-	@echo ... Game.s
-	@echo ... Map.obj
-	@echo ... Map.i
-	@echo ... Map.s
-	@echo ... TextureManager.obj
-	@echo ... TextureManager.i
-	@echo ... TextureManager.s
-	@echo ... Vector2D.obj
-	@echo ... Vector2D.i
-	@echo ... Vector2D.s
-	@echo ... main.obj
-	@echo ... main.i
-	@echo ... main.s
+	@echo ... src/AssetManager.obj
+	@echo ... src/AssetManager.i
+	@echo ... src/AssetManager.s
+	@echo ... src/Collision.obj
+	@echo ... src/Collision.i
+	@echo ... src/Collision.s
+	@echo ... src/ECS/ECS.obj
+	@echo ... src/ECS/ECS.i
+	@echo ... src/ECS/ECS.s
+	@echo ... src/Game.obj
+	@echo ... src/Game.i
+	@echo ... src/Game.s
+	@echo ... src/Map.obj
+	@echo ... src/Map.i
+	@echo ... src/Map.s
+	@echo ... src/TextureManager.obj
+	@echo ... src/TextureManager.i
+	@echo ... src/TextureManager.s
+	@echo ... src/Vector2D.obj
+	@echo ... src/Vector2D.i
+	@echo ... src/Vector2D.s
+	@echo ... src/main.obj
+	@echo ... src/main.i
+	@echo ... src/main.s
 .PHONY : help
 
 

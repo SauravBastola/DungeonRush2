@@ -55,185 +55,185 @@ include CMakeFiles\Prelude.dir\progress.make
 # Include the compile flags for this target's objects.
 include CMakeFiles\Prelude.dir\flags.make
 
-CMakeFiles\Prelude.dir\main.cpp.obj: CMakeFiles\Prelude.dir\flags.make
-CMakeFiles\Prelude.dir\main.cpp.obj: ..\main.cpp
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=C:\Users\saurav\Desktop\Prelude\cmake-build-debug\CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/Prelude.dir/main.cpp.obj"
+CMakeFiles\Prelude.dir\src\main.cpp.obj: CMakeFiles\Prelude.dir\flags.make
+CMakeFiles\Prelude.dir\src\main.cpp.obj: ..\src\main.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=C:\Users\saurav\Desktop\Prelude\cmake-build-debug\CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/Prelude.dir/src/main.cpp.obj"
 	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe @<<
- /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoCMakeFiles\Prelude.dir\main.cpp.obj /FdCMakeFiles\Prelude.dir\ /FS -c C:\Users\saurav\Desktop\Prelude\main.cpp
+ /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoCMakeFiles\Prelude.dir\src\main.cpp.obj /FdCMakeFiles\Prelude.dir\ /FS -c C:\Users\saurav\Desktop\Prelude\src\main.cpp
 <<
 
-CMakeFiles\Prelude.dir\main.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Prelude.dir/main.cpp.i"
-	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe > CMakeFiles\Prelude.dir\main.cpp.i @<<
- /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E C:\Users\saurav\Desktop\Prelude\main.cpp
+CMakeFiles\Prelude.dir\src\main.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Prelude.dir/src/main.cpp.i"
+	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe > CMakeFiles\Prelude.dir\src\main.cpp.i @<<
+ /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E C:\Users\saurav\Desktop\Prelude\src\main.cpp
 <<
 
-CMakeFiles\Prelude.dir\main.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Prelude.dir/main.cpp.s"
+CMakeFiles\Prelude.dir\src\main.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Prelude.dir/src/main.cpp.s"
 	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe @<<
- /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoNUL /FAs /FaCMakeFiles\Prelude.dir\main.cpp.s /c C:\Users\saurav\Desktop\Prelude\main.cpp
+ /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoNUL /FAs /FaCMakeFiles\Prelude.dir\src\main.cpp.s /c C:\Users\saurav\Desktop\Prelude\src\main.cpp
 <<
 
-CMakeFiles\Prelude.dir\AssetManager.cpp.obj: CMakeFiles\Prelude.dir\flags.make
-CMakeFiles\Prelude.dir\AssetManager.cpp.obj: ..\AssetManager.cpp
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=C:\Users\saurav\Desktop\Prelude\cmake-build-debug\CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object CMakeFiles/Prelude.dir/AssetManager.cpp.obj"
+CMakeFiles\Prelude.dir\src\AssetManager.cpp.obj: CMakeFiles\Prelude.dir\flags.make
+CMakeFiles\Prelude.dir\src\AssetManager.cpp.obj: ..\src\AssetManager.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=C:\Users\saurav\Desktop\Prelude\cmake-build-debug\CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object CMakeFiles/Prelude.dir/src/AssetManager.cpp.obj"
 	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe @<<
- /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoCMakeFiles\Prelude.dir\AssetManager.cpp.obj /FdCMakeFiles\Prelude.dir\ /FS -c C:\Users\saurav\Desktop\Prelude\AssetManager.cpp
+ /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoCMakeFiles\Prelude.dir\src\AssetManager.cpp.obj /FdCMakeFiles\Prelude.dir\ /FS -c C:\Users\saurav\Desktop\Prelude\src\AssetManager.cpp
 <<
 
-CMakeFiles\Prelude.dir\AssetManager.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Prelude.dir/AssetManager.cpp.i"
-	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe > CMakeFiles\Prelude.dir\AssetManager.cpp.i @<<
- /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E C:\Users\saurav\Desktop\Prelude\AssetManager.cpp
+CMakeFiles\Prelude.dir\src\AssetManager.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Prelude.dir/src/AssetManager.cpp.i"
+	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe > CMakeFiles\Prelude.dir\src\AssetManager.cpp.i @<<
+ /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E C:\Users\saurav\Desktop\Prelude\src\AssetManager.cpp
 <<
 
-CMakeFiles\Prelude.dir\AssetManager.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Prelude.dir/AssetManager.cpp.s"
+CMakeFiles\Prelude.dir\src\AssetManager.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Prelude.dir/src/AssetManager.cpp.s"
 	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe @<<
- /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoNUL /FAs /FaCMakeFiles\Prelude.dir\AssetManager.cpp.s /c C:\Users\saurav\Desktop\Prelude\AssetManager.cpp
+ /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoNUL /FAs /FaCMakeFiles\Prelude.dir\src\AssetManager.cpp.s /c C:\Users\saurav\Desktop\Prelude\src\AssetManager.cpp
 <<
 
-CMakeFiles\Prelude.dir\Collision.cpp.obj: CMakeFiles\Prelude.dir\flags.make
-CMakeFiles\Prelude.dir\Collision.cpp.obj: ..\Collision.cpp
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=C:\Users\saurav\Desktop\Prelude\cmake-build-debug\CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/Prelude.dir/Collision.cpp.obj"
+CMakeFiles\Prelude.dir\src\Collision.cpp.obj: CMakeFiles\Prelude.dir\flags.make
+CMakeFiles\Prelude.dir\src\Collision.cpp.obj: ..\src\Collision.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=C:\Users\saurav\Desktop\Prelude\cmake-build-debug\CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/Prelude.dir/src/Collision.cpp.obj"
 	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe @<<
- /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoCMakeFiles\Prelude.dir\Collision.cpp.obj /FdCMakeFiles\Prelude.dir\ /FS -c C:\Users\saurav\Desktop\Prelude\Collision.cpp
+ /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoCMakeFiles\Prelude.dir\src\Collision.cpp.obj /FdCMakeFiles\Prelude.dir\ /FS -c C:\Users\saurav\Desktop\Prelude\src\Collision.cpp
 <<
 
-CMakeFiles\Prelude.dir\Collision.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Prelude.dir/Collision.cpp.i"
-	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe > CMakeFiles\Prelude.dir\Collision.cpp.i @<<
- /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E C:\Users\saurav\Desktop\Prelude\Collision.cpp
+CMakeFiles\Prelude.dir\src\Collision.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Prelude.dir/src/Collision.cpp.i"
+	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe > CMakeFiles\Prelude.dir\src\Collision.cpp.i @<<
+ /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E C:\Users\saurav\Desktop\Prelude\src\Collision.cpp
 <<
 
-CMakeFiles\Prelude.dir\Collision.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Prelude.dir/Collision.cpp.s"
+CMakeFiles\Prelude.dir\src\Collision.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Prelude.dir/src/Collision.cpp.s"
 	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe @<<
- /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoNUL /FAs /FaCMakeFiles\Prelude.dir\Collision.cpp.s /c C:\Users\saurav\Desktop\Prelude\Collision.cpp
+ /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoNUL /FAs /FaCMakeFiles\Prelude.dir\src\Collision.cpp.s /c C:\Users\saurav\Desktop\Prelude\src\Collision.cpp
 <<
 
-CMakeFiles\Prelude.dir\Game.cpp.obj: CMakeFiles\Prelude.dir\flags.make
-CMakeFiles\Prelude.dir\Game.cpp.obj: ..\Game.cpp
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=C:\Users\saurav\Desktop\Prelude\cmake-build-debug\CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/Prelude.dir/Game.cpp.obj"
+CMakeFiles\Prelude.dir\src\Game.cpp.obj: CMakeFiles\Prelude.dir\flags.make
+CMakeFiles\Prelude.dir\src\Game.cpp.obj: ..\src\Game.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=C:\Users\saurav\Desktop\Prelude\cmake-build-debug\CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/Prelude.dir/src/Game.cpp.obj"
 	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe @<<
- /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoCMakeFiles\Prelude.dir\Game.cpp.obj /FdCMakeFiles\Prelude.dir\ /FS -c C:\Users\saurav\Desktop\Prelude\Game.cpp
+ /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoCMakeFiles\Prelude.dir\src\Game.cpp.obj /FdCMakeFiles\Prelude.dir\ /FS -c C:\Users\saurav\Desktop\Prelude\src\Game.cpp
 <<
 
-CMakeFiles\Prelude.dir\Game.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Prelude.dir/Game.cpp.i"
-	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe > CMakeFiles\Prelude.dir\Game.cpp.i @<<
- /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E C:\Users\saurav\Desktop\Prelude\Game.cpp
+CMakeFiles\Prelude.dir\src\Game.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Prelude.dir/src/Game.cpp.i"
+	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe > CMakeFiles\Prelude.dir\src\Game.cpp.i @<<
+ /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E C:\Users\saurav\Desktop\Prelude\src\Game.cpp
 <<
 
-CMakeFiles\Prelude.dir\Game.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Prelude.dir/Game.cpp.s"
+CMakeFiles\Prelude.dir\src\Game.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Prelude.dir/src/Game.cpp.s"
 	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe @<<
- /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoNUL /FAs /FaCMakeFiles\Prelude.dir\Game.cpp.s /c C:\Users\saurav\Desktop\Prelude\Game.cpp
+ /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoNUL /FAs /FaCMakeFiles\Prelude.dir\src\Game.cpp.s /c C:\Users\saurav\Desktop\Prelude\src\Game.cpp
 <<
 
-CMakeFiles\Prelude.dir\Map.cpp.obj: CMakeFiles\Prelude.dir\flags.make
-CMakeFiles\Prelude.dir\Map.cpp.obj: ..\Map.cpp
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=C:\Users\saurav\Desktop\Prelude\cmake-build-debug\CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/Prelude.dir/Map.cpp.obj"
+CMakeFiles\Prelude.dir\src\Map.cpp.obj: CMakeFiles\Prelude.dir\flags.make
+CMakeFiles\Prelude.dir\src\Map.cpp.obj: ..\src\Map.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=C:\Users\saurav\Desktop\Prelude\cmake-build-debug\CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/Prelude.dir/src/Map.cpp.obj"
 	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe @<<
- /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoCMakeFiles\Prelude.dir\Map.cpp.obj /FdCMakeFiles\Prelude.dir\ /FS -c C:\Users\saurav\Desktop\Prelude\Map.cpp
+ /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoCMakeFiles\Prelude.dir\src\Map.cpp.obj /FdCMakeFiles\Prelude.dir\ /FS -c C:\Users\saurav\Desktop\Prelude\src\Map.cpp
 <<
 
-CMakeFiles\Prelude.dir\Map.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Prelude.dir/Map.cpp.i"
-	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe > CMakeFiles\Prelude.dir\Map.cpp.i @<<
- /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E C:\Users\saurav\Desktop\Prelude\Map.cpp
+CMakeFiles\Prelude.dir\src\Map.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Prelude.dir/src/Map.cpp.i"
+	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe > CMakeFiles\Prelude.dir\src\Map.cpp.i @<<
+ /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E C:\Users\saurav\Desktop\Prelude\src\Map.cpp
 <<
 
-CMakeFiles\Prelude.dir\Map.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Prelude.dir/Map.cpp.s"
+CMakeFiles\Prelude.dir\src\Map.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Prelude.dir/src/Map.cpp.s"
 	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe @<<
- /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoNUL /FAs /FaCMakeFiles\Prelude.dir\Map.cpp.s /c C:\Users\saurav\Desktop\Prelude\Map.cpp
+ /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoNUL /FAs /FaCMakeFiles\Prelude.dir\src\Map.cpp.s /c C:\Users\saurav\Desktop\Prelude\src\Map.cpp
 <<
 
-CMakeFiles\Prelude.dir\TextureManager.cpp.obj: CMakeFiles\Prelude.dir\flags.make
-CMakeFiles\Prelude.dir\TextureManager.cpp.obj: ..\TextureManager.cpp
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=C:\Users\saurav\Desktop\Prelude\cmake-build-debug\CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object CMakeFiles/Prelude.dir/TextureManager.cpp.obj"
+CMakeFiles\Prelude.dir\src\TextureManager.cpp.obj: CMakeFiles\Prelude.dir\flags.make
+CMakeFiles\Prelude.dir\src\TextureManager.cpp.obj: ..\src\TextureManager.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=C:\Users\saurav\Desktop\Prelude\cmake-build-debug\CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object CMakeFiles/Prelude.dir/src/TextureManager.cpp.obj"
 	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe @<<
- /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoCMakeFiles\Prelude.dir\TextureManager.cpp.obj /FdCMakeFiles\Prelude.dir\ /FS -c C:\Users\saurav\Desktop\Prelude\TextureManager.cpp
+ /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoCMakeFiles\Prelude.dir\src\TextureManager.cpp.obj /FdCMakeFiles\Prelude.dir\ /FS -c C:\Users\saurav\Desktop\Prelude\src\TextureManager.cpp
 <<
 
-CMakeFiles\Prelude.dir\TextureManager.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Prelude.dir/TextureManager.cpp.i"
-	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe > CMakeFiles\Prelude.dir\TextureManager.cpp.i @<<
- /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E C:\Users\saurav\Desktop\Prelude\TextureManager.cpp
+CMakeFiles\Prelude.dir\src\TextureManager.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Prelude.dir/src/TextureManager.cpp.i"
+	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe > CMakeFiles\Prelude.dir\src\TextureManager.cpp.i @<<
+ /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E C:\Users\saurav\Desktop\Prelude\src\TextureManager.cpp
 <<
 
-CMakeFiles\Prelude.dir\TextureManager.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Prelude.dir/TextureManager.cpp.s"
+CMakeFiles\Prelude.dir\src\TextureManager.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Prelude.dir/src/TextureManager.cpp.s"
 	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe @<<
- /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoNUL /FAs /FaCMakeFiles\Prelude.dir\TextureManager.cpp.s /c C:\Users\saurav\Desktop\Prelude\TextureManager.cpp
+ /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoNUL /FAs /FaCMakeFiles\Prelude.dir\src\TextureManager.cpp.s /c C:\Users\saurav\Desktop\Prelude\src\TextureManager.cpp
 <<
 
-CMakeFiles\Prelude.dir\Vector2D.cpp.obj: CMakeFiles\Prelude.dir\flags.make
-CMakeFiles\Prelude.dir\Vector2D.cpp.obj: ..\Vector2D.cpp
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=C:\Users\saurav\Desktop\Prelude\cmake-build-debug\CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building CXX object CMakeFiles/Prelude.dir/Vector2D.cpp.obj"
+CMakeFiles\Prelude.dir\src\Vector2D.cpp.obj: CMakeFiles\Prelude.dir\flags.make
+CMakeFiles\Prelude.dir\src\Vector2D.cpp.obj: ..\src\Vector2D.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=C:\Users\saurav\Desktop\Prelude\cmake-build-debug\CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building CXX object CMakeFiles/Prelude.dir/src/Vector2D.cpp.obj"
 	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe @<<
- /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoCMakeFiles\Prelude.dir\Vector2D.cpp.obj /FdCMakeFiles\Prelude.dir\ /FS -c C:\Users\saurav\Desktop\Prelude\Vector2D.cpp
+ /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoCMakeFiles\Prelude.dir\src\Vector2D.cpp.obj /FdCMakeFiles\Prelude.dir\ /FS -c C:\Users\saurav\Desktop\Prelude\src\Vector2D.cpp
 <<
 
-CMakeFiles\Prelude.dir\Vector2D.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Prelude.dir/Vector2D.cpp.i"
-	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe > CMakeFiles\Prelude.dir\Vector2D.cpp.i @<<
- /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E C:\Users\saurav\Desktop\Prelude\Vector2D.cpp
+CMakeFiles\Prelude.dir\src\Vector2D.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Prelude.dir/src/Vector2D.cpp.i"
+	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe > CMakeFiles\Prelude.dir\src\Vector2D.cpp.i @<<
+ /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E C:\Users\saurav\Desktop\Prelude\src\Vector2D.cpp
 <<
 
-CMakeFiles\Prelude.dir\Vector2D.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Prelude.dir/Vector2D.cpp.s"
+CMakeFiles\Prelude.dir\src\Vector2D.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Prelude.dir/src/Vector2D.cpp.s"
 	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe @<<
- /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoNUL /FAs /FaCMakeFiles\Prelude.dir\Vector2D.cpp.s /c C:\Users\saurav\Desktop\Prelude\Vector2D.cpp
+ /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoNUL /FAs /FaCMakeFiles\Prelude.dir\src\Vector2D.cpp.s /c C:\Users\saurav\Desktop\Prelude\src\Vector2D.cpp
 <<
 
-CMakeFiles\Prelude.dir\ECS.cpp.obj: CMakeFiles\Prelude.dir\flags.make
-CMakeFiles\Prelude.dir\ECS.cpp.obj: ..\ECS.cpp
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=C:\Users\saurav\Desktop\Prelude\cmake-build-debug\CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Building CXX object CMakeFiles/Prelude.dir/ECS.cpp.obj"
+CMakeFiles\Prelude.dir\src\ECS\ECS.cpp.obj: CMakeFiles\Prelude.dir\flags.make
+CMakeFiles\Prelude.dir\src\ECS\ECS.cpp.obj: ..\src\ECS\ECS.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=C:\Users\saurav\Desktop\Prelude\cmake-build-debug\CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Building CXX object CMakeFiles/Prelude.dir/src/ECS/ECS.cpp.obj"
 	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe @<<
- /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoCMakeFiles\Prelude.dir\ECS.cpp.obj /FdCMakeFiles\Prelude.dir\ /FS -c C:\Users\saurav\Desktop\Prelude\ECS.cpp
+ /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoCMakeFiles\Prelude.dir\src\ECS\ECS.cpp.obj /FdCMakeFiles\Prelude.dir\ /FS -c C:\Users\saurav\Desktop\Prelude\src\ECS\ECS.cpp
 <<
 
-CMakeFiles\Prelude.dir\ECS.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Prelude.dir/ECS.cpp.i"
-	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe > CMakeFiles\Prelude.dir\ECS.cpp.i @<<
- /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E C:\Users\saurav\Desktop\Prelude\ECS.cpp
+CMakeFiles\Prelude.dir\src\ECS\ECS.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Prelude.dir/src/ECS/ECS.cpp.i"
+	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe > CMakeFiles\Prelude.dir\src\ECS\ECS.cpp.i @<<
+ /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E C:\Users\saurav\Desktop\Prelude\src\ECS\ECS.cpp
 <<
 
-CMakeFiles\Prelude.dir\ECS.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Prelude.dir/ECS.cpp.s"
+CMakeFiles\Prelude.dir\src\ECS\ECS.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Prelude.dir/src/ECS/ECS.cpp.s"
 	C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\cl.exe @<<
- /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoNUL /FAs /FaCMakeFiles\Prelude.dir\ECS.cpp.s /c C:\Users\saurav\Desktop\Prelude\ECS.cpp
+ /nologo /TP $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) /FoNUL /FAs /FaCMakeFiles\Prelude.dir\src\ECS\ECS.cpp.s /c C:\Users\saurav\Desktop\Prelude\src\ECS\ECS.cpp
 <<
 
 # Object files for target Prelude
 Prelude_OBJECTS = \
-"CMakeFiles\Prelude.dir\main.cpp.obj" \
-"CMakeFiles\Prelude.dir\AssetManager.cpp.obj" \
-"CMakeFiles\Prelude.dir\Collision.cpp.obj" \
-"CMakeFiles\Prelude.dir\Game.cpp.obj" \
-"CMakeFiles\Prelude.dir\Map.cpp.obj" \
-"CMakeFiles\Prelude.dir\TextureManager.cpp.obj" \
-"CMakeFiles\Prelude.dir\Vector2D.cpp.obj" \
-"CMakeFiles\Prelude.dir\ECS.cpp.obj"
+"CMakeFiles\Prelude.dir\src\main.cpp.obj" \
+"CMakeFiles\Prelude.dir\src\AssetManager.cpp.obj" \
+"CMakeFiles\Prelude.dir\src\Collision.cpp.obj" \
+"CMakeFiles\Prelude.dir\src\Game.cpp.obj" \
+"CMakeFiles\Prelude.dir\src\Map.cpp.obj" \
+"CMakeFiles\Prelude.dir\src\TextureManager.cpp.obj" \
+"CMakeFiles\Prelude.dir\src\Vector2D.cpp.obj" \
+"CMakeFiles\Prelude.dir\src\ECS\ECS.cpp.obj"
 
 # External object files for target Prelude
 Prelude_EXTERNAL_OBJECTS =
 
-Prelude.exe: CMakeFiles\Prelude.dir\main.cpp.obj
-Prelude.exe: CMakeFiles\Prelude.dir\AssetManager.cpp.obj
-Prelude.exe: CMakeFiles\Prelude.dir\Collision.cpp.obj
-Prelude.exe: CMakeFiles\Prelude.dir\Game.cpp.obj
-Prelude.exe: CMakeFiles\Prelude.dir\Map.cpp.obj
-Prelude.exe: CMakeFiles\Prelude.dir\TextureManager.cpp.obj
-Prelude.exe: CMakeFiles\Prelude.dir\Vector2D.cpp.obj
-Prelude.exe: CMakeFiles\Prelude.dir\ECS.cpp.obj
+Prelude.exe: CMakeFiles\Prelude.dir\src\main.cpp.obj
+Prelude.exe: CMakeFiles\Prelude.dir\src\AssetManager.cpp.obj
+Prelude.exe: CMakeFiles\Prelude.dir\src\Collision.cpp.obj
+Prelude.exe: CMakeFiles\Prelude.dir\src\Game.cpp.obj
+Prelude.exe: CMakeFiles\Prelude.dir\src\Map.cpp.obj
+Prelude.exe: CMakeFiles\Prelude.dir\src\TextureManager.cpp.obj
+Prelude.exe: CMakeFiles\Prelude.dir\src\Vector2D.cpp.obj
+Prelude.exe: CMakeFiles\Prelude.dir\src\ECS\ECS.cpp.obj
 Prelude.exe: CMakeFiles\Prelude.dir\build.make
 Prelude.exe: CMakeFiles\Prelude.dir\objects1.rsp
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=C:\Users\saurav\Desktop\Prelude\cmake-build-debug\CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Linking CXX executable Prelude.exe"
 	"D:\applications\CLion 2021.2\bin\cmake\win\bin\cmake.exe" -E vs_link_exe --intdir=CMakeFiles\Prelude.dir --rc=C:\PROGRA~2\WI3CF2~1\10\bin\100190~1.0\x86\rc.exe --mt=C:\PROGRA~2\WI3CF2~1\10\bin\100190~1.0\x86\mt.exe --manifests -- C:\PROGRA~2\MICROS~2\2019\COMMUN~1\VC\Tools\MSVC\1428~1.299\bin\Hostx86\x86\link.exe /nologo @CMakeFiles\Prelude.dir\objects1.rsp @<<
- /out:Prelude.exe /implib:Prelude.lib /pdb:C:\Users\saurav\Desktop\Prelude\cmake-build-debug\Prelude.pdb /version:0.0 /machine:X86 /debug /INCREMENTAL /subsystem:console   -LIBPATH:C:\Dev\SDL2\lib\x86  -LIBPATH:C:\Dev\SDL2_image\lib\x86  -LIBPATH:C:\Dev\SDL2_ttf\lib\x86  SDL2main.lib SDL2.lib SDL2_ttf.lib SDL2_image.lib kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib 
+ /out:Prelude.exe /implib:Prelude.lib /pdb:C:\Users\saurav\Desktop\Prelude\cmake-build-debug\Prelude.pdb /version:0.0 /machine:X86 /debug /INCREMENTAL /subsystem:console   -LIBPATH:C:\Dev\SDL2\lib\x86  -LIBPATH:C:\Dev\SDL2_image\lib\x86  -LIBPATH:C:\Dev\SDL2_ttf\lib\x86  -LIBPATH:C:\Dev\SDL2_mixer\lib\x86  SDL2main.lib SDL2.lib SDL2_ttf.lib SDL2_image.lib SDL2_mixer.lib kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib 
 <<
 
 # Rule to build all files generated by this target.

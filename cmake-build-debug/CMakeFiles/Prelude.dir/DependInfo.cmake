@@ -8,22 +8,25 @@ set(CMAKE_DEPENDS_LANGUAGES
   )
 # The set of files for implicit dependencies of each language:
 set(CMAKE_DEPENDS_CHECK_CXX
-  "C:/Users/saurav/Desktop/Prelude/AssetManager.cpp" "C:/Users/saurav/Desktop/Prelude/cmake-build-debug/CMakeFiles/Prelude.dir/AssetManager.cpp.obj"
-  "C:/Users/saurav/Desktop/Prelude/Collision.cpp" "C:/Users/saurav/Desktop/Prelude/cmake-build-debug/CMakeFiles/Prelude.dir/Collision.cpp.obj"
-  "C:/Users/saurav/Desktop/Prelude/ECS.cpp" "C:/Users/saurav/Desktop/Prelude/cmake-build-debug/CMakeFiles/Prelude.dir/ECS.cpp.obj"
-  "C:/Users/saurav/Desktop/Prelude/Game.cpp" "C:/Users/saurav/Desktop/Prelude/cmake-build-debug/CMakeFiles/Prelude.dir/Game.cpp.obj"
-  "C:/Users/saurav/Desktop/Prelude/Map.cpp" "C:/Users/saurav/Desktop/Prelude/cmake-build-debug/CMakeFiles/Prelude.dir/Map.cpp.obj"
-  "C:/Users/saurav/Desktop/Prelude/TextureManager.cpp" "C:/Users/saurav/Desktop/Prelude/cmake-build-debug/CMakeFiles/Prelude.dir/TextureManager.cpp.obj"
-  "C:/Users/saurav/Desktop/Prelude/Vector2D.cpp" "C:/Users/saurav/Desktop/Prelude/cmake-build-debug/CMakeFiles/Prelude.dir/Vector2D.cpp.obj"
-  "C:/Users/saurav/Desktop/Prelude/main.cpp" "C:/Users/saurav/Desktop/Prelude/cmake-build-debug/CMakeFiles/Prelude.dir/main.cpp.obj"
+  "C:/Users/saurav/Desktop/Prelude/src/AssetManager.cpp" "C:/Users/saurav/Desktop/Prelude/cmake-build-debug/CMakeFiles/Prelude.dir/src/AssetManager.cpp.obj"
+  "C:/Users/saurav/Desktop/Prelude/src/Collision.cpp" "C:/Users/saurav/Desktop/Prelude/cmake-build-debug/CMakeFiles/Prelude.dir/src/Collision.cpp.obj"
+  "C:/Users/saurav/Desktop/Prelude/src/ECS/ECS.cpp" "C:/Users/saurav/Desktop/Prelude/cmake-build-debug/CMakeFiles/Prelude.dir/src/ECS/ECS.cpp.obj"
+  "C:/Users/saurav/Desktop/Prelude/src/Game.cpp" "C:/Users/saurav/Desktop/Prelude/cmake-build-debug/CMakeFiles/Prelude.dir/src/Game.cpp.obj"
+  "C:/Users/saurav/Desktop/Prelude/src/Map.cpp" "C:/Users/saurav/Desktop/Prelude/cmake-build-debug/CMakeFiles/Prelude.dir/src/Map.cpp.obj"
+  "C:/Users/saurav/Desktop/Prelude/src/TextureManager.cpp" "C:/Users/saurav/Desktop/Prelude/cmake-build-debug/CMakeFiles/Prelude.dir/src/TextureManager.cpp.obj"
+  "C:/Users/saurav/Desktop/Prelude/src/Vector2D.cpp" "C:/Users/saurav/Desktop/Prelude/cmake-build-debug/CMakeFiles/Prelude.dir/src/Vector2D.cpp.obj"
+  "C:/Users/saurav/Desktop/Prelude/src/main.cpp" "C:/Users/saurav/Desktop/Prelude/cmake-build-debug/CMakeFiles/Prelude.dir/src/main.cpp.obj"
   )
 set(CMAKE_CXX_COMPILER_ID "MSVC")
 
 # The include file search paths:
 set(CMAKE_CXX_TARGET_INCLUDE_PATH
+  "../src"
+  "../src/ECS"
   "C:/Dev/SDL2/include"
   "C:/Dev/SDL2_image/include"
   "C:/Dev/SDL2_ttf/include"
+  "C:/Dev/SDL2_mixer/include"
   )
 
 # The set of dependency files which are needed:

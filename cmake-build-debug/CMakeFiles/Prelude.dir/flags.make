@@ -4,7 +4,7 @@
 # compile CXX with C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/VC/Tools/MSVC/14.28.29910/bin/Hostx86/x86/cl.exe
 CXX_DEFINES = 
 
-CXX_INCLUDES = -IC:\Dev\SDL2\include -IC:\Dev\SDL2_image\include -IC:\Dev\SDL2_ttf\include
+CXX_INCLUDES = -IC:\Users\saurav\Desktop\Prelude\src -IC:\Users\saurav\Desktop\Prelude\src\ECS -IC:\Dev\SDL2\include -IC:\Dev\SDL2_image\include -IC:\Dev\SDL2_ttf\include -IC:\Dev\SDL2_mixer\include
 
 CXX_FLAGS = /DWIN32 /D_WINDOWS /EHsc /Zi /Ob0 /Od /RTC1 -MDd -std:c++14
 
