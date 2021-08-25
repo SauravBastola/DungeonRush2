@@ -90,7 +90,6 @@ void Map::LoadCoins(const char* coinMapPath, int sizeX, int sizeY) {
             if (v == 0) {
                 auto &coin(manager.addEntity("coin"));
                 coin.addComponent<TransformComponent>(x * scaledSize, y * scaledSize, 61, 62, 1.3);
-                std::cout << sizeX * 96 << " " << sizeY * 96 << std::endl;
                 coin.addComponent<SpriteComponent>("coins", true);
                 coin.addComponent<ColliderComponent>("coin");
                 coin.addComponent<ScriptComponent>();
