@@ -44,6 +44,8 @@ add_executable(
         src/ECS/TileComponent.h
         src/ECS/TransformComponent.h
         src/ECS/UILabel.h
-        src/ECS/RigidBodyComponent.h src/ECS/ScriptComponent.h)
+        src/ECS/RigidBodyComponent.h
+        src/ECS/ScriptComponent.h
+)
 
 target_link_libraries(Prelude SDL2main SDL2 SDL2_ttf SDL2_image SDL2_mixer)

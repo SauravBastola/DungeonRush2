@@ -36,12 +36,11 @@ public:
 
         Animation player_idle = Animation(0, 3, 130);
         Animation player_run = Animation(1, 6, 100);
-        Animation player_jump = Animation(5, 4, 50);
+        Animation player_jump = Animation(5, 4, 120);
 
         animations.emplace("playerIdle", player_idle);
         animations.emplace("playerRun", player_run);
         animations.emplace("playerJump", player_jump);
-
 
         Play("playerIdle");
 

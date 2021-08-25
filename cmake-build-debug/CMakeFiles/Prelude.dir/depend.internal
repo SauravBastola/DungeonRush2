@@ -57,6 +57,7 @@ CMakeFiles/Prelude.dir/src/AssetManager.cpp.obj
  C:/Dev/SDL2/include/begin_code.h
  C:/Dev/SDL2/include/close_code.h
  C:/Dev/SDL2_image/include/SDL_image.h
+ C:/Dev/SDL2_mixer/include/SDL_mixer.h
  C:/Dev/SDL2_ttf/include/SDL_ttf.h
  C:/Users/saurav/Desktop/Prelude/src/AssetManager.cpp
  C:/Users/saurav/Desktop/Prelude/src/AssetManager.h
@@ -122,6 +123,7 @@ CMakeFiles/Prelude.dir/src/Collision.cpp.obj
  C:/Dev/SDL2/include/begin_code.h
  C:/Dev/SDL2/include/close_code.h
  C:/Dev/SDL2_image/include/SDL_image.h
+ C:/Dev/SDL2_mixer/include/SDL_mixer.h
  C:/Dev/SDL2_ttf/include/SDL_ttf.h
  C:/Users/saurav/Desktop/Prelude/src/Collision.cpp
  C:/Users/saurav/Desktop/Prelude/src/Collision.h
@@ -253,6 +255,7 @@ CMakeFiles/Prelude.dir/src/Map.cpp.obj
  C:/Dev/SDL2/include/begin_code.h
  C:/Dev/SDL2/include/close_code.h
  C:/Dev/SDL2_image/include/SDL_image.h
+ C:/Dev/SDL2_mixer/include/SDL_mixer.h
  C:/Dev/SDL2_ttf/include/SDL_ttf.h
  C:/Users/saurav/Desktop/Prelude/src/Game.h
  C:/Users/saurav/Desktop/Prelude/src/Map.cpp

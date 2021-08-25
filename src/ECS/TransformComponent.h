@@ -15,7 +15,7 @@ public:
 
     int height = 32;
     int width = 32;
-    int scale = 1;
+    float scale = 1;
 
     int health = 100;
 
@@ -37,7 +37,7 @@ public:
         acceleration.Zero();
     }
 
-    TransformComponent(float x, float y, int w, int h, int sc) {
+    TransformComponent(float x, float y, int w, int h, float sc) {
         position.x = x;
         position.y = y;
         height = h;

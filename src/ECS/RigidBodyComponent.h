@@ -18,8 +18,8 @@ public:
     }
 
     void update() override {
-        if(transform->velocity.y < 2000) {
-            transform->velocity.y += 60;
+        if(transform->velocity.y < 3000) {
+            transform->velocity.y += 68;
         }
     }
 };

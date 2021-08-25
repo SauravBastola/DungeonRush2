@@ -10,6 +10,7 @@ public:
 
 	void LoadMap(std::string path, int sizeX, int sizeY, int spriteRowSize);
     void LoadColliders(std::string colliderMapPath, std::string colliderMapData, int sizeX, int sizeY);
+    void Map::LoadCoins(const char* coinMapPath, int sizeX, int sizeY);
 	void AddTile(int srcX, int srcY, int xpos, int ypos);
 
 private:

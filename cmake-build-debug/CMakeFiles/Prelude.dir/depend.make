@@ -56,6 +56,7 @@ CMakeFiles\Prelude.dir\src\AssetManager.cpp.obj: C:\Dev\SDL2\include\SDL_video.h
 CMakeFiles\Prelude.dir\src\AssetManager.cpp.obj: C:\Dev\SDL2\include\begin_code.h
 CMakeFiles\Prelude.dir\src\AssetManager.cpp.obj: C:\Dev\SDL2\include\close_code.h
 CMakeFiles\Prelude.dir\src\AssetManager.cpp.obj: C:\Dev\SDL2_image\include\SDL_image.h
+CMakeFiles\Prelude.dir\src\AssetManager.cpp.obj: C:\Dev\SDL2_mixer\include\SDL_mixer.h
 CMakeFiles\Prelude.dir\src\AssetManager.cpp.obj: C:\Dev\SDL2_ttf\include\SDL_ttf.h
 CMakeFiles\Prelude.dir\src\AssetManager.cpp.obj: ..\src\AssetManager.cpp
 CMakeFiles\Prelude.dir\src\AssetManager.cpp.obj: ..\src\AssetManager.h
@@ -121,6 +122,7 @@ CMakeFiles\Prelude.dir\src\Collision.cpp.obj: C:\Dev\SDL2\include\SDL_video.h
 CMakeFiles\Prelude.dir\src\Collision.cpp.obj: C:\Dev\SDL2\include\begin_code.h
 CMakeFiles\Prelude.dir\src\Collision.cpp.obj: C:\Dev\SDL2\include\close_code.h
 CMakeFiles\Prelude.dir\src\Collision.cpp.obj: C:\Dev\SDL2_image\include\SDL_image.h
+CMakeFiles\Prelude.dir\src\Collision.cpp.obj: C:\Dev\SDL2_mixer\include\SDL_mixer.h
 CMakeFiles\Prelude.dir\src\Collision.cpp.obj: C:\Dev\SDL2_ttf\include\SDL_ttf.h
 CMakeFiles\Prelude.dir\src\Collision.cpp.obj: ..\src\Collision.cpp
 CMakeFiles\Prelude.dir\src\Collision.cpp.obj: ..\src\Collision.h
@@ -252,6 +254,7 @@ CMakeFiles\Prelude.dir\src\Map.cpp.obj: C:\Dev\SDL2\include\SDL_video.h
 CMakeFiles\Prelude.dir\src\Map.cpp.obj: C:\Dev\SDL2\include\begin_code.h
 CMakeFiles\Prelude.dir\src\Map.cpp.obj: C:\Dev\SDL2\include\close_code.h
 CMakeFiles\Prelude.dir\src\Map.cpp.obj: C:\Dev\SDL2_image\include\SDL_image.h
+CMakeFiles\Prelude.dir\src\Map.cpp.obj: C:\Dev\SDL2_mixer\include\SDL_mixer.h
 CMakeFiles\Prelude.dir\src\Map.cpp.obj: C:\Dev\SDL2_ttf\include\SDL_ttf.h
 CMakeFiles\Prelude.dir\src\Map.cpp.obj: ..\src\Game.h
 CMakeFiles\Prelude.dir\src\Map.cpp.obj: ..\src\Map.cpp

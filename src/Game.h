@@ -40,7 +40,8 @@ public:
 		groupColliders,
 		groupProjectiles,
 		groupHealth,
-		groupLabels
+		groupLabels,
+		groupCoins
 	};
 
 private:

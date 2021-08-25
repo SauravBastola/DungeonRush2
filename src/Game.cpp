@@ -8,6 +8,7 @@
 #include <sstream>
 
 #include <SDL_mixer.h>
+#include <fstream>
 
 extern float lastFrameTime;
 
@@ -31,10 +32,8 @@ auto &healthBar(manager.addEntity("healthBarStuff"));
 auto &label(manager.addEntity("label"));
 auto &scoreLabel(manager.addEntity("scoreLabel"));
 
-auto &testRectangle(manager.addEntity("testRect"));
-
 Game::Game() {
-    eventProcessTime["w"] = 0.92;
+    eventProcessTime["w"] = 0.88;
     currentEvents["w"] = false;
 }
 
@@ -67,6 +66,7 @@ void Game::init(const char *title, int width, int height, bool fullscreen) {
 
     assets->AddTexture("platformer", "assets/tileset/platformer.png");
     assets->AddTexture("player", "assets/player_sprites.png");
+    assets->AddTexture("coins", "assets/tileset/coins.png");
     assets->AddTexture("projectile", "assets/proj.png");
     assets->AddTexture("healthBarDecoration", "assets/health_bar_decoration.png");
     assets->AddTexture("healthBar", "assets/health_bar.png");
@@ -76,7 +76,10 @@ void Game::init(const char *title, int width, int height, bool fullscreen) {
     assets->AddFont("arial", "assets/arial.ttf", 16);
     assets->AddFont("firaCode", "assets/FiraCode-Regular.ttf", 32);
 
-    background = Mix_LoadMUS("assets/music.wav");
+    assets->AddSound("coinCollect", "assets/coinCollect.wav");
+    assets->AddSound("playerJump", "assets/playerJump.wav");
+
+    background = Mix_LoadMUS("assets/background_music.wav");
     Mix_PlayMusic(background, -1);
 
     map = new Map("platformer", 3, 32);
@@ -85,13 +88,14 @@ void Game::init(const char *title, int width, int height, bool fullscreen) {
     map->LoadMap("assets/tileset/DecorLayer.map", 150, 30, 18);
     map->LoadColliders("assets/tileset/Colliders.map",
                        "assets/tileset/ColliderData.txt", 150, 30);
+    map->LoadCoins("assets/tileset/CoinLayer.map", 150, 30);
 
     player.addComponent<TransformComponent>(10.0f, 1300.0f, 50, 37, 3);
     player.addComponent<RigidBodyComponent>();
     player.addComponent<SpriteComponent>("player", true);
     player.addComponent<ColliderComponent>("player");
-    player.addComponent<ScriptComponent>();
     player.addGroup(groupPlayers);
+
 
     healthBarDecoration.addComponent<TransformComponent>(15, 15, 64, 17, 4);
     healthBarDecoration.addComponent<SpriteComponent>("healthBarDecoration", false);
@@ -120,6 +124,7 @@ void Game::init(const char *title, int width, int height, bool fullscreen) {
 auto &tiles(manager.getGroup(Game::groupMap));
 auto &players(manager.getGroup(Game::groupPlayers));
 auto &colliders(manager.getGroup(Game::groupColliders));
+auto &coins(manager.getGroup(Game::groupCoins));
 auto &projectiles(manager.getGroup(Game::groupProjectiles));
 auto &healthStuff(manager.getGroup(Game::groupHealth));
 auto &labels(manager.getGroup(Game::groupLabels));
@@ -135,9 +140,10 @@ void Game::handleEvents() {
                 switch (event.key.keysym.sym) {
                     case SDLK_w:
                         if (currentEvents["w"] == false) {
-                            player.getComponent<TransformComponent>().velocity.y = -1500;
+                            player.getComponent<TransformComponent>().velocity.y = -1400;
                             eventInitTime["w"] = SDL_GetTicks();
                             currentEvents["w"] = true;
+                            Mix_PlayChannel(-1, assets->GetSound("playerJump"), 0);
                         }
                         break;
                     case SDLK_a:
@@ -193,11 +199,11 @@ void Game::update() {
     label.getComponent<UILabel>().SetLabelText(ss.str(), "arial");
 
     int scoreLabelPosOffset = 0;
-    if(gameScore < 10) {
-       scoreLabelPosOffset = 10;
-    } else if(gameScore < 100) {
+    if (gameScore < 10) {
+        scoreLabelPosOffset = 10;
+    } else if (gameScore < 100) {
         scoreLabelPosOffset = 20;
-    } else if(gameScore < 1000) {
+    } else if (gameScore < 1000) {
         scoreLabelPosOffset = 30;
     }
 
@@ -241,6 +247,14 @@ void Game::update() {
         }
     }
 
+    for (auto &c : coins) {
+        if (Collision::AABB(playerCol, c->getComponent<ColliderComponent>().collider)) {
+            gameScore += 10;
+            c->destroy();
+            Mix_PlayChannel(-1, assets->GetSound("coinCollect"), 0);
+        }
+    }
+
 
     for (auto &p : projectiles) {
         if (Collision::AABB(player.getComponent<ColliderComponent>().collider,
@@ -252,7 +266,7 @@ void Game::update() {
 
     healthBar.getComponent<TransformComponent>().width = 49 * player.getComponent<TransformComponent>().health / 100.0;
     healthBar.getComponent<TransformComponent>().position.x =
-             70 + 10 * (100 - player.getComponent<TransformComponent>().health) / 100.0;
+            70 + 10 * (100 - player.getComponent<TransformComponent>().health) / 100.0;
 
     manager.refresh();
     manager.update();
@@ -275,7 +289,7 @@ void Game::clearEventProcessing() {
         if (cEvent.second) {
             Uint32 currTicks = SDL_GetTicks();
             float time = (currTicks - eventInitTime[cEvent.first]) / 1000.0;
-            if (time < 0.2) {
+            if (time < 0.48) {
                 player.getComponent<SpriteComponent>().overridden = true;
                 player.getComponent<SpriteComponent>().Play("playerJump");
             } else {
@@ -302,6 +316,10 @@ void Game::render() {
         p->draw();
     }
 
+    for (auto &c : coins) {
+        c->draw();
+    }
+
     for (auto &p : projectiles) {
         p->draw();
     }
@@ -310,7 +328,7 @@ void Game::render() {
         h->draw();
     }
 
-    for(auto &l : labels) {
+    for (auto &l : labels) {
         l->draw();
     }
 
