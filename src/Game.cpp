@@ -10,7 +10,11 @@
 #include <SDL_mixer.h>
 #include <fstream>
 
+bool main_flag = true;
+
 extern float lastFrameTime;
+
+Uint32 healthInitTime = 0;
 
 Map *map;
 Manager manager;
@@ -54,6 +58,7 @@ void Game::init(const char *title, int width, int height, bool fullscreen) {
         }
 
         isRunning = true;
+
     }
 
     if (TTF_Init() == -1) {
@@ -74,13 +79,15 @@ void Game::init(const char *title, int width, int height, bool fullscreen) {
     assets->AddTexture("rect", "assets/ColTex.png");
 
     assets->AddFont("arial", "assets/arial.ttf", 16);
-    assets->AddFont("firaCode", "assets/FiraCode-Regular.ttf", 32);
+    assets->AddFont("firaCode16", "assets/FiraCode-Regular.ttf", 16);
+    assets->AddFont("firaCode32", "assets/FiraCode-Regular.ttf", 32);
 
     assets->AddSound("coinCollect", "assets/coinCollect.wav");
     assets->AddSound("playerJump", "assets/playerJump.wav");
 
     background = Mix_LoadMUS("assets/background_music.wav");
     Mix_PlayMusic(background, -1);
+
 
     map = new Map("platformer", 3, 32);
     map->LoadMap("assets/tileset/BackgroundLayer.map", 150, 30, 18);
@@ -108,10 +115,10 @@ void Game::init(const char *title, int width, int height, bool fullscreen) {
 
     SDL_Color white = {255, 255, 255, 255};
 
-    label.addComponent<UILabel>(1150, 10, "Test String", "arial", white);
+    label.addComponent<UILabel>(1060, 10, "Test String", "arial", white);
     label.addGroup(groupLabels);
 
-    scoreLabel.addComponent<UILabel>(665, 10, std::to_string(gameScore), "firaCode", white);
+    scoreLabel.addComponent<UILabel>(665, 10, std::to_string(gameScore), "firaCode32", white);
     scoreLabel.addGroup(groupLabels);
 
     assets->CreateProjectile(Vector2D(200, 1600), Vector2D(2 * 300, 0), 2000, 20, "projectile");
@@ -187,6 +194,11 @@ void Game::handleEvents() {
 
 void Game::update() {
 
+
+    if((SDL_GetTicks() - healthInitTime)/ 1000.0 > 0.1) {
+        player.getComponent<TransformComponent>().health -= 0.1;
+        healthInitTime = SDL_GetTicks();
+    }
     SDL_Rect playerCol = player.getComponent<ColliderComponent>().collider;
     sb::Rect player_col;
     player_col.pos = {static_cast<float>(playerCol.x), static_cast<float>(playerCol.y)};
@@ -196,7 +208,7 @@ void Game::update() {
 
     std::stringstream ss;
     ss << "Player position: " << playerPos;
-    label.getComponent<UILabel>().SetLabelText(ss.str(), "arial");
+    label.getComponent<UILabel>().SetLabelText(ss.str(), "firaCode16");
 
     int scoreLabelPosOffset = 0;
     if (gameScore < 10) {
@@ -208,7 +220,7 @@ void Game::update() {
     }
 
     scoreLabel.getComponent<UILabel>().position.x = 675 - scoreLabelPosOffset;
-    scoreLabel.getComponent<UILabel>().SetLabelText(std::to_string(gameScore), "firaCode");
+    scoreLabel.getComponent<UILabel>().SetLabelText(std::to_string(gameScore), "firaCode32");
 
     Vector2D contactPoint = {0, 0}, contactNormal = {0, 0};
     float contactTime = 0;
@@ -300,36 +312,71 @@ void Game::clearEventProcessing() {
             }
         }
     }
+
+
+    // Game Ending
+
+    if (player.getComponent<TransformComponent>().position.x > 14000 ||
+        player.getComponent<TransformComponent>().health <= 0) {
+
+        if (eflag) {
+            eStart = SDL_GetTicks();
+            eflag = false;
+        }
+        if (main_flag && (SDL_GetTicks() - eStart) / 1000.0 > 3) {
+
+            SDL_RenderClear(renderer);
+
+            SDL_Rect srcr = {0, 0, 450, 338}, destr = {0, 0, 1350, 850};
+            SDL_Surface *tempSurface = IMG_Load("assets/gameover.jpg");
+            SDL_Texture *tex = SDL_CreateTextureFromSurface(renderer, tempSurface);
+            SDL_FreeSurface(tempSurface);
+            SDL_RenderCopyEx(renderer, tex, &srcr, &destr, NULL, NULL, SDL_FLIP_NONE);
+            SDL_RenderPresent(renderer);
+
+
+            Mix_HaltMusic();
+            background = Mix_LoadMUS("assets/gameover.wav");
+            Mix_PlayMusic(background, -1);
+
+            main_flag = false;
+        }
+
+    }
+
+
 }
 
 void Game::render() {
-    SDL_RenderClear(renderer);
-    for (auto &t : tiles) {
-        t->draw();
-    }
+    if (main_flag) {
+        SDL_RenderClear(renderer);
+        for (auto &t : tiles) {
+            t->draw();
+        }
 
 //    for (auto &c : colliders) {
 //        c->draw();
 //    }
 
-    for (auto &p : players) {
-        p->draw();
-    }
+        for (auto &p : players) {
+            p->draw();
+        }
 
-    for (auto &c : coins) {
-        c->draw();
-    }
+        for (auto &c : coins) {
+            c->draw();
+        }
 
-    for (auto &p : projectiles) {
-        p->draw();
-    }
+        for (auto &p : projectiles) {
+            p->draw();
+        }
 
-    for (auto &h : healthStuff) {
-        h->draw();
-    }
+        for (auto &h : healthStuff) {
+            h->draw();
+        }
 
-    for (auto &l : labels) {
-        l->draw();
+        for (auto &l : labels) {
+            l->draw();
+        }
     }
 
     SDL_RenderPresent(renderer);

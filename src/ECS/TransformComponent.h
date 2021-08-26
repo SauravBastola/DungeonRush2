@@ -17,7 +17,7 @@ public:
     int width = 32;
     float scale = 1;
 
-    int health = 100;
+    float health = 100.0;
 
     int speed = 3;
 

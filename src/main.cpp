@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
 
 
     game = new Game();
-    game->init("GameWindow", 1350, 850, false);
+    game->init("DungeonRush", 1350, 850, false);
 
     gameStart = SDL_GetTicks();
     while (game->running()) {

@@ -32,6 +32,11 @@ public:
 	static bool isRunning;
 	static SDL_Rect camera;
 	static AssetManager* assets;
+
+	//game end state
+	Uint32 eStart;
+	bool eflag = true;
+
 	enum groupLabels : std::size_t
 	{
 		groupMap,
