@@ -4,172 +4,160 @@
 	<Project>
 		<Option title="Prelude"/>
 		<Option makefile_is_custom="1"/>
-		<Option compiler="msvc8"/>
+		<Option compiler="gcc"/>
 		<Option virtualFolders="CMake Files\;"/>
 		<Build>
 			<Target title="all">
-				<Option working_dir="C:/Users/saurav/Desktop/Prelude/cmake-build-debug"/>
+				<Option working_dir="/home/saurav/Desktop/Prelude/cmake-build-debug"/>
 				<Option type="4"/>
 				<MakeCommands>
-					<Build command="nmake /NOLOGO /f C:\Users\saurav\Desktop\Prelude\cmake-build-debug\Makefile VERBOSE=1 all"/>
-					<CompileFile command="nmake /NOLOGO /f C:\Users\saurav\Desktop\Prelude\cmake-build-debug\Makefile VERBOSE=1 &quot;$file&quot;"/>
-					<Clean command="nmake /NOLOGO /f C:\Users\saurav\Desktop\Prelude\cmake-build-debug\Makefile VERBOSE=1 clean"/>
-					<DistClean command="nmake /NOLOGO /f C:\Users\saurav\Desktop\Prelude\cmake-build-debug\Makefile VERBOSE=1 clean"/>
-				</MakeCommands>
-			</Target>
-			<Target title="Prelude">
-				<Option output="C:/Users/saurav/Desktop/Prelude/cmake-build-debug/Prelude.exe" prefix_auto="0" extension_auto="0"/>
-				<Option working_dir="C:/Users/saurav/Desktop/Prelude/cmake-build-debug"/>
-				<Option object_output="./"/>
-				<Option type="1"/>
-				<Option compiler="msvc8"/>
-				<Compiler>
-					<Add directory="C:/Users/saurav/Desktop/Prelude/src"/>
-					<Add directory="C:/Users/saurav/Desktop/Prelude/src/ECS"/>
-					<Add directory="C:/Dev/SDL2/include"/>
-					<Add directory="C:/Dev/SDL2_image/include"/>
-					<Add directory="C:/Dev/SDL2_ttf/include"/>
-					<Add directory="C:/Dev/SDL2_mixer/include"/>
-					<Add directory="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Tools\MSVC\14.28.29910\ATLMFC\include"/>
-					<Add directory="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Tools\MSVC\14.28.29910\include"/>
-					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.19041.0\ucrt"/>
-					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.19041.0\shared"/>
-					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.19041.0\um"/>
-					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.19041.0\winrt"/>
-					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.19041.0\cppwinrt"/>
-				</Compiler>
-				<MakeCommands>
-					<Build command="nmake /NOLOGO /f C:\Users\saurav\Desktop\Prelude\cmake-build-debug\Makefile VERBOSE=1 Prelude"/>
-					<CompileFile command="nmake /NOLOGO /f C:\Users\saurav\Desktop\Prelude\cmake-build-debug\Makefile VERBOSE=1 &quot;$file&quot;"/>
-					<Clean command="nmake /NOLOGO /f C:\Users\saurav\Desktop\Prelude\cmake-build-debug\Makefile VERBOSE=1 clean"/>
-					<DistClean command="nmake /NOLOGO /f C:\Users\saurav\Desktop\Prelude\cmake-build-debug\Makefile VERBOSE=1 clean"/>
-				</MakeCommands>
-			</Target>
-			<Target title="Prelude/fast">
-				<Option output="C:/Users/saurav/Desktop/Prelude/cmake-build-debug/Prelude.exe" prefix_auto="0" extension_auto="0"/>
-				<Option working_dir="C:/Users/saurav/Desktop/Prelude/cmake-build-debug"/>
-				<Option object_output="./"/>
-				<Option type="1"/>
-				<Option compiler="msvc8"/>
-				<Compiler>
-					<Add directory="C:/Users/saurav/Desktop/Prelude/src"/>
-					<Add directory="C:/Users/saurav/Desktop/Prelude/src/ECS"/>
-					<Add directory="C:/Dev/SDL2/include"/>
-					<Add directory="C:/Dev/SDL2_image/include"/>
-					<Add directory="C:/Dev/SDL2_ttf/include"/>
-					<Add directory="C:/Dev/SDL2_mixer/include"/>
-					<Add directory="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Tools\MSVC\14.28.29910\ATLMFC\include"/>
-					<Add directory="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Tools\MSVC\14.28.29910\include"/>
-					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.19041.0\ucrt"/>
-					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.19041.0\shared"/>
-					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.19041.0\um"/>
-					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.19041.0\winrt"/>
-					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.19041.0\cppwinrt"/>
-				</Compiler>
-				<MakeCommands>
-					<Build command="nmake /NOLOGO /f C:\Users\saurav\Desktop\Prelude\cmake-build-debug\Makefile VERBOSE=1 Prelude/fast"/>
-					<CompileFile command="nmake /NOLOGO /f C:\Users\saurav\Desktop\Prelude\cmake-build-debug\Makefile VERBOSE=1 &quot;$file&quot;"/>
-					<Clean command="nmake /NOLOGO /f C:\Users\saurav\Desktop\Prelude\cmake-build-debug\Makefile VERBOSE=1 clean"/>
-					<DistClean command="nmake /NOLOGO /f C:\Users\saurav\Desktop\Prelude\cmake-build-debug\Makefile VERBOSE=1 clean"/>
-				</MakeCommands>
-			</Target>
-			<Target title="edit_cache">
-				<Option working_dir="C:/Users/saurav/Desktop/Prelude/cmake-build-debug"/>
-				<Option type="4"/>
-				<MakeCommands>
-					<Build command="nmake /NOLOGO /f C:\Users\saurav\Desktop\Prelude\cmake-build-debug\Makefile VERBOSE=1 edit_cache"/>
-					<CompileFile command="nmake /NOLOGO /f C:\Users\saurav\Desktop\Prelude\cmake-build-debug\Makefile VERBOSE=1 &quot;$file&quot;"/>
-					<Clean command="nmake /NOLOGO /f C:\Users\saurav\Desktop\Prelude\cmake-build-debug\Makefile VERBOSE=1 clean"/>
-					<DistClean command="nmake /NOLOGO /f C:\Users\saurav\Desktop\Prelude\cmake-build-debug\Makefile VERBOSE=1 clean"/>
+					<Build command="/usr/bin/make -j8 -f &quot;/home/saurav/Desktop/Prelude/cmake-build-debug/Makefile&quot;  VERBOSE=1 all"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/home/saurav/Desktop/Prelude/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/home/saurav/Desktop/Prelude/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/home/saurav/Desktop/Prelude/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
 				</MakeCommands>
 			</Target>
 			<Target title="rebuild_cache">
-				<Option working_dir="C:/Users/saurav/Desktop/Prelude/cmake-build-debug"/>
+				<Option working_dir="/home/saurav/Desktop/Prelude/cmake-build-debug"/>
 				<Option type="4"/>
 				<MakeCommands>
-					<Build command="nmake /NOLOGO /f C:\Users\saurav\Desktop\Prelude\cmake-build-debug\Makefile VERBOSE=1 rebuild_cache"/>
-					<CompileFile command="nmake /NOLOGO /f C:\Users\saurav\Desktop\Prelude\cmake-build-debug\Makefile VERBOSE=1 &quot;$file&quot;"/>
-					<Clean command="nmake /NOLOGO /f C:\Users\saurav\Desktop\Prelude\cmake-build-debug\Makefile VERBOSE=1 clean"/>
-					<DistClean command="nmake /NOLOGO /f C:\Users\saurav\Desktop\Prelude\cmake-build-debug\Makefile VERBOSE=1 clean"/>
+					<Build command="/usr/bin/make -j8 -f &quot;/home/saurav/Desktop/Prelude/cmake-build-debug/Makefile&quot;  VERBOSE=1 rebuild_cache"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/home/saurav/Desktop/Prelude/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/home/saurav/Desktop/Prelude/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/home/saurav/Desktop/Prelude/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="edit_cache">
+				<Option working_dir="/home/saurav/Desktop/Prelude/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j8 -f &quot;/home/saurav/Desktop/Prelude/cmake-build-debug/Makefile&quot;  VERBOSE=1 edit_cache"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/home/saurav/Desktop/Prelude/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/home/saurav/Desktop/Prelude/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/home/saurav/Desktop/Prelude/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="Prelude">
+				<Option output="/home/saurav/Desktop/Prelude/bin/Prelude" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/saurav/Desktop/Prelude/bin"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add directory="/home/saurav/Desktop/Prelude/src"/>
+					<Add directory="/home/saurav/Desktop/Prelude/src/ECS"/>
+					<Add directory="/usr/include/SDL2"/>
+					<Add directory="/usr/include/c++/9"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/9"/>
+					<Add directory="/usr/include/c++/9/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/9/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+					<Add directory="/usr/include"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j8 -f &quot;/home/saurav/Desktop/Prelude/cmake-build-debug/Makefile&quot;  VERBOSE=1 Prelude"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/home/saurav/Desktop/Prelude/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/home/saurav/Desktop/Prelude/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/home/saurav/Desktop/Prelude/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="Prelude/fast">
+				<Option output="/home/saurav/Desktop/Prelude/bin/Prelude" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/saurav/Desktop/Prelude/bin"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add directory="/home/saurav/Desktop/Prelude/src"/>
+					<Add directory="/home/saurav/Desktop/Prelude/src/ECS"/>
+					<Add directory="/usr/include/SDL2"/>
+					<Add directory="/usr/include/c++/9"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/9"/>
+					<Add directory="/usr/include/c++/9/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/9/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+					<Add directory="/usr/include"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j8 -f &quot;/home/saurav/Desktop/Prelude/cmake-build-debug/Makefile&quot;  VERBOSE=1 Prelude/fast"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/home/saurav/Desktop/Prelude/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/home/saurav/Desktop/Prelude/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/home/saurav/Desktop/Prelude/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
 				</MakeCommands>
 			</Target>
 		</Build>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/AssetManager.cpp">
+		<Unit filename="/home/saurav/Desktop/Prelude/src/AssetManager.cpp">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/AssetManager.h">
+		<Unit filename="/home/saurav/Desktop/Prelude/src/AssetManager.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/Collision.cpp">
+		<Unit filename="/home/saurav/Desktop/Prelude/src/Collision.cpp">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/Collision.h">
+		<Unit filename="/home/saurav/Desktop/Prelude/src/Collision.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/ECS/Animation.h">
+		<Unit filename="/home/saurav/Desktop/Prelude/src/ECS/Animation.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/ECS/ColliderComponent.h">
+		<Unit filename="/home/saurav/Desktop/Prelude/src/ECS/ColliderComponent.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/ECS/Components.h">
+		<Unit filename="/home/saurav/Desktop/Prelude/src/ECS/Components.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/ECS/ECS.cpp">
+		<Unit filename="/home/saurav/Desktop/Prelude/src/ECS/ECS.cpp">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/ECS/ECS.h">
+		<Unit filename="/home/saurav/Desktop/Prelude/src/ECS/ECS.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/ECS/ProjectileComponent.h">
+		<Unit filename="/home/saurav/Desktop/Prelude/src/ECS/ProjectileComponent.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/ECS/RigidBodyComponent.h">
+		<Unit filename="/home/saurav/Desktop/Prelude/src/ECS/SpriteComponent.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/ECS/ScriptComponent.h">
+		<Unit filename="/home/saurav/Desktop/Prelude/src/ECS/TileComponent.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/ECS/SpriteComponent.h">
+		<Unit filename="/home/saurav/Desktop/Prelude/src/ECS/TransformComponent.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/ECS/TileComponent.h">
+		<Unit filename="/home/saurav/Desktop/Prelude/src/ECS/UILabel.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/ECS/TransformComponent.h">
+		<Unit filename="/home/saurav/Desktop/Prelude/src/Game.cpp">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/ECS/UILabel.h">
+		<Unit filename="/home/saurav/Desktop/Prelude/src/Game.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/Game.cpp">
+		<Unit filename="/home/saurav/Desktop/Prelude/src/Map.cpp">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/Game.h">
+		<Unit filename="/home/saurav/Desktop/Prelude/src/Map.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/Map.cpp">
+		<Unit filename="/home/saurav/Desktop/Prelude/src/TextureManager.cpp">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/Map.h">
+		<Unit filename="/home/saurav/Desktop/Prelude/src/TextureManager.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/TextureManager.cpp">
+		<Unit filename="/home/saurav/Desktop/Prelude/src/Vector2D.cpp">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/TextureManager.h">
+		<Unit filename="/home/saurav/Desktop/Prelude/src/Vector2D.h">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/Vector2D.cpp">
+		<Unit filename="/home/saurav/Desktop/Prelude/src/main.cpp">
 			<Option target="Prelude"/>
 		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/Vector2D.h">
-			<Option target="Prelude"/>
-		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/src/main.cpp">
-			<Option target="Prelude"/>
-		</Unit>
-		<Unit filename="C:/Users/saurav/Desktop/Prelude/CMakeLists.txt">
+		<Unit filename="/home/saurav/Desktop/Prelude/CMakeLists.txt">
 			<Option virtualFolder="CMake Files\"/>
 		</Unit>
 	</Project>

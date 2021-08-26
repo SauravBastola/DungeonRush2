@@ -7,7 +7,6 @@
 #include <map>
 
 class AssetManager;
-class ColliderComponent;
 
 class Game
 {
@@ -32,6 +31,10 @@ public:
 	static bool isRunning;
 	static SDL_Rect camera;
 	static AssetManager* assets;
+
+    bool mainFlag = true;
+    Uint32 healthTicks = 0;
+
 	enum groupLabels : std::size_t
 	{
 		groupMap,
@@ -46,6 +49,5 @@ public:
 
 private:
 
-	int cnt = 0;
 	SDL_Window *window;
 };

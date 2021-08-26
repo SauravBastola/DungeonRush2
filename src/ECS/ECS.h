@@ -60,7 +60,7 @@ private:
     GroupBitset groupBitset;
 
 public:
-    std::string tag = "";
+    std::string tag;
 
     Entity(Manager &mManager) : manager(mManager) {}
 

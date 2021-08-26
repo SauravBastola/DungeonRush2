@@ -1,4 +1,4 @@
-"D:\applications\CLion 2021.2\bin\cmake\win\bin\cmake.exe" -DCMAKE_BUILD_TYPE=Debug -DCMAKE_DEPENDS_USE_COMPILER=FALSE -G "CodeBlocks - NMake Makefiles" C:\Users\saurav\Desktop\Prelude
+/snap/clion/163/bin/cmake/linux/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_DEPENDS_USE_COMPILER=FALSE -G "CodeBlocks - Unix Makefiles" /home/saurav/Desktop/Prelude
 -- Configuring done
 -- Generating done
--- Build files have been written to: C:/Users/saurav/Desktop/Prelude/cmake-build-debug
+-- Build files have been written to: /home/saurav/Desktop/Prelude/cmake-build-debug

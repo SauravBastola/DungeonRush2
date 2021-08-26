@@ -19,7 +19,7 @@ private:
 
 public:
 
-    bool overridden = false;
+    bool isOverridden = false;
     int animIndex = 0;
     std::map<const std::string, Animation> animations;
 
@@ -41,6 +41,7 @@ public:
         animations.emplace("playerIdle", player_idle);
         animations.emplace("playerRun", player_run);
         animations.emplace("playerJump", player_jump);
+
 
         Play("playerIdle");
 
@@ -64,7 +65,7 @@ public:
 
     void update() override {
 
-        if (!overridden && entity->tag == "player") {
+        if (!isOverridden && entity->tag == "player") {
             if (transform->velocity.x != 0) {
                 Play("playerRun");
             } else {
@@ -90,7 +91,7 @@ public:
     }
 
     void draw() override {
-        if (overridden) {
+        if (isOverridden) {
             update();
         }
         TextureManager::Draw(texture, srcRect, destRect, spriteFlip);

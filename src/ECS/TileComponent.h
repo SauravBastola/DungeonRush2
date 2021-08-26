@@ -32,6 +32,7 @@ public:
 		destRect.w = destRect.h = tsize * tscale;
 	}
 
+
 	void update() override
 	{
 		destRect.x = static_cast<int>(position.x - Game::camera.x);

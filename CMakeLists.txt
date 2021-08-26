@@ -1,22 +1,20 @@
 cmake_minimum_required(VERSION 3.20)
+
 project(Prelude)
 
 set(CMAKE_CXX_STANDARD 14)
 
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
+
 include_directories(
         ${PROJECT_SOURCE_DIR}/src
         ${PROJECT_SOURCE_DIR}/src/ECS
-        C:/Dev/SDL2/include
-        C:/Dev/SDL2_image/include
-        C:/Dev/SDL2_ttf/include
-        C:/Dev/SDL2_mixer/include
+        /usr/include/SDL2
 )
 
 link_directories(
-        C:/Dev/SDL2/lib/x86
-        C:/Dev/SDL2_image/lib/x86
-        C:/Dev/SDL2_ttf/lib/x86
-        C:/Dev/SDL2_mixer/lib/x86
 )
 
 add_executable(
@@ -44,8 +42,6 @@ add_executable(
         src/ECS/TileComponent.h
         src/ECS/TransformComponent.h
         src/ECS/UILabel.h
-        src/ECS/RigidBodyComponent.h
-        src/ECS/ScriptComponent.h
 )
 
 target_link_libraries(Prelude SDL2main SDL2 SDL2_ttf SDL2_image SDL2_mixer)

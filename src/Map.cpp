@@ -5,6 +5,7 @@
 #include "Components.h"
 
 extern Manager manager;
+extern Entity player;
 
 Map::Map(std::string tID, int ms, int ts) : texID(tID), mapScale(ms), tileSize(ts) {
     scaledSize = ms * ts;
@@ -83,16 +84,20 @@ void Map::LoadCoins(const char* coinMapPath, int sizeX, int sizeY) {
     for (int y = 0; y < sizeY; y++) {
         for (int x = 0; x < sizeX; x++) {
             std::string val;
-            while (cFile.get(c) && c != ',' && c != '\n') {
-                val += c;
+            while (cFile.get(c)) {
+                if(c!=',' && c!='\n') {
+                    val += c;
+                } else {
+                    break;
+                }
             }
             int v = atoi(val.c_str());
-            if (v == 0) {
+            if (v == 1) {
                 auto &coin(manager.addEntity("coin"));
-                coin.addComponent<TransformComponent>(x * scaledSize, y * scaledSize, 61, 62, 1.3);
+                coin.addComponent<TransformComponent>(x * scaledSize, y * scaledSize, 61, 62, 1.2);
                 coin.addComponent<SpriteComponent>("coins", true);
                 coin.addComponent<ColliderComponent>("coin");
-                coin.addComponent<ScriptComponent>();
+                coin.addComponent<ScriptComponent>("coin", player);
                 coin.addGroup(Game::groupCoins);
             }
         }
