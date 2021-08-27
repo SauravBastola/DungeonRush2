@@ -6,6 +6,28 @@
 
 #IncludeRegexTransform: 
 
+../src/AssetManager.h
+map
+-
+string
+-
+TextureManager.h
+../src/TextureManager.h
+Vector2D.h
+../src/Vector2D.h
+ECS.h
+../src/ECS.h
+SDL_ttf.h
+../src/SDL_ttf.h
+SDL_mixer.h
+../src/SDL_mixer.h
+
+../src/Collision.h
+SDL.h
+-
+Vector2D.h
+../src/Vector2D.h
+
 ../src/ECS/Animation.h
 
 ../src/ECS/ColliderComponent.h
@@ -120,6 +142,32 @@ SDL_ttf.h
 string
 -
 
+../src/Game.h
+SDL.h
+../src/SDL.h
+SDL_image.h
+../src/SDL_image.h
+iostream
+-
+vector
+-
+map
+-
+
+../src/TextureManager.h
+Game.h
+../src/Game.h
+
+../src/Vector2D.h
+iostream
+-
+
+/home/saurav/Desktop/Prelude/src/AssetManager.cpp
+AssetManager.h
+/home/saurav/Desktop/Prelude/src/AssetManager.h
+Components.h
+/home/saurav/Desktop/Prelude/src/Components.h
+
 /home/saurav/Desktop/Prelude/src/AssetManager.h
 map
 -
@@ -135,6 +183,12 @@ SDL_ttf.h
 /home/saurav/Desktop/Prelude/src/SDL_ttf.h
 SDL_mixer.h
 /home/saurav/Desktop/Prelude/src/SDL_mixer.h
+
+/home/saurav/Desktop/Prelude/src/Collision.cpp
+Collision.h
+/home/saurav/Desktop/Prelude/src/Collision.h
+ColliderComponent.h
+/home/saurav/Desktop/Prelude/src/ColliderComponent.h
 
 /home/saurav/Desktop/Prelude/src/Collision.h
 SDL.h
@@ -175,6 +229,18 @@ vector
 -
 map
 -
+
+/home/saurav/Desktop/Prelude/src/Map.cpp
+Map.h
+/home/saurav/Desktop/Prelude/src/Map.h
+Game.h
+/home/saurav/Desktop/Prelude/src/Game.h
+fstream
+-
+ECS.h
+/home/saurav/Desktop/Prelude/src/ECS.h
+Components.h
+/home/saurav/Desktop/Prelude/src/Components.h
 
 /home/saurav/Desktop/Prelude/src/Map.h
 string

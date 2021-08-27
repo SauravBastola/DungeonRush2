@@ -39,6 +39,16 @@ auto& fpsdisplay(manager.addEntity("FPS"));
 Game::Game() {
     eventProcessTime["w"] = 0.88;
     currentEvents["w"] = false;
+    eventProcessTime["q"] = 0.88;
+    currentEvents["q"] = false;
+    eventProcessTime["e"] = 0.88;
+    currentEvents["e"] = false;
+    eventProcessTime["f"] = 0.88;
+    currentEvents["f"] = false;
+
+    currentEvents["qUp"] = true;
+    currentEvents["eUp"] = true;
+    currentEvents["fUp"] = true;
 }
 
 Game::~Game() {}
@@ -99,7 +109,7 @@ void Game::init(const char *title, int width, int height, bool fullscreen) {
     player.addComponent<TransformComponent>(10.0f, 1300.0f, 50, 37, 3);
     player.addComponent<RigidBodyComponent>();
     player.addComponent<SpriteComponent>("player", true);
-    player.addComponent<ColliderComponent>("player", 30, 37);
+    player.addComponent<ColliderComponent>("player", 22, 37);
     player.addGroup(groupPlayers);
 
     enemySkeleton.addComponent<TransformComponent>(200.0f, 1300.0f, 150, 150, 1.8);
@@ -171,6 +181,36 @@ void Game::handleEvents() {
                         break;
                     case SDLK_s:
                         break;
+                    case SDLK_q:
+                        if (currentEvents["q"] == false && currentEvents["e"] == false && currentEvents["f"] == false
+                            && currentEvents["qUp"]) {
+                            player.getComponent<ColliderComponent>().colliderWidth += 12;
+                            eventInitTime["q"] = SDL_GetTicks();
+                            currentEvents["q"] = true;
+                            currentEvents["qUp"] = false;
+//                            Mix_PlayChannel(-1, assets->GetSound("playerAttack"), 0);
+                        }
+                        break;
+                    case SDLK_e:
+                        if (currentEvents["e"] == false && currentEvents["q"] == false && currentEvents["f"] == false
+                            && currentEvents["eUp"]) {
+                            player.getComponent<ColliderComponent>().colliderWidth += 12;
+                            eventInitTime["e"] = SDL_GetTicks();
+                            currentEvents["e"] = true;
+                            currentEvents["eUp"] = false;
+//                            Mix_PlayChannel(-1, assets->GetSound("playerAttack"), 0);
+                        }
+                        break;
+                    case SDLK_f:
+                        if (currentEvents["f"] == false && currentEvents["e"] == false && currentEvents["q"] == false
+                            && currentEvents["fUp"]) {
+                            player.getComponent<ColliderComponent>().colliderWidth += 12;
+                            eventInitTime["f"] = SDL_GetTicks();
+                            currentEvents["f"] = true;
+                            currentEvents["fUp"] = false;
+//                            Mix_PlayChannel(-1, assets->GetSound("playerAttack"), 0);
+                        }
+                        break;
                     default:
                         break;
                 }
@@ -186,6 +226,24 @@ void Game::handleEvents() {
                         player.getComponent<TransformComponent>().velocity.x = 0;
                         break;
                     case SDLK_s:
+                        break;
+                    case SDLK_q:
+                        if (currentEvents["q"] && !currentEvents["qUp"]) {
+                            player.getComponent<ColliderComponent>().colliderWidth -= 12;
+                        }
+                        currentEvents["qUp"] = true;
+                        break;
+                    case SDLK_e:
+                        if (currentEvents["e"] && !currentEvents["eUp"]) {
+                            player.getComponent<ColliderComponent>().colliderWidth -= 12;
+                        }
+                        currentEvents["eUp"] = true;
+                        break;
+                    case SDLK_f:
+                        if (currentEvents["f"] && !currentEvents["fUp"]) {
+                            player.getComponent<ColliderComponent>().colliderWidth -= 12;
+                        }
+                        currentEvents["fUp"] = true;
                         break;
                     case SDLK_ESCAPE:
                         Game::isRunning = false;
@@ -345,6 +403,12 @@ void Game::update() {
         } else {
             e->getComponent<SpriteComponent>().isOverridden = false;
         }
+
+        if(currentEvents["q"] || currentEvents["e"] || currentEvents["f"]) {
+//            e->getComponent<TransformComponent>().health -= 20;
+//            std::cout << "Enemy Health :: " << e->getComponent<TransformComponent>().health << std::endl;
+        }
+
     }
 
     healthBar.getComponent<TransformComponent>().width = 49 * player.getComponent<TransformComponent>().health / 100.0;
@@ -372,14 +436,49 @@ void Game::clearEventProcessing() {
         if (cEvent.second) {
             Uint32 currTicks = SDL_GetTicks();
             float time = (currTicks - eventInitTime[cEvent.first]) / 1000.0;
-            if (time < 0.48) {
-                player.getComponent<SpriteComponent>().isOverridden = true;
-                player.getComponent<SpriteComponent>().Play("playerJump");
-            } else {
-                player.getComponent<SpriteComponent>().isOverridden = false;
-            }
-            if (time > eventProcessTime[cEvent.first]) {
-                cEvent.second = false;
+            if (cEvent.first == "w") {
+                if (time < 0.48) {
+                    player.getComponent<SpriteComponent>().isOverridden = true;
+                    player.getComponent<SpriteComponent>().Play("playerJump");
+                } else {
+                    player.getComponent<SpriteComponent>().isOverridden = false;
+                }
+                if (time > eventProcessTime[cEvent.first]) {
+                    currentEvents["w"] = false;
+                }
+            } else if (cEvent.first == "q") {
+                if (time < 0.4) {
+                    player.getComponent<SpriteComponent>().isOverridden = true;
+                    player.getComponent<SpriteComponent>().Play("playerAttack1");
+                } else {
+                    cEvent.second = false;
+                    player.getComponent<SpriteComponent>().isOverridden = false;
+                    if(currentEvents["qUp"] == false) {
+                        player.getComponent<ColliderComponent>().colliderWidth -= 12;
+                    }
+                }
+            } else if (cEvent.first == "e") {
+                if (time < 0.4) {
+                    player.getComponent<SpriteComponent>().isOverridden = true;
+                    player.getComponent<SpriteComponent>().Play("playerAttack2");
+                } else {
+                    cEvent.second = false;
+                    player.getComponent<SpriteComponent>().isOverridden = false;
+                    if(currentEvents["eUp"] == false) {
+                        player.getComponent<ColliderComponent>().colliderWidth -= 12;
+                    }
+                }
+            } else if (cEvent.first == "f") {
+                if (time < 0.4) {
+                    player.getComponent<SpriteComponent>().isOverridden = true;
+                    player.getComponent<SpriteComponent>().Play("playerAttack3");
+                } else {
+                    cEvent.second = false;
+                    player.getComponent<SpriteComponent>().isOverridden = false;
+                    if(currentEvents["fUp"] == false) {
+                        player.getComponent<ColliderComponent>().colliderWidth -= 12;
+                    }
+                }
             }
         }
     }
@@ -423,8 +522,6 @@ void Game::render() {
 }
 
 void Game::clean() {
-    Mix_FreeMusic(background);
-
     SDL_DestroyWindow(window);
     SDL_DestroyRenderer(renderer);
 

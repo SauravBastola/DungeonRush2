@@ -67,9 +67,9 @@ public:
 
                 if (entity->getComponent<TransformComponent>().position.x -
                     player.getComponent<TransformComponent>().position.x > 0) {
-                    entity->getComponent<TransformComponent>().velocity.x = -450;
+                    entity->getComponent<TransformComponent>().velocity.x = -200;
                 } else {
-                    entity->getComponent<TransformComponent>().velocity.x = 450;
+                    entity->getComponent<TransformComponent>().velocity.x = 200;
                 }
 
             } else {

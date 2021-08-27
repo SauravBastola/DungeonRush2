@@ -37,10 +37,16 @@ public:
         Animation player_idle = Animation(0, 3, 130);
         Animation player_run = Animation(1, 6, 100);
         Animation player_jump = Animation(5, 4, 120);
+        Animation player_attack1 = Animation(2, 5, 60);
+        Animation player_attack2 = Animation(3, 6, 60);
+        Animation player_attack3 = Animation(4, 6, 60);
 
         animations.emplace("playerIdle", player_idle);
         animations.emplace("playerRun", player_run);
         animations.emplace("playerJump", player_jump);
+        animations.emplace("playerAttack1", player_attack1);
+        animations.emplace("playerAttack2", player_attack2);
+        animations.emplace("playerAttack3", player_attack3);
 
 
         Play("playerIdle");
