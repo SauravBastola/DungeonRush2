@@ -15,6 +15,6 @@ Make sure you have met the following dependencies
 * SDL2_mixer
 
 **Run the build.sh file contained in the project directory by running the command**
-> bin/bash build.sh
+> /bin/bash build.sh
 >
 **You will find the binary in bin folder of the project directory**
