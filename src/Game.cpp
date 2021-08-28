@@ -49,6 +49,8 @@ Game::Game() {
     currentEvents["qUp"] = true;
     currentEvents["eUp"] = true;
     currentEvents["fUp"] = true;
+
+    currentEvents["handlingEnemyHealth"] = false;
 }
 
 Game::~Game() {}
@@ -104,7 +106,7 @@ void Game::init(const char *title, int width, int height, bool fullscreen) {
     map->LoadMap("../assets/tileset/DecorLayer.map", 150, 30, 18);
     map->LoadColliders("../assets/tileset/Colliders.map",
                        "../assets/tileset/ColliderData.txt", 150, 30);
-//    map->LoadCoins("../assets/tileset/CoinLayer.map", 150, 30);
+    map->LoadCoins("../assets/tileset/CoinLayer.map", 150, 30);
 
     player.addComponent<TransformComponent>(10.0f, 1300.0f, 50, 37, 3);
     player.addComponent<RigidBodyComponent>();
@@ -115,7 +117,7 @@ void Game::init(const char *title, int width, int height, bool fullscreen) {
     enemySkeleton.addComponent<TransformComponent>(200.0f, 1300.0f, 150, 150, 1.8);
     enemySkeleton.addComponent<RigidBodyComponent>();
     enemySkeleton.addComponent<SpriteComponent>("enemySkeleton", true);
-    enemySkeleton.addComponent<ColliderComponent>("enemySkeleton", 60, 60);
+    enemySkeleton.addComponent<ColliderComponent>("enemySkeleton", 50, 50);
     enemySkeleton.addComponent<ScriptComponent>("enemy", player);
     enemySkeleton.addGroup(groupEnemies);
 
@@ -188,6 +190,7 @@ void Game::handleEvents() {
                             eventInitTime["q"] = SDL_GetTicks();
                             currentEvents["q"] = true;
                             currentEvents["qUp"] = false;
+                            currentEvents["handlingEnemyHealth"] = true;
 //                            Mix_PlayChannel(-1, assets->GetSound("playerAttack"), 0);
                         }
                         break;
@@ -198,6 +201,7 @@ void Game::handleEvents() {
                             eventInitTime["e"] = SDL_GetTicks();
                             currentEvents["e"] = true;
                             currentEvents["eUp"] = false;
+                            currentEvents["handlingEnemyHealth"] = true;
 //                            Mix_PlayChannel(-1, assets->GetSound("playerAttack"), 0);
                         }
                         break;
@@ -208,6 +212,7 @@ void Game::handleEvents() {
                             eventInitTime["f"] = SDL_GetTicks();
                             currentEvents["f"] = true;
                             currentEvents["fUp"] = false;
+                            currentEvents["handlingEnemyHealth"] = true;
 //                            Mix_PlayChannel(-1, assets->GetSound("playerAttack"), 0);
                         }
                         break;
@@ -404,9 +409,10 @@ void Game::update() {
             e->getComponent<SpriteComponent>().isOverridden = false;
         }
 
-        if(currentEvents["q"] || currentEvents["e"] || currentEvents["f"]) {
-//            e->getComponent<TransformComponent>().health -= 20;
-//            std::cout << "Enemy Health :: " << e->getComponent<TransformComponent>().health << std::endl;
+        if((currentEvents["q"] || currentEvents["e"] || currentEvents["f"]) && currentEvents["handlingEnemyHealth"]) {
+            e->getComponent<TransformComponent>().health -= 10;
+            currentEvents["handlingEnemyHealth"] = false;
+            std::cout << "Enemy Health :: " << e->getComponent<TransformComponent>().health << std::endl;
         }
 
     }

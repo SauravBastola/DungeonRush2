@@ -58,6 +58,17 @@ public:
             collider.h = colliderHeight * transform->scale;
         }
 
+        if (tag != "terrain") {
+            collider.x = static_cast<int>(transform->position.x);
+            collider.x += (transform->width - colliderWidth) * transform->scale / 2.0;
+            collider.y = static_cast<int>(transform->position.y);
+            collider.y += (transform->height - colliderHeight) * transform->scale / 2.0;
+            collider.w =colliderWidth * transform->scale;
+            collider.h = colliderHeight * transform->scale;
+            destR.w = colliderWidth * transform->scale;
+            destR.h = colliderHeight * transform->scale;
+        }
+
         tex = TextureManager::LoadTexture("../assets/sprites/ColTex.png");
         srcR = {0, 0, 32, 32};
         destR = {collider.x, collider.y, collider.w, collider.h};

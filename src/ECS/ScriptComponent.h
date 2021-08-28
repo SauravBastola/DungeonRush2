@@ -28,7 +28,7 @@ public:
             entity->getComponent<SpriteComponent>().animations.emplace("enemySkeletonAttack", Animation(2, 8, 100));
             entity->getComponent<SpriteComponent>().animations.emplace("enemySkeletonShield", Animation(3, 4, 100));
             entity->getComponent<SpriteComponent>().animations.emplace("enemySkeletonTakeHit", Animation(4, 4, 100));
-            entity->getComponent<SpriteComponent>().animations.emplace("enemySkeletonDie", Animation(5, 4, 100));
+            entity->getComponent<SpriteComponent>().animations.emplace("enemySkeletonDie", Animation(5, 4, 200));
             entity->getComponent<SpriteComponent>().Play("enemySkeletonIdle");
 
         }
@@ -74,6 +74,19 @@ public:
 
             } else {
                 entity->getComponent<TransformComponent>().velocity.x = 0;
+            }
+
+            if(entity->getComponent<TransformComponent>().health <= 0) {
+                entity->getComponent<SpriteComponent>().isOverridden = true;
+                entity->getComponent<SpriteComponent>().Play("enemySkeletonDie");
+                if(isHandlingAction == false) {
+                    actionInitTime = SDL_GetTicks();
+                    isHandlingAction = true;
+                } else {
+                   if((SDL_GetTicks() - actionInitTime) / 1000.0 > 0.8) {
+                       entity->destroy();
+                   }
+                }
             }
 
 
