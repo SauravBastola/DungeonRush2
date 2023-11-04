@@ -34,6 +34,9 @@ public:
 
     bool mainFlag = true;
     Uint32 healthTicks = 0;
+	//game end state
+	Uint32 eStart;
+	bool eflag = true;
 
 	enum groupLabels : std::size_t
 	{

@@ -10,7 +10,11 @@
 #include <SDL_mixer.h>
 #include <fstream>
 
+bool main_flag = true;
+
 extern float lastFrameTime;
+
+Uint32 healthInitTime = 0;
 
 Map *map;
 Manager manager;
@@ -70,6 +74,7 @@ void Game::init(const char *title, int width, int height, bool fullscreen) {
         }
 
         isRunning = true;
+
     }
 
     if (TTF_Init() == -1) {
@@ -99,6 +104,7 @@ void Game::init(const char *title, int width, int height, bool fullscreen) {
 
     background = Mix_LoadMUS("../assets/sounds/background_music.wav");
     Mix_PlayMusic(background, -1);
+
 
     map = new Map("platformer", 3, 32);
     map->LoadMap("../assets/tileset/BackgroundLayer.map", 150, 30, 18);
@@ -488,40 +494,75 @@ void Game::clearEventProcessing() {
             }
         }
     }
+
+
+    // Game Ending
+
+    if (player.getComponent<TransformComponent>().position.x > 14000 ||
+        player.getComponent<TransformComponent>().health <= 0) {
+
+        if (eflag) {
+            eStart = SDL_GetTicks();
+            eflag = false;
+        }
+        if (main_flag && (SDL_GetTicks() - eStart) / 1000.0 > 3) {
+
+            SDL_RenderClear(renderer);
+
+            SDL_Rect srcr = {0, 0, 450, 338}, destr = {0, 0, 1350, 850};
+            SDL_Surface *tempSurface = IMG_Load("../assets/sprites/gameover.jpg");
+            SDL_Texture *tex = SDL_CreateTextureFromSurface(renderer, tempSurface);
+            SDL_FreeSurface(tempSurface);
+            SDL_RenderCopyEx(renderer, tex, &srcr, &destr, NULL, NULL, SDL_FLIP_NONE);
+            SDL_RenderPresent(renderer);
+
+
+            Mix_HaltMusic();
+            background = Mix_LoadMUS("../assets/sounds/gameover.wav");
+            Mix_PlayMusic(background, -1);
+
+            main_flag = false;
+        }
+
+    }
+
+
 }
 
 void Game::render() {
-    SDL_RenderClear(renderer);
-    for (auto& t: tiles) {
-        t->draw();
-    }
+    if (main_flag) {
+        SDL_RenderClear(renderer);
+        for (auto& t: tiles) {
+            t->draw();
+        }
 
-    for (auto& c: colliders) {
-        c->draw();
-    }
+        for (auto& c: colliders) {
+            c->draw();
+        }
 
-    for (auto& e: enemies) {
-        e->draw();
-    }
+        for (auto& e: enemies) {
+            e->draw();
+        }
 
-    for (auto& p: players) {
-        p->draw();
-    }
+        for (auto& p: players) {
+            p->draw();
+        }
 
-    for (auto& c: coins) {
-        c->draw();
-    }
+        for (auto& c: coins) {
+            c->draw();
+        }
 
-    for (auto& p: projectiles) {
-        p->draw();
-    }
+        for (auto& p: projectiles) {
+            p->draw();
+        }
 
-    for (auto& h: healthStuff) {
-        h->draw();
-    }
+        for (auto& h: healthStuff) {
+            h->draw();
+        }
 
-    for (auto& l: labels) {
-        l->draw();
+        for (auto& l: labels) {
+            l->draw();
+        }
     }
 
     SDL_RenderPresent(renderer);
