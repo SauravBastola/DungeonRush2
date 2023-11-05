@@ -1,0 +1,16 @@
+# Build output
+build/
+bin/
+lib/
+cmake-build-*/
+
+# Object files and binaries
+*.o
+*.obj
+*.exe
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store

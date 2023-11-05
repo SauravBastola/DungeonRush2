@@ -10,13 +10,13 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
 
 SET(CMAKE_BUILD_TYPE Debug)
 
+# Find SDL2 and its add-ons with pkg-config (Linux and Homebrew on macOS).
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2 SDL2_image SDL2_ttf SDL2_mixer)
+
 include_directories(
         ${PROJECT_SOURCE_DIR}/src
         ${PROJECT_SOURCE_DIR}/src/ECS
-        /usr/include/SDL2
-)
-
-link_directories(
 )
 
 add_executable(
@@ -46,4 +46,4 @@ add_executable(
         src/ECS/UILabel.h
 )
 
-target_link_libraries(Prelude SDL2main SDL2 SDL2_ttf SDL2_image SDL2_mixer)
+target_link_libraries(Prelude PkgConfig::SDL2)

@@ -1,3 +1,0 @@
-/home/saurav/Desktop/Prelude/cmake-build-debug/CMakeFiles/rebuild_cache.dir
-/home/saurav/Desktop/Prelude/cmake-build-debug/CMakeFiles/edit_cache.dir
-/home/saurav/Desktop/Prelude/cmake-build-debug/CMakeFiles/Prelude.dir
