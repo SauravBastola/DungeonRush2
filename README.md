@@ -4,7 +4,7 @@
 ## Apollo 
 **Apollo is a 2D game engine that implements ECS and has useful utility functions for 2D rendering and loading assets**
 
-![DungeonRush](https://github.com/SauravBastola/Prelude/blob/test/assets/DungeonRush.png)
+![DungeonRush](https://github.com/SauravBastola/DungeonRush2/blob/main/assets/DungeonRush.png)
 
 ## Build
 #### To build on linux platforms
