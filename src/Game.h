@@ -74,6 +74,10 @@ public:
     float wallJumpLockT = 0.f;
     bool  wallSliding = false;
     float wallDustT = 0.f;
+    // Batch C: parry
+    float parryT = 0.f, parryCooldown = 0.f;
+    bool  parryHit = false;           // the current window already landed
+    int   parriesLanded = 0;          // run stat (and what the harness reads)
     float dashTrailTimer = 0.f;     // paces the dash afterimages
     float speedBoostTimer = 0.f;
     float invincibleTimer = 0.f;
@@ -156,6 +160,11 @@ private:
     int  wallContact() const;          // -1 wall on the left, +1 right, 0 none
     void setSlideHitbox(bool low);
     bool fullHeightFits() const;
+    void startParry();
+    SDL_Rect parryZone() const;
+    void stepParry();                  // stagger enemies in the zone
+    bool tryReflect(Entity& shot);     // true: the shot was parried
+    void drawParryShield();
 public:
     // Batch B: stages (public: the harness and a future level select use it)
     void loadStage(int n);

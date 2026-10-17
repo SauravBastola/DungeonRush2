@@ -371,6 +371,7 @@ void Game::spawnPlayer() {
     sp.addAnim("fall",   Animation(5, 2, 110, 2));     // cols 2-3: descent
     sp.addAnim("leap",   Animation(5, 1, 100, 1));     // dash pose: stretched
     sp.addAnim("slide",  Animation(4, 1, 100, 1));     // Batch C: thrust crouch, low
+    sp.addAnim("parry",  Animation(3, 1, 100, 1));     // Batch C: blade across the body
     // The three distinct sword attacks the sheet provides.
     sp.addAnim("attackPower", Animation(2, 5, 62));    // row 2, the big arc
     sp.addAnim("attackSlash", Animation(3, 6, 52));    // row 3, horizontal
@@ -660,6 +661,8 @@ void Game::handlePlayerInput() {
         }
     }
     if (wallJumpLockT > 0) wallJumpLockT -= lastFrameTime;
+    if (parryCooldown > 0) parryCooldown -= lastFrameTime;
+    if (parryT > 0) { parryT -= lastFrameTime; stepParry(); pTr.velocity.x *= 0.85f; }
 
     if (slideT > 0.f || wallJumpLockT > 0.f) {
         // slide owns the horizontal speed; a fresh wall-jump keeps its kick
@@ -915,6 +918,7 @@ void Game::updatePlayerAnimation() {
     if (hp.dead)            { sp.Play("die");  return; }
     if (dashActive)         { sp.Play("leap"); return; }
     if (slideT > 0.f)       { sp.Play("slide"); return; }      // Batch C
+    if (parryT > 0.f)       { sp.Play("parry"); return; }      // Batch C
     if (diving)             { sp.Play("attackThrust"); return; }
 
     if (!isGrounded) {
@@ -981,6 +985,102 @@ bool Game::fullHeightFits() const {
         if (c->hasComponent<ColliderComponent>() &&
             SDL_HasIntersection(&full, &c->getComponent<ColliderComponent>().collider)) return false;
     return true;
+}
+
+// ---- Batch C: parry -------------------------------------------------------
+void Game::startParry() {
+    if (state != State::Playing || parryCooldown > 0.f || slideT > 0.f) return;
+    auto& p = *manager.getGroup(groupPlayers)[0];
+    parryT = Config::PARRY_WINDOW;
+    parryCooldown = Config::PARRY_WINDOW + Config::PARRY_RECOVER;   // shortened on a hit
+    parryHit = false;
+    // the window negates damage: Damage::applyToPlayer gates on hp.iframes
+    auto& hp = p.getComponent<HealthComponent>();
+    hp.iframes = std::max(hp.iframes, Config::PARRY_WINDOW);
+    if (auto* s = assets->GetSound("dash")) Mix_PlayChannel(-1, s, 0);
+}
+
+// The hero's hitbox plus PARRY_REACH px on the side it faces.
+SDL_Rect Game::parryZone() const {
+    auto& p = *manager.getGroup(groupPlayers)[0];
+    SDL_Rect z = p.getComponent<ColliderComponent>().collider;
+    const int reach = (int)Config::PARRY_REACH;
+    z.w += reach;
+    if (!facingRight) z.x -= reach;
+    z.y -= 6; z.h += 12;
+    return z;
+}
+
+static void parryLanded(Game& g, float x, float y) {
+    g.parryHit = true;
+    g.parriesLanded++;
+    g.parryCooldown = std::min(g.parryCooldown, 0.12f);     // reward: chain them
+    g.hitStop = std::max(g.hitStop, 0.06f);
+    Vfx::impactRing(x, y, 249, 230, 207, 44.f, 0.22f);
+    Particles::emitHitSparks(x, y);
+    if (auto* s = Game::assets->GetSound("powerup")) Mix_PlayChannel(-1, s, 0);
+}
+
+void Game::stepParry() {
+    const SDL_Rect z = parryZone();
+    for (auto* e : manager.getGroup(groupEnemies)) {
+        if (!e->isActive() || !e->hasComponent<ColliderComponent>() ||
+            !e->hasComponent<EnemyAIComponent>()) continue;
+        if (!SDL_HasIntersection(&z, &e->getComponent<ColliderComponent>().collider)) continue;
+        auto& ai = e->getComponent<EnemyAIComponent>();
+        const bool boss = ai.kind == EnemyAIComponent::Kind::Boss;
+        if (ai.hurtT >= (boss ? Config::PARRY_STUN / 3.f : Config::PARRY_STUN) * 0.5f) continue;
+        ai.hurtT = std::max(ai.hurtT, boss ? Config::PARRY_STUN / 3.f : Config::PARRY_STUN);
+        auto& et = e->getComponent<TransformComponent>();
+        et.velocity.x = (facingRight ? 1.f : -1.f) * (boss ? 120.f : 260.f);
+        if (e->hasComponent<SpriteComponent>()) e->getComponent<SpriteComponent>().flash(0.15f);
+        parryLanded(*this, z.x + (facingRight ? z.w : 0), z.y + z.h / 2.f);
+    }
+}
+
+bool Game::tryReflect(Entity& shot) {
+    if (parryT <= 0.f || !shot.hasComponent<ColliderComponent>()) return false;
+    const SDL_Rect z = parryZone();
+    if (!SDL_HasIntersection(&z, &shot.getComponent<ColliderComponent>().collider)) return false;
+    auto& pc = shot.getComponent<ProjectileComponent>();
+    auto& tr = shot.getComponent<TransformComponent>();
+    const float speed = std::sqrt(tr.velocity.x * tr.velocity.x + tr.velocity.y * tr.velocity.y)
+                        * Config::PARRY_SHOT_SPEED;
+    // back at whoever fired it, if it is still around; otherwise straight back
+    float dx = -tr.velocity.x, dy = -tr.velocity.y;
+    if (pc.owner && pc.owner->isActive() && pc.owner->hasComponent<TransformComponent>()) {
+        auto& ot = pc.owner->getComponent<TransformComponent>();
+        dx = (ot.position.x + ot.width * ot.scale * 0.5f) - tr.position.x;
+        dy = (ot.position.y + ot.height * ot.scale * 0.5f) - tr.position.y;
+    }
+    const float len = std::max(1.f, std::sqrt(dx * dx + dy * dy));
+    tr.velocity = Vector2D(dx / len * speed, dy / len * speed);
+    pc.velocity = tr.velocity;
+    tr.facingRight = tr.velocity.x > 0;
+    pc.ownerTag = "player";
+    pc.owner = manager.getGroup(groupPlayers)[0];
+    pc.damage *= Config::PARRY_SHOT_DAMAGE;
+    pc.stunT = std::max(pc.stunT, 0.6f);
+    pc.gravity = false;
+    pc.dead.clear();
+    parryLanded(*this, tr.position.x, tr.position.y);
+    return true;
+}
+
+// A bright shield on the facing side while the window is open.
+void Game::drawParryShield() {
+    if (parryT <= 0.f) return;
+    const SDL_Rect z = parryZone();
+    const int x = (facingRight ? z.x + z.w - 6 : z.x) - camera.x, y = z.y - camera.y;
+    const Uint8 a = (Uint8)(120 + 135 * (parryT / Config::PARRY_WINDOW));
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, 0xf9, 0xe6, 0xcf, a);          // CREAM
+    SDL_Rect bar{ x, y + 4, 4, z.h - 8 };
+    SDL_RenderFillRect(renderer, &bar);
+    SDL_SetRenderDrawColor(renderer, 0x00, 0x98, 0xdc, a);          // WATER rim
+    SDL_Rect rim{ x + (facingRight ? 4 : -2), y + 10, 2, z.h - 20 };
+    SDL_RenderFillRect(renderer, &rim);
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 }
 
 void Game::startJump() {
@@ -1100,6 +1200,7 @@ void Game::respawn() {
     hp.iframes = Config::RESPAWN_INVULN;
     dashActive = false;
     slideT = 0.f; slideCooldown = 0.f; wallJumpLockT = 0.f; wallSliding = false;
+    parryT = 0.f; parryCooldown = 0.f; parryHit = false;
     setSlideHitbox(false);                 // Batch C: never respawn crouched
     iframeTimer = Config::RESPAWN_INVULN;
     // A death should not leave the hero mid-swing or holding a stale combo.
@@ -1428,6 +1529,7 @@ void Game::update() {
                 }
             }
         } else {
+            if (tryReflect(*pr)) continue;            // Batch C: parried
             if (Collision::AABB(col, player.getComponent<ColliderComponent>().collider)) {
                 // same funnel as contact damage, so a shield charge eats an
                 // arrow or a shockwave exactly like it eats a skeleton's touch
@@ -1768,6 +1870,7 @@ void Game::handleEvents() {
                 // Dash moved off K: J/K/L is now melee / ranged / dash, which
                 // is what makes the three-attack split reachable with one hand.
                 case SDLK_LSHIFT: case SDLK_RSHIFT: case SDLK_l: startDash(); break;
+                case SDLK_u: case SDLK_c: startParry(); break;          // Batch C
                 case SDLK_p:
                     if (state == State::Playing) { state = State::Paused; isPaused = true; }
                     else if (state == State::Paused) { state = State::Playing; isPaused = false; }
@@ -2035,6 +2138,7 @@ void Game::drawWorld() {
     }
     // player
     for (auto* p : manager.getGroup(groupPlayers)) p->draw();
+    drawParryShield();                                      // Batch C
     // projectiles
     for (auto* p : manager.getGroup(groupProjectiles)) p->draw();
     // particles on top
@@ -2653,6 +2757,7 @@ namespace {
         { "Wall Jump",      "Wall Rebound",     "Touch any wall while airborne and press Jump to rebound upward." },
         { "Into a wall",    "Wall Slide",       "Hold toward a wall while falling to slide down it slowly; jump to kick off." },
         { "S / Down",       "Slide",            "On the ground while moving: a fast low slide that dodges shots overhead." },
+        { "U / C",          "Parry",            "Block just as a hit lands: shots fly back at the shooter, attackers stagger." },
     };
 
     static const HelpItem ITEMS_COMBAT[] = {

@@ -72,6 +72,14 @@ namespace Config {
     constexpr float SLIDE_TIME         = 0.32f;
     constexpr float SLIDE_COOLDOWN     = 0.45f;
     constexpr int   SLIDE_H            = 26;       // hitbox height while sliding
+    // Batch C: parry (U / C).  A short window that negates hits, reflects
+    // enemy shots back at their shooter and staggers whoever is in front.
+    constexpr float PARRY_WINDOW       = 0.20f;
+    constexpr float PARRY_RECOVER      = 0.40f;    // added on a whiff
+    constexpr float PARRY_REACH        = 24.f;     // px in front of the hitbox
+    constexpr float PARRY_STUN         = 0.90f;    // boss gets a third
+    constexpr float PARRY_SHOT_SPEED   = 1.3f;     // reflected shot speed x
+    constexpr float PARRY_SHOT_DAMAGE  = 1.5f;     // reflected shot damage x
 
     // ---- dash ----
     constexpr float DASH_SPEED         = 720.f;
