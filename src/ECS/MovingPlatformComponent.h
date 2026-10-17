@@ -23,7 +23,14 @@ public:
     void init() override {
         startPos = entity->getComponent<TransformComponent>().position;
     }
-    void update() override {
+    // Batch C: a platform moves exactly once per frame, from
+    // Physics::stepPlatforms() (right before the hero is carried).  It used to
+    // move three times - this update() from the ECS, the same call again from
+    // stepPlatforms, and TransformComponent integrating its velocity - and the
+    // two reversal checks per frame undid each other at the end of the run, so
+    // platforms never turned round and drifted thousands of pixels away.
+    void update() override {}
+    void step() {
         auto& tr = entity->getComponent<TransformComponent>();
         float step = speed * lastFrameTime * dir;
         tr.position.x += axis.x * step;

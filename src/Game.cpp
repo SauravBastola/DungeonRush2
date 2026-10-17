@@ -609,6 +609,9 @@ void Game::spawnPlatform(int col, int row, int w, int h,
         Vector2D axis = vertical ? Vector2D(0, 1) : Vector2D(1, 0);
         p.addComponent<MovingPlatformComponent>(
             Vector2D(px, py), axis, range, speed);
+        // the platform component owns the motion; the transform must not also
+        // integrate the velocity (that is only there for the carry)
+        p.getComponent<TransformComponent>().physicsOwnsMotion = true;
     }
     p.addGroup(groupPlatforms);
     p.addGroup(groupColliders);

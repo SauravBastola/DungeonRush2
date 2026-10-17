@@ -122,7 +122,7 @@ MoveResult moveAndCollideOneWay(Entity& e, const std::vector<SDL_Rect>& oneWays)
 void stepPlatforms(std::vector<Entity*>& platforms) {
     for (auto* p : platforms) {
         if (p->hasComponent<MovingPlatformComponent>())
-            p->getComponent<MovingPlatformComponent>().update();
+            p->getComponent<MovingPlatformComponent>().step();
     }
 }
 
