@@ -1,0 +1,1611 @@
+#!/usr/bin/env python3
+"""
+DungeonRush2 level generator.
+
+Single source of truth for the world geometry. Emits:
+  - assets/tileset/ForegroundLayer.map  (terrain, -11 for sky)
+  - assets/tileset/BackgroundLayer.map  (parallax filler)
+  - assets/tileset/DecorLayer.map       (sparse props: rocks, crystals, lamps)
+  - assets/tileset/CoinLayer.map        (0/1 per tile)
+  - assets/tileset/Colliders.txt        (one `x y w h` rect per line, tile units)
+  - src/Level.h                         (C++ spawn data, tile units)
+
+All coordinates inside the generator are in TILE units. Colliders are
+auto-derived from the terrain heightmap + explicit platform rects so
+visuals and physics can never disagree.
+
+PLAYABILITY
+-----------
+The level used to be mathematically unplayable: it asked the hero to climb
+2- and 4-tile walls and clear 4- and 5-tile gaps.  Those numbers are not
+matters of taste, they come straight out of the physics in Config.h:
+
+    jump height  = v^2 / 2g   = 620^2 / 4000       =  96 px  = 1.50 tiles
+    jump length  = speed * 2v/g = 280 * 0.62 s     = 174 px  = 2.71 tiles
+
+so anything steeper than ONE tile up, or wider than TWO tiles across, is a
+wall.  Every obstacle below is generated against those two limits and then
+re-verified by `validate_level()`, which walks the heightmap and refuses to
+emit a level that cannot be finished.
+"""
+import math
+import os
+import sys
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Tuple
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Object ids, parsed from src/Objects.h so the two generators cannot drift.
+OBJ_IDS: Dict[str, int] = {}
+
+# ---------------------------------------------------------------------------
+# Traversal limits (see module docstring for the derivation)
+#
+# These are READ OUT OF Config.h rather than copied.  The level used to drift
+# out of sync with the physics — the generator happily emitted 2-tile walls
+# for a hero that could only clear 1.5 tiles — so the numbers now have
+# exactly one home and this script refuses to emit an impossible level.
+# ---------------------------------------------------------------------------
+import re
+
+CONFIG_H = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "src", "Config.h")
+
+
+def _read_config_float(name: str, default: float) -> float:
+    try:
+        with open(CONFIG_H) as f:
+            txt = f.read()
+        m = re.search(rf"constexpr\s+float\s+{name}\s*=\s*(-?[0-9.]+)f", txt)
+        return float(m.group(1)) if m else default
+    except OSError:
+        return default
+
+
+TILE         = 64
+JUMP_VEL     = abs(_read_config_float("PLAYER_JUMP_VEL", 900.0))
+GRAVITY      = _read_config_float("PLAYER_GRAVITY", 2000.0)
+RUN_SPEED    = _read_config_float("PLAYER_SPEED", 280.0)
+
+JUMP_HEIGHT  = (JUMP_VEL ** 2) / (2 * GRAVITY)          # px
+JUMP_LENGTH  = RUN_SPEED * (2 * JUMP_VEL / GRAVITY)     # px
+
+# Leave a little margin rather than aiming at the exact limit: a jump that
+# only just clears a ledge feels bad and breaks the moment anything is tuned.
+MAX_STEP_UP  = max(1, int(JUMP_HEIGHT // TILE) - 1)   # tiles the hero can climb
+MAX_GAP      = max(1, int(JUMP_LENGTH // TILE) - 1)   # tiles the hero can clear
+
+# ---------------------------------------------------------------------------
+# Tile IDs — platformer.png, 9 cols x 5 rows of 64 px (45 cells, 36 usable)
+#
+# Indices are row * 9 + col.  Every entry below was established by measuring
+# the PNG: per-cell fill fraction, the opaque-pixel count on each of the four
+# edges, the dominant palette colour, and the shape of the alpha silhouette.
+#
+# The previous table was guessed from colour alone and got several tiles
+# badly wrong -- it called tile 40 a "crystal" and tile 41 a "chest" when they
+# are the BOTTOM halves of the two trees, and it called 31 a "plant" when it
+# is the TOP half of the green tree.  That is how the level ended up strewn
+# with severed tree parts standing in for crystals.
+#
+# The sheet's one hard constraint, measured directly:
+#
+#   Only tiles 2, 5 and 8 have all four edges 64/64 opaque.  They are the
+#   ONLY cells that can be repeated without leaving a seam.  Everything else
+#   carries transparent margins -- and because platformer.png stores the RGB
+#   (255,0,64) in all 69271 of its transparent pixels, a non-seamless tile
+#   used as terrain fill paints a magenta square wherever it fails to cover.
+#   (Verified: blitting tile 31 with SDL_BLENDMODE_NONE puts 2930 magenta
+#   pixels on screen; with BLEND it composites correctly.)
+#
+# So the terrain is built from 2/5/8 as fill with purpose-drawn tiles at the
+# boundaries, and ALL of the interesting art goes in the decor layer, which
+# draws on top of already-solid ground where transparency is free.
+# ---------------------------------------------------------------------------
+
+EMPTY = -11                        # sentinel matching the existing loader
+
+# --- seamless fills: the only three repeatable cells -----------------------
+FILL_TEAL = 8                      # 99.5% opaque, teal
+FILL_SOIL = 2                      # 99.8% opaque, dark brown subsoil
+FILL_NAVY = 5                      # 99.5% opaque, deep blue
+
+# --- teal terrain: a CORNER set, not a left/mid/right slice ---------------
+#
+# Measured edge profiles (opaque pixels out of 64):
+#     6:  T 9  B61  L 9  R61     grass fringe along TOP and LEFT
+#     7:  T 9  B55  L61  R 9     grass fringe along TOP and RIGHT
+#    15:  T61  B 9  L 3  R55     grass fringe along the BOTTOM, left corner
+#    16:  T55  B11  L55  R 7     grass fringe along the BOTTOM, right corner
+#
+# 6/7 are therefore the exposed TOP corners of a cliff and 15/16 the exposed
+# BOTTOM corners; the left/right values are what actually join to the fill.
+TEAL_TOP    = (6,  FILL_TEAL, 7)   # walkable surface, grass on top
+TEAL_BOTTOM = (15, FILL_TEAL, 16)  # underside, fringe hangs down
+TEAL_BODY   = TEAL_TOP             # rows between them are plain fill
+
+SOIL_SET    = (0,  FILL_SOIL, 1)   # 0/1 subsoil caps, 2 fill
+SOIL_ALT    = (9,  FILL_SOIL, 10)  # second subsoil variant (T60/T52, banded)
+STONE_SET   = (18, FILL_SOIL, 19)  # near-black deep stone
+STONE_WALL  = 20                   # seamless HORIZONTALLY (L64 R64), T35 B39
+NAVY_SET    = (3,  FILL_NAVY, 4)
+NAVY_BOTTOM = (12, FILL_NAVY, 13)
+
+# --- water -----------------------------------------------------------------
+WATER_SET   = (36, 28, 37)         # 28 bright surface, 36/37 rounded ends
+WATER_BRIGHT = 28                  # the lit band just under the surface
+WATER_SHORE = 27                   # water meeting ground, left-weighted
+
+# --- props (transparent margins: DECOR LAYER ONLY) -------------------------
+BUSH         = 30                  # teal mound with plants growing up (B64)
+TREE_G_TOP, TREE_G_BOT = 31, 40    # green tree, 2 cells tall
+TREE_A_TOP, TREE_A_BOT = 32, 41    # autumn tree, 2 cells tall
+BOULDER_SOIL = 11                  # brown round rock
+BOULDER_NAVY = 14                  # deep-blue round rock (reads as wet)
+BOULDER_TEAL = 17                  # teal round rock
+CRYSTAL      = 22                  # slate crystal cluster + red-berried branch
+SHARD        = 23                  # small crystal shard
+LEDGE_ARM    = 21                  # ledge jutting right, attached on the left
+GRASS_TUFT   = 29                  # teal block, plants along its right side
+CHUNK_TEAL   = 38                  # chunky teal block, rounded top (B64)
+CHUNK_TEAL_B = 39                  # variant with a notch on the right
+CHUNK_WATER  = 36                  # chunky water block
+CHUNK_WATER_B = 37                 # variant with a notch on the right
+
+# Every distinct cell the sheet offers, for the coverage check in main().
+# Duplicates are collapsed: several tiles legitimately appear in more than one
+# set (8 is both the teal fill and the middle of TEAL_TOP, 36/37 are both the
+# water end caps and the chunky water blocks).
+ALL_USABLE_TILES = sorted(set(
+    [FILL_TEAL, FILL_SOIL, FILL_NAVY, WATER_BRIGHT] +
+    list(TEAL_TOP) + list(TEAL_BOTTOM) +
+    list(SOIL_SET) + list(SOIL_ALT) + list(STONE_SET) + [STONE_WALL] +
+    list(NAVY_SET) + list(NAVY_BOTTOM) + list(WATER_SET) + [WATER_SHORE] +
+    [BUSH, TREE_G_TOP, TREE_G_BOT, TREE_A_TOP, TREE_A_BOT,
+     BOULDER_SOIL, BOULDER_NAVY, BOULDER_TEAL, CRYSTAL, SHARD, LEDGE_ARM,
+     GRASS_TUFT, CHUNK_TEAL, CHUNK_TEAL_B, CHUNK_WATER, CHUNK_WATER_B]))
+
+# ---------------------------------------------------------------------------
+# Level — "The Sunken Path"
+# ---------------------------------------------------------------------------
+WIDTH  = 200
+HEIGHT = 36
+GROUND_ROW = 29   # baseline: the last EMPTY row above the surface
+
+
+@dataclass
+class EnemySpawn:
+    kind: str
+    col: int
+    row: Optional[int] = None
+    stands_on: str = "ground"
+
+
+@dataclass
+class Powerup:
+    kind: str
+    col: int
+    row: Optional[int] = None
+
+
+@dataclass
+class Platform:
+    col: int
+    row: int
+    w: int
+    h: int
+    moving: bool = False
+    range: int = 0
+    speed: float = 0.0
+    vertical: bool = False
+
+
+@dataclass
+class Hazard:
+    kind: str
+    col: int
+    w: int
+    h: int
+    row: Optional[int] = None
+
+
+@dataclass
+class Facility:
+    kind: str
+    col: int
+    row: Optional[int] = None
+
+
+@dataclass
+class SceneryItem:
+    """A whole prop placed in the world.
+
+    `kind` names an entry in tools/build_objects.py.  These are assembled
+    objects, not tile ids: the two trees on the sheet are each drawn across two
+    64px cells, so placing them by tile id scattered half-trees around the
+    level.  `col` is the tile column and `row` the tile row whose TOP EDGE the
+    object stands on, so an object is anchored by its bottom centre and taller
+    objects simply occupy the space above.
+    """
+    kind: str
+    col: int
+    row: int
+    scale: float = 1.0
+    flip: bool = False
+
+
+@dataclass
+class Level:
+    name: str
+    width: int
+    height: int
+    ground: List[Optional[int]]
+    decor: List[Tuple[int, int, int]] = field(default_factory=list)  # (col,row,tile)
+    scenery: List[SceneryItem] = field(default_factory=list)
+    platforms: List[Platform] = field(default_factory=list)
+    hazards:   List[Hazard]   = field(default_factory=list)
+    coins:     List[Tuple[int, int]] = field(default_factory=list)
+    powerups:  List[Powerup]  = field(default_factory=list)
+    enemies:   List[EnemySpawn] = field(default_factory=list)
+    facilities: List[Facility] = field(default_factory=list)
+    player: Tuple[int, int] = (4, GROUND_ROW - 2)
+
+
+# ---------------------------------------------------------------------------
+# Terrain-aware placement
+# ---------------------------------------------------------------------------
+
+def _solid_row(L: Level, col: int) -> int:
+    """Topmost solid row at `col`; walks outward over chasms if needed."""
+    col = max(0, min(L.width - 1, col))
+    if L.ground[col] is not None and L.ground[col] >= 0:
+        return L.ground[col]
+    for d in range(1, L.width):
+        for c in (col - d, col + d):
+            if 0 <= c < L.width and L.ground[c] is not None and L.ground[c] >= 0:
+                return L.ground[c]
+    return GROUND_ROW
+
+
+def _clamp_row(row: int) -> int:
+    return max(1, min(HEIGHT - 2, row))
+
+
+def resolve_rows(L: Level) -> None:
+    pcol, _ = L.player
+    L.player = (pcol, _clamp_row(_solid_row(L, pcol) - 1))
+
+    for e in L.enemies:
+        if e.row is None:
+            e.row = _clamp_row(_solid_row(L, e.col) - 1)
+    for f in L.facilities:
+        if f.row is None:
+            f.row = _clamp_row(_solid_row(L, f.col) - 1)
+    for p in L.powerups:
+        if p.row is None:
+            p.row = _clamp_row(_solid_row(L, p.col) - 2)
+    for h in L.hazards:
+        if h.row is None:
+            cols = range(h.col, h.col + h.w)
+            tops = [_solid_row(L, c) for c in cols]
+            h.row = _clamp_row(min(tops) - 1)
+
+
+# ---------------------------------------------------------------------------
+# Playable terrain
+#
+# The heightmap is built from features, then every adjacent delta is clamped
+# to +-MAX_STEP_UP so no wall can sneak in, then gaps are cut no wider than
+# MAX_GAP.  Doing it in that order means a later feature can never resurrect
+# an impassable step.
+# ---------------------------------------------------------------------------
+
+def _clamp_steps(g: List[Optional[int]]) -> None:
+    """Force |height change| between neighbours to at most MAX_STEP_UP.
+
+    Row numbers grow downward, so a smaller row means higher ground.  A step
+    UP is therefore (g[c] - g[c+1]) > 0 and that is the direction that has to
+    be limited — walking off a ledge is always allowed.
+    """
+    for c in range(len(g) - 1):
+        if g[c] is None or g[c + 1] is None:
+            continue
+        if g[c] < 0 or g[c + 1] < 0:
+            continue
+        rise = g[c] - g[c + 1]          # >0 means the next column is higher
+        if rise > MAX_STEP_UP:
+            g[c + 1] = g[c] - MAX_STEP_UP
+        elif rise < -MAX_STEP_UP:
+            # a drop steeper than the limit is fine to fall down, but keep it
+            # from becoming a sheer cliff the hero cannot climb back up
+            g[c + 1] = g[c] + MAX_STEP_UP
+
+
+def _h(i: int) -> float:
+    """Deterministic 0..1 hash of an integer.
+
+    A plain multiply-modulo LCG is no good for scattering: stepping the input
+    by a fixed stride makes the high bits advance almost linearly, so the
+    "random" value simply counts across the level and whole categories of
+    detail never appear.  A murmur-style finalizer avalanches the input first.
+    """
+    x = (i * 0x9E3779B1) & 0xFFFFFFFF
+    x ^= x >> 15
+    x = (x * 0x85EBCA6B) & 0xFFFFFFFF
+    x ^= x >> 13
+    x = (x * 0xC2B2AE35) & 0xFFFFFFFF
+    x ^= x >> 16
+    return (x & 0xFFFFFF) / float(0x1000000)
+
+
+# ---------------------------------------------------------------------------
+# Biome Zones
+# ---------------------------------------------------------------------------
+ZONE_MEADOW = (0, 50)
+ZONE_RUINS  = (50, 120)
+ZONE_SUNKEN = (120, 175)
+ZONE_ARENA  = (175, 200)
+
+
+def get_zone(col: int) -> str:
+    if col < ZONE_MEADOW[1]:
+        return "meadow"
+    elif col < ZONE_RUINS[1]:
+        return "ruins"
+    elif col < ZONE_SUNKEN[1]:
+        return "sunken"
+    else:
+        return "arena"
+
+
+def scatter_decor(L: Level) -> None:
+    """Populate the decor layer: the art that sits ON the terrain.
+
+    Zoned by biome:
+      - 0..50   Meadow:       Lush teal/green, green trees, bushes, tufts, teal boulders
+      - 50..120 Moss Ruins:   Ancient ruins, autumn trees, soil boulders, crystal veins, stone walls
+      - 120..175 Sunken Water: Wet navy stone, crystal veins, water chunks, shoreline ripples
+      - 175..200 Boss Arena:  Dramatic framing at the gate & throne, clean floor for boss combat
+    """
+    g = L.ground
+    cells: Dict[Tuple[int, int], int] = {}
+
+    def put(c: int, r: int, t: int) -> None:
+        if 0 <= c < L.width and 0 <= r < L.height:
+            cells[(c, r)] = t
+
+    def solid(c: int) -> bool:
+        return 0 <= c < len(g) and g[c] is not None and g[c] >= 0
+
+    def surf(c: int) -> int:
+        """Row of the walkable cap tile -- the row a prop stands on top of."""
+        return g[c] + 1
+
+    def flat(c: int) -> bool:
+        """Ground level with both neighbours, so nothing looks like it floats."""
+        if not solid(c):
+            return False
+        base = g[c]
+        return all(solid(c + d) and g[c + d] == base for d in (-1, 0, 1))
+
+    def falls_right(c: int) -> int:
+        """Rows of exposed cliff face on the right of column c."""
+        if not (solid(c) and solid(c + 1)):
+            return 0
+        return max(0, g[c + 1] - g[c])
+
+    taken = set()
+
+    def claim(c: int, r: int, t: int, w: int = 1) -> None:
+        """Place a prop and reserve its footprint so nothing overlaps it."""
+        for k in range(w):
+            if (c + k, r) in taken:
+                return
+        for k in range(w):
+            put(c + k, r, t)
+            taken.add((c + k, r))
+
+    # --- 1. Trees (Two cells tall: top half r-2, trunk r-1) ---
+    # Meadow gets green trees; Moss Ruins gets autumn trees.
+    # Sunken Water and Arena have zero trees (cavern & colosseum).
+    last_tree = -99
+    for c in range(3, WIDTH - 3):
+        zone = get_zone(c)
+        if zone in ("sunken", "arena"):
+            continue
+        if not flat(c) or c - last_tree < 10:
+            continue
+        if _h(c * 31 + 3) > 0.35:
+            continue
+        r = surf(c)
+        if (c, r - 1) in taken or (c, r - 2) in taken:
+            continue
+        if zone == "meadow":
+            put(c, r - 2, TREE_G_TOP)
+            put(c, r - 1, TREE_G_BOT)
+            taken.add((c, r - 1))
+            taken.add((c, r - 2))
+            # Understorey cluster: 1-2 bushes or tufts nestled by the trunk
+            for d in (-1, 1):
+                if flat(c + d) and (c + d, surf(c + d) - 1) not in taken:
+                    claim(c + d, surf(c + d) - 1, BUSH if _h(c * 43 + d) < 0.5 else GRASS_TUFT)
+        elif zone == "ruins":
+            put(c, r - 2, TREE_A_TOP)
+            put(c, r - 1, TREE_A_BOT)
+            taken.add((c, r - 1))
+            taken.add((c, r - 2))
+            # Ruins understorey: bush or soil boulder
+            for d in (-1, 1):
+                if flat(c + d) and (c + d, surf(c + d) - 1) not in taken:
+                    claim(c + d, surf(c + d) - 1, BUSH if _h(c * 47 + d) < 0.6 else BOULDER_SOIL)
+        last_tree = c
+
+    # --- 2. Crystal Outcrops (Clusters of 1-3 with shards at base) ---
+    # Allowed in Ruins, Sunken, and Arena framing. Denied in Meadow.
+    last_x = -99
+    for c in range(3, WIDTH - 3):
+        zone = get_zone(c)
+        if zone == "meadow":
+            continue
+        # Arena: Keep the battle floor (181..196) clean!
+        if zone == "arena" and 181 <= c <= 196:
+            continue
+        if not flat(c) or c - last_x < 8 or _h(c * 53 + 17) > 0.32:
+            continue
+        n = 1 + int(_h(c * 59 + 23) * 3)
+        n = min(n, 3)
+        if all(not flat(c + k) for k in range(n)):
+            continue
+        for k in range(n):
+            if flat(c + k):
+                claim(c + k, surf(c + k) - 1, CRYSTAL)
+        # Shards clustered at the foot of crystals
+        for k in (-1, n):
+            if flat(c + k) and _h(c * 61 + k + 7) < 0.65:
+                claim(c + k, surf(c + k) - 1, SHARD)
+        last_x = c + n
+
+    # --- 3. Ground Details & Clustering with Breathing Room ---
+    # Clustered in groups of 1-3, followed by breathing space
+    in_cluster = 0
+    cluster_zone = ""
+    for c in range(2, WIDTH - 2):
+        if not solid(c):
+            in_cluster = 0
+            continue
+        zone = get_zone(c)
+        # Keep arena floor clean for the boss fight
+        if zone == "arena" and 181 <= c <= 196:
+            continue
+        r = surf(c) - 1
+        if (c, r) in taken:
+            continue
+
+        hval = _h(c * 67 + 29)
+        # Breathing room: only start a cluster if hash passes
+        if in_cluster == 0:
+            if hval > 0.28:
+                continue
+            in_cluster = 1 + int(_h(c * 71 + 11) * 2.5)  # cluster size 1 to 3
+            cluster_zone = zone
+
+        if in_cluster > 0 and zone == cluster_zone:
+            in_cluster -= 1
+            v = _h(c * 73 + 19)
+            if zone == "meadow":
+                if v < 0.40:
+                    claim(c, r, GRASS_TUFT)
+                elif v < 0.75:
+                    claim(c, r, BUSH)
+                else:
+                    claim(c, r, BOULDER_TEAL)
+            elif zone == "ruins":
+                if v < 0.45:
+                    claim(c, r, BOULDER_SOIL)
+                elif v < 0.80:
+                    claim(c, r, BUSH)
+                else:
+                    claim(c, r, SHARD)
+            elif zone == "sunken":
+                if v < 0.40:
+                    claim(c, r, BOULDER_NAVY)
+                elif v < 0.70:
+                    claim(c, r, CHUNK_WATER)
+                elif v < 0.85:
+                    claim(c, r, CHUNK_WATER_B)
+                else:
+                    claim(c, r, SHARD)
+            elif zone == "arena":
+                # Boundary framing only
+                if c < 181:
+                    claim(c, r, BOULDER_NAVY if v < 0.5 else SHARD)
+                else:
+                    claim(c, r, SHARD if v < 0.6 else CRYSTAL)
+
+    # --- 4. Cliff lips and exposed rock faces ---
+    for c in range(2, WIDTH - 2):
+        face = falls_right(c)
+        if face < 1:
+            continue
+        r = surf(c)
+        zone = get_zone(c)
+        # Ledge arm jutting out over drop
+        if _h(c * 71 + 31) < 0.45:
+            claim(c, r - 1, LEDGE_ARM)
+        if face < 2:
+            continue
+        depth = 1 + int(_h(c * 73 + 37) * min(face - 1, 2))
+        fr = r + depth
+        if fr < L.height:
+            pick = _h(c * 79 + 41)
+            if zone == "meadow":
+                claim(c, fr, CHUNK_TEAL if pick < 0.6 else CHUNK_TEAL_B)
+            elif zone == "ruins":
+                claim(c, fr, STONE_WALL if pick < 0.6 else CRYSTAL)
+            elif zone == "sunken":
+                claim(c, fr, CRYSTAL if pick < 0.5 else CHUNK_WATER)
+            else:
+                claim(c, fr, STONE_WALL)
+
+    # --- 5. Shorelines (meeting chasm water) ---
+    for c in range(1, WIDTH - 1):
+        if solid(c) and not solid(c + 1):
+            put(c, surf(c) - 1, WATER_SHORE)
+        elif solid(c) and not solid(c - 1) and _h(c * 83 + 43) < 0.5:
+            put(c, surf(c) - 1, WATER_SHORE)
+
+    L.decor = [(c, r, t) for (c, r), t in sorted(cells.items())]
+
+
+def build_level() -> Level:
+    L = Level(name="The Sunken Path", width=WIDTH, height=HEIGHT,
+              ground=[GROUND_ROW] * WIDTH)
+    g = L.ground
+
+    # --- rolling hills -----------------------------------------------------
+    for x in range(WIDTH):
+        g[x] = GROUND_ROW + int(round(1.4 * math.sin(x * 0.055)
+                                      + 0.8 * math.sin(x * 0.021 + 1.3)))
+
+    # --- authored features -------------------------------------------------
+    # gentle opening ramp so the first steps read clearly
+    for x in range(0, 10):
+        g[x] = GROUND_ROW - min(3, x // 3)
+
+    # flat arena for the boss at the far end
+    for x in range(180, WIDTH):
+        g[x] = 31
+
+    # a low rise and a matching fall, both walkable after clamping
+    for x in range(56, 66):
+        g[x] = GROUND_ROW - 2
+    for x in range(96, 108):
+        g[x] = GROUND_ROW - 3
+    for x in range(140, 152):
+        g[x] = GROUND_ROW - 4
+
+    _clamp_steps(g)
+    _clamp_steps(g)          # second pass settles knock-on changes
+
+    # --- chasms: never wider than MAX_GAP ----------------------------------
+    for start in (40, 78, 118):
+        for x in range(start, start + MAX_GAP):
+            g[x] = -1
+        # the far lip must not be higher than the near lip, or the jump turns
+        # into a wall the moment the gap is added
+        near = g[start - 1]
+        for x in range(start + MAX_GAP, min(WIDTH, start + MAX_GAP + 4)):
+            if g[x] >= 0 and g[x] < near:
+                g[x] = near
+
+    _clamp_steps(g)
+
+    # --- platforms ---------------------------------------------------------
+    # Every platform is placed at most MAX_STEP_UP above the surface beneath
+    # it, so a single hop always lands.  Platform tops are also kept clear of
+    # each other so they do not form accidental ceilings.
+    def safe_row(col: int, above: int) -> int:
+        """Row `above` tiles over the surface at col, clamped to the map."""
+        base = _solid_row(L, col)
+        return _clamp_row(base - above)
+
+    L.platforms += [
+        Platform(38, safe_row(38, 2), 3, 1),     # stepping stones, chasm 1
+        Platform(76, safe_row(76, 2), 3, 1),     # chasm 2
+        Platform(116, safe_row(116, 2), 3, 1),   # chasm 3
+        Platform(50, safe_row(50, 3), 4, 1),     # low ledge, coins
+        Platform(60, safe_row(60, 3), 3, 1),
+        Platform(70, safe_row(70, 3), 4, 1),
+        Platform(88, safe_row(88, 3), 4, 1),
+        Platform(103, safe_row(103, 3), 4, 1),
+        Platform(130, safe_row(130, 3), 4, 1),
+        Platform(155, safe_row(155, 3), 4, 1),   # approach to the arena
+        Platform(170, safe_row(170, 2), 3, 1),
+    ]
+    # Moving platforms sit LOWER than the static ones on purpose: the vertical
+    # traveller spends half its cycle above its spawn row, so a lift that
+    # starts at the jump limit would be unreachable at the top of its travel.
+    # Keeping it at 2 tiles leaves room for the range below.
+    L.platforms += [
+        Platform(64,  safe_row(64, 2),  3, 1, moving=True, range=96,  speed=70, vertical=False),
+        Platform(100, safe_row(100, 2), 3, 1, moving=True, range=64,  speed=80, vertical=True),
+        Platform(134, safe_row(134, 2), 3, 1, moving=True, range=96,  speed=85, vertical=False),
+    ]
+
+    # --- hazards: spike strips on the near lip of each chasm ---------------
+    L.hazards += [
+        Hazard("spikes", 36, 2, 1),
+        Hazard("spikes", 43, 2, 1),
+        Hazard("spikes", 74, 2, 1),
+        Hazard("spikes", 81, 2, 1),
+        Hazard("spikes", 114, 2, 1),
+        Hazard("spikes", 121, 2, 1),
+    ]
+
+    # --- facilities --------------------------------------------------------
+    L.facilities += [
+        Facility("checkpoint", 30),
+        Facility("checkpoint", 70),
+        Facility("checkpoint", 110),
+        Facility("checkpoint", 150),
+        Facility("shrine",     55),
+        Facility("shrine",     100),
+        Facility("shrine",     145),
+        Facility("key",        143),
+        Facility("door",       175),
+    ]
+
+    # --- enemies -----------------------------------------------------------
+    L.enemies += [
+        EnemySpawn("skeleton", 18),
+        EnemySpawn("skeleton", 28),
+        EnemySpawn("skeleton", 50),
+        EnemySpawn("skeleton", 60),
+        EnemySpawn("skeleton", 73),
+        EnemySpawn("skeleton", 90),
+        EnemySpawn("skeleton", 108),
+        EnemySpawn("skeleton", 132),
+        EnemySpawn("skeleton", 158),
+        EnemySpawn("slime", 35),
+        EnemySpawn("slime", 88),
+        EnemySpawn("slime", 128),
+        EnemySpawn("bomber", 46),
+        EnemySpawn("bomber", 84),
+        EnemySpawn("bomber", 126),
+        EnemySpawn("archer", 66),
+        EnemySpawn("archer", 112),
+        EnemySpawn("archer", 160),
+        EnemySpawn("bat", 48, 22, stands_on="air"),
+        EnemySpawn("bat", 80, 18, stands_on="air"),
+        EnemySpawn("bat", 115, 19, stands_on="air"),
+        EnemySpawn("bat", 138, 20, stands_on="air"),
+        EnemySpawn("mage", 71, stands_on="platform"),
+        EnemySpawn("mage", 89, stands_on="platform"),
+        EnemySpawn("mage", 131, stands_on="platform"),
+        EnemySpawn("boss", 192, 30),
+    ]
+
+    # --- powerups ----------------------------------------------------------
+    L.powerups += [
+        Powerup("Health",      22),
+        Powerup("Speed",       45),
+        Powerup("Invincible",  65),
+        Powerup("Health",      85),
+        Powerup("DoubleJump",  103),
+        Powerup("Damage",      125),
+        Powerup("Magnet",      92),
+        Powerup("Shield",      133),
+        Powerup("Health",      145),
+        Powerup("CoinX2",      168),
+        Powerup("Speed",       186),
+    ]
+
+    # --- scenery: whole objects, not tile ids ------------------------------
+    #
+    # This used to drop raw tile ids into the decor layer, and those ids were
+    # simply wrong: tile 40 is the BOTTOM HALF of the green tree and tile 32 is
+    # the TOP HALF of the autumn tree, so the level was littered with severed
+    # tree parts standing in for "crystals" and "lamps".
+    #
+    # Everything below names an assembled object from tools/build_objects.py
+    # instead.  Placement is deterministic (a small LCG keyed on the column) so
+    # the level looks the same every run without depending on random state.
+    #
+    # Objects only go on stretches of ground that are flat for three columns in
+    # a row -- a prop standing on a step edge looks like it is floating.
+    def _is_chasm(col: int) -> bool:
+        if not 0 <= col < WIDTH:
+            return True
+        v = L.ground[col]
+        return v is None or v < 0
+
+    def _flat_run(col: int) -> bool:
+        # Chasms are stored as -1, so they must be excluded explicitly --
+        # testing only for None let a run of chasm columns look like flat
+        # ground and put props floating over the water.
+        if any(_is_chasm(c) for c in (col - 1, col, col + 1)):
+            return False
+        rows = [L.ground[c] for c in (col - 1, col, col + 1)]
+        return all(r == rows[1] for r in rows)
+
+    def _lcg(i: int) -> float:
+        """Deterministic 0..1 hash.
+
+        A plain multiply-modulo LCG is no good here: stepping the column by a
+        fixed stride made the high bits advance almost linearly, so the
+        "random" value simply counted down across the level and whole prop
+        categories never appeared.  A murmur-style finalizer avalanches the
+        input first, which decorrelates neighbouring columns.
+        """
+        x = (i * 0x9E3779B1) & 0xFFFFFFFF
+        x ^= x >> 15
+        x = (x * 0x85EBCA6B) & 0xFFFFFFFF
+        x ^= x >> 13
+        x = (x * 0xC2B2AE35) & 0xFFFFFFFF
+        x ^= x >> 16
+        return (x & 0xFFFFFF) / float(0x1000000)
+
+    # tile_for() fills rows <= ground[col] with sky and puts the surface cap at
+    # row ground[col] + 1, so the walkable surface is the TOP EDGE of that row.
+    # An object standing on the ground is therefore anchored at ground+1 --
+    # anchoring at ground-1 (the obvious reading of "one above the ground")
+    # leaves every prop floating a full tile in the air.
+    def _surface_row(col: int) -> int:
+        return L.ground[col] + 1
+
+    # Props carry no collider -- they are drawn decor, so density is purely a
+    # look decision and cannot trap or block the player.
+    #
+    # One pass rather than several per-type passes.  Four independent loops
+    # with their own spacing rules fought each other: whichever ran first
+    # claimed the good columns and the later ones were filtered down to
+    # almost nothing (boulder_deep and shard each collapsed to a single
+    # placement on a 200-tile level).  Walking the columns once and advancing
+    # by a kind-dependent stride spaces props evenly by construction and gives
+    # every type a fair share.
+    # --- scenery: whole objects, zoned by biome with clustering & breathing room ---
+    # Objects allowed per zone:
+    #   Meadow:       tree_green, bush, boulder_teal
+    #   Moss Ruins:   tree_autumn, bush, crystal, branch_red, shard
+    #   Sunken Water: boulder_deep, crystal, branch_red, shard
+    #   Boss Arena:   framing crystals & deep boulders at gate & throne, floor clear
+    scenery_specs = [
+        # --- Meadow (0..50) ---
+        SceneryItem("boulder_teal",  7, _surface_row(7),  scale=0.95),
+        SceneryItem("tree_green",   14, _surface_row(14), scale=1.05),
+        SceneryItem("bush",         15, _surface_row(15), scale=0.85),
+        SceneryItem("tree_green",   22, _surface_row(22), scale=0.98, flip=True),
+        SceneryItem("bush",         23, _surface_row(23), scale=0.80),
+        SceneryItem("boulder_teal", 30, _surface_row(30), scale=1.00),
+        SceneryItem("tree_green",   34, _surface_row(34), scale=1.10),
+        SceneryItem("bush",         35, _surface_row(35), scale=0.90),
+
+        # --- Moss Ruins (50..120) ---
+        SceneryItem("tree_autumn",  58, _surface_row(58), scale=1.05),
+        SceneryItem("bush",         59, _surface_row(59), scale=0.85),
+        SceneryItem("crystal",      72, _surface_row(72), scale=1.00),
+        SceneryItem("branch_red",   73, _surface_row(73), scale=0.95),
+        SceneryItem("crystal",      86, _surface_row(86), scale=1.10),
+        SceneryItem("shard",        87, _surface_row(87), scale=0.85),
+        SceneryItem("tree_autumn",  92, _surface_row(92), scale=1.00, flip=True),
+        SceneryItem("bush",         93, _surface_row(93), scale=0.80),
+        SceneryItem("tree_autumn", 104, _surface_row(104), scale=0.95),
+        SceneryItem("crystal",     105, _surface_row(105), scale=1.00),
+        SceneryItem("shard",       106, _surface_row(106), scale=0.85),
+
+        # --- Sunken Water (120..175) ---
+        SceneryItem("boulder_deep", 123, _surface_row(123), scale=1.05),
+        SceneryItem("crystal",      124, _surface_row(124), scale=1.15),
+        SceneryItem("shard",        125, _surface_row(125), scale=0.90),
+        SceneryItem("boulder_deep", 135, _surface_row(135), scale=1.00),
+        SceneryItem("branch_red",   136, _surface_row(136), scale=0.95),
+        SceneryItem("crystal",      144, _surface_row(144), scale=1.10),
+        SceneryItem("shard",        145, _surface_row(145), scale=0.85),
+        SceneryItem("boulder_deep", 156, _surface_row(156), scale=1.00),
+        SceneryItem("branch_red",   157, _surface_row(157), scale=0.90),
+        SceneryItem("crystal",      164, _surface_row(164), scale=1.05),
+        SceneryItem("shard",        165, _surface_row(165), scale=0.85),
+
+        # --- Boss Arena (175..200) ---
+        # Arena Gate framing
+        SceneryItem("boulder_deep", 176, _surface_row(176), scale=1.10),
+        SceneryItem("crystal",      177, _surface_row(177), scale=1.20),
+        SceneryItem("shard",        178, _surface_row(178), scale=0.90),
+        # Arena Floor (180..196) is kept clear for the boss battle!
+        # Arena Throne framing
+        SceneryItem("crystal",      197, _surface_row(197), scale=1.25),
+        SceneryItem("branch_red",   198, _surface_row(198), scale=1.05),
+    ]
+    # Filter so every scenery item is guaranteed to stand on a valid _flat_run
+    L.scenery = [s for s in scenery_specs if _flat_run(s.col)]
+
+    # --- decor layer: the detail that sits on the terrain ------------------
+    # Runs last because it reads the finished heightmap, the platform rows and
+    # the chasms to decide what belongs where.
+    scatter_decor(L)
+
+    # --- coins: exactly 129 coins with arcs to teach jumps, platform rewards & secrets ---
+    coin_list: List[Tuple[int, int]] = []
+
+    # Zone 1: Meadow (cols 0-50)
+    # Safe tutorial path
+    for c in (4, 7, 10):
+        coin_list.append((c, g[c] - 1))  # 3
+    # Hop over hill arc
+    coin_list += [(14, g[14] - 1), (15, g[15] - 2), (16, g[16] - 1)]  # 3
+    # Gentle valley arc
+    coin_list += [(24, g[24] - 1), (25, g[25] - 2), (26, g[26] - 1)]  # 3
+    # Checkpoint 30 arc
+    coin_list += [(29, g[29] - 1), (30, g[30] - 2), (31, g[31] - 1)]  # 3
+    # Hop to stepping stone platform 38
+    coin_list += [(36, g[36] - 1), (37, g[37] - 2), (38, safe_row(38, 2) - 1)]  # 3
+    # Parabolic arc OVER chasm 40 (gap at 40-41)
+    coin_list += [
+        (39, safe_row(38, 2) - 2),
+        (40, safe_row(38, 2) - 3),
+        (41, safe_row(38, 2) - 3),
+        (42, g[42] - 2),
+    ]  # 4
+    # Platform 50 reward
+    for c in range(50, 54):
+        coin_list.append((c, safe_row(50, 3) - 1))  # 4
+    # Meadow subtotal: 23 coins
+
+    # Zone 2: Moss Ruins (cols 50-120)
+    # Hop onto rise 56
+    coin_list += [(54, g[54] - 1), (55, g[55] - 2), (56, g[56] - 1)]  # 3
+    # Platform 60 (w=3)
+    for c in range(60, 63):
+        coin_list.append((c, safe_row(60, 3) - 1))  # 3
+    # Jump arc to moving platform 64
+    coin_list += [(63, safe_row(60, 3) - 1), (64, safe_row(64, 2) - 1), (65, safe_row(64, 2) - 1)]  # 3
+    coin_list.append((66, safe_row(64, 2) - 1))  # 1
+    # Platform 70 (w=4)
+    for c in range(70, 74):
+        coin_list.append((c, safe_row(70, 3) - 1))  # 4
+    # Approach to stepping stone 76
+    coin_list += [(74, g[74] - 1), (75, g[75] - 2), (76, safe_row(76, 2) - 1)]  # 3
+    # Parabolic arc OVER chasm 78 (gap at 78-79)
+    coin_list += [
+        (77, safe_row(76, 2) - 2),
+        (78, safe_row(76, 2) - 3),
+        (79, safe_row(76, 2) - 3),
+        (80, g[80] - 2),
+    ]  # 4
+    # Platform 88 (w=4)
+    for c in range(88, 92):
+        coin_list.append((c, safe_row(88, 3) - 1))  # 4
+    # Secret cache beneath platform 88
+    coin_list += [(89, g[89] - 1), (90, g[90] - 1)]  # 2
+    # Approach to rise 96
+    coin_list += [(94, g[94] - 1), (95, g[95] - 2), (96, g[96] - 1)]  # 3
+    # Vertical elevator 100 lift trail
+    coin_list += [(100, safe_row(100, 2) - 1), (100, safe_row(100, 2) - 2), (100, safe_row(100, 2) - 3)]  # 3
+    # High platform 103 reward (w=4)
+    for c in range(103, 107):
+        coin_list.append((c, safe_row(103, 3) - 1))  # 4
+    # Checkpoint 110 arc
+    coin_list += [(109, g[109] - 1), (110, g[110] - 2), (111, g[111] - 1)]  # 3
+    # Ruins subtotal: 40 coins (Running: 63)
+
+    # Zone 3: Sunken Water (cols 120-175)
+    # Approach to stepping stone 116
+    coin_list += [(114, g[114] - 1), (115, g[115] - 2), (116, safe_row(116, 2) - 1)]  # 3
+    # Parabolic arc OVER chasm 118 (gap at 118-119)
+    coin_list += [
+        (117, safe_row(116, 2) - 2),
+        (118, safe_row(116, 2) - 3),
+        (119, safe_row(116, 2) - 3),
+        (120, g[120] - 2),
+    ]  # 4
+    # Cavern trail
+    for c in (122, 124, 126, 128):
+        coin_list.append((c, g[c] - 1))  # 4
+    # Platform 130 reward (w=4)
+    for c in range(130, 134):
+        coin_list.append((c, safe_row(130, 3) - 1))  # 4
+    # Moving ferry platform 134 ride
+    for c in range(134, 137):
+        coin_list.append((c, safe_row(134, 2) - 1))  # 3
+    # Jump arc off ferry onto rise 140
+    coin_list += [(137, g[137] - 1), (138, g[138] - 2), (139, g[139] - 3), (140, g[140] - 1)]  # 4
+    # Key chamber 143: Crown of gold around the Key
+    coin_list += [
+        (142, g[142] - 1), (142, g[142] - 2),
+        (143, g[143] - 3),
+        (144, g[144] - 2), (144, g[144] - 1),
+    ]  # 5
+    # Shrine 145 blessing arc
+    coin_list += [(145, g[145] - 2), (146, g[146] - 2), (147, g[147] - 1)]  # 3
+    # Checkpoint 150 trail
+    coin_list += [(149, g[149] - 1), (150, g[150] - 2), (151, g[151] - 1)]  # 3
+    # Platform 155 approach to arena (w=4)
+    for c in range(155, 159):
+        coin_list.append((c, safe_row(155, 3) - 1))  # 4
+    # High-stakes leap trail
+    for c in (160, 162, 164, 166, 168):
+        coin_list.append((c, g[c] - 1))  # 5
+    # Platform 170 final ledge (w=3)
+    for c in range(170, 173):
+        coin_list.append((c, safe_row(170, 2) - 1))  # 3
+    # Boss door 175 threshold arch
+    coin_list += [
+        (173, g[173] - 1), (174, g[174] - 2), (175, g[175] - 3),
+        (176, g[176] - 2), (177, g[177] - 1),
+    ]  # 5
+    # Sunken subtotal: 50 coins (Running: 113)
+
+    # Zone 4: Boss Arena (cols 175-200)
+    # Entrance constellation
+    coin_list += [
+        (180, 30), (181, 29), (182, 28), (183, 29), (184, 30),
+        (186, 30), (188, 30), (190, 30),
+    ]  # 8
+    # Arena victory crown behind boss
+    coin_list += [
+        (194, 30), (195, 29), (196, 28), (197, 27),
+        (198, 27), (198, 28), (199, 29), (199, 30),
+    ]  # 8
+    # Arena subtotal: 16 coins. Total = 113 + 16 = 129 coins.
+    assert len(coin_list) == 129, f"Expected 129 coins, got {len(coin_list)}"
+    L.coins = coin_list
+
+    resolve_rows(L)
+
+    # pin the mages onto the platform nearest their column
+    for e in L.enemies:
+        if e.stands_on == "platform":
+            best = min(L.platforms,
+                       key=lambda p: abs(p.col + p.w // 2 - e.col))
+            e.col = best.col + best.w // 2
+            e.row = best.row - 1
+
+    return L
+
+
+# ---------------------------------------------------------------------------
+# Validation — refuse to emit a level the hero cannot finish
+# ---------------------------------------------------------------------------
+
+def validate_level(L: Level) -> List[str]:
+    """Return a list of playability violations; empty means the level is fine."""
+    bad: List[str] = []
+    g = L.ground
+
+    # 1. no step up steeper than the jump height
+    for c in range(WIDTH - 1):
+        a, b = g[c], g[c + 1]
+        if a is None or b is None or a < 0 or b < 0:
+            continue
+        if a - b > MAX_STEP_UP:
+            bad.append(f"col {c}->{c+1}: step up {a-b} tiles "
+                       f"(> {MAX_STEP_UP}) is a wall")
+
+    # 2. no gap wider than the jump length
+    run = 0
+    for c in range(WIDTH):
+        if g[c] is None or g[c] < 0:
+            run += 1
+            continue
+        if run > MAX_GAP:
+            bad.append(f"gap ending at col {c}: {run} tiles wide "
+                       f"(> {MAX_GAP}) cannot be jumped")
+        run = 0
+    if run > MAX_GAP:
+        bad.append(f"trailing gap of {run} tiles at the map edge")
+
+    # 3. every platform must be reachable from the surface under it
+    for p in L.platforms:
+        if not (0 <= p.col < WIDTH):
+            bad.append(f"platform at col {p.col} is off the map")
+            continue
+        base = _solid_row(L, p.col)
+        rise = base - p.row                 # rows saved by standing on it
+        if rise > MAX_STEP_UP + 1:
+            bad.append(f"platform at col {p.col}: {rise} tiles above the "
+                       f"ground below - out of jump range")
+
+    # 4. the whole map must be walkable start to finish
+    x = 0
+    guard = 0
+    while x < WIDTH - 1 and guard < WIDTH * 4:
+        guard += 1
+        if g[x] is None or g[x] < 0:
+            # hop the gap
+            run = 0
+            while x < WIDTH and (g[x] is None or g[x] < 0):
+                x += 1
+                run += 1
+            if run > MAX_GAP:
+                bad.append(f"unwalkable: {run}-tile gap before col {x}")
+                break
+            continue
+        if g[x + 1] is not None and g[x + 1] >= 0 and g[x] - g[x + 1] > MAX_STEP_UP:
+            bad.append(f"unwalkable: {g[x]-g[x+1]}-tile wall at col {x}")
+            break
+        x += 1
+
+    # 5. spawn must be on solid ground
+    pc, pr = L.player
+    if g[pc] is None or g[pc] < 0:
+        bad.append(f"player spawns over a chasm at col {pc}")
+
+    return bad
+
+
+# ---------------------------------------------------------------------------
+# Emit tile maps
+# ---------------------------------------------------------------------------
+
+def _solid_at(col: int, row: int, g: List[Optional[int]]) -> bool:
+    """Is (col,row) inside the ground mass?
+
+    g[col] is the last EMPTY row above the surface, so solid rows are
+    row > top -- the surface tile itself is row top+1.
+    """
+    if not (0 <= col < len(g)):
+        return False
+    v = g[col]
+    return v is not None and v >= 0 and row > v
+
+
+def _is_water_col(col: int, g: List[Optional[int]]) -> bool:
+    if not (0 <= col < len(g)):
+        return False
+    v = g[col]
+    return v is not None and v < 0
+
+
+def _edge_index(col: int, inside) -> int:
+    """0 = left cap, 1 = middle fill, 2 = right cap.
+
+    `inside(c)` says whether column c continues the same run at this row.
+    Only the middle tile is seamless, so it is the sole tile used to fill a
+    run; the caps appear strictly at the exposed ends.
+    """
+    left  = inside(col - 1)
+    right = inside(col + 1)
+    if not left and not right:
+        return 1          # isolated column: neither side has anything to join
+    if not left:
+        return 0
+    if not right:
+        return 2
+    return 1
+
+
+def tile_for(col: int, row: int, g: List[Optional[int]]) -> int:
+    """Pick a tile for (col,row) given the ground heightmap.
+
+    g[col] is the last EMPTY row above the surface, so the surface tile is
+    row top+1.  -1 marks a chasm: open water all the way down.
+
+    Tile choice has two independent inputs -- depth, which picks the
+    material, and horizontal neighbourhood, which picks the slice.  Mixing
+    them (the old `(col + row) & 2`) is what put ragged cap tiles in the
+    middle of solid runs: `& 2` only ever yields 0 or 2, so it alternated
+    between one cap and whatever sat at index 2 -- for the teal body that is
+    tile 17, a decorative round rock, which is why the underground was full
+    of floating blobs with transparent margins.
+    """
+    if not (0 <= col < len(g)):
+        return EMPTY
+    top = g[col]
+    if top is None:
+        return EMPTY
+
+    if top < 0:
+        # Chasm: a bright surface line, then the deep blue body.  Both are in
+        # the reference palette - #0098dc reads as the lit top of the water.
+        if row <= WATER_LINE:
+            return EMPTY
+        def water(c: int) -> bool:
+            return _is_water_col(c, g)
+        i = _edge_index(col, water)
+        if row == WATER_LINE + 1:
+            return WATER_SET[i]
+        # A second bright band just under the surface.  The chasms are only
+        # MAX_GAP wide, which is narrow enough that _edge_index() hands both
+        # columns an end cap and the middle tile (28, the lit water) never
+        # gets used at all -- this row is where it lands instead, and it reads
+        # as sunlight reaching down into the top of the water.
+        if row == WATER_LINE + 2:
+            return WATER_BRIGHT
+        # The water runs to the bottom of the map, so close it with the navy
+        # pair whose fringe hangs along its BOTTOM edge (12/13) instead of
+        # ending the sheet on a hard horizontal cut.
+        if row == HEIGHT - 1:
+            return NAVY_BOTTOM[i]
+        return NAVY_SET[i]
+
+    if row <= top:
+        return EMPTY
+
+    def solid(c: int) -> bool:
+        return _solid_at(c, row, g)
+    i = _edge_index(col, solid)
+
+    # Ground profile, top-down, zoned by biome:
+    # Surface is always TEAL_TOP[i] so all terrain has a consistent walkable grass/moss fringe
+    if row == top + 1:
+        return TEAL_TOP[i]
+
+    zone = get_zone(col)
+    if zone == "meadow":
+        if row in (top + 2, top + 3):
+            return TEAL_BODY[i]
+        if row == top + 4:
+            return SOIL_SET[i]
+        if row == top + 5:
+            return SOIL_ALT[i]
+        if row == HEIGHT - 1:
+            return TEAL_BOTTOM[i]
+        return STONE_SET[i]
+    elif zone == "ruins":
+        if row == top + 2:
+            return SOIL_SET[i]
+        if row == top + 3:
+            return SOIL_ALT[i]
+        if row == top + 4:
+            return STONE_SET[i]
+        if row == HEIGHT - 1:
+            return TEAL_BOTTOM[i]
+        return STONE_SET[i]
+    elif zone == "sunken":
+        if row == top + 2:
+            return NAVY_SET[i]
+        if row == top + 3:
+            return FILL_NAVY
+        if row == top + 4:
+            return SOIL_ALT[i]
+        if row == HEIGHT - 1:
+            return NAVY_BOTTOM[i]
+        return STONE_SET[i]
+    else:  # arena
+        if row == top + 2:
+            return STONE_SET[i]
+        if row == top + 3:
+            return SOIL_ALT[i]
+        if row == HEIGHT - 1:
+            return TEAL_BOTTOM[i]
+        return STONE_SET[i]
+
+
+# The water surface row used by the chasms.  tile_for() puts the bright water
+# tile at WATER_LINE + 1; that same value is exported to Level.h as
+# WATER_SURFACE_ROW so Parallax::drawWater animates the crest on the exact row
+# the tiles occupy.  Deriving it per column would put chasm water at row 3 —
+# GROUND_TOP is -1 there — i.e. a column of water hanging in the sky.
+WATER_LINE = GROUND_ROW + 3
+WATER_ROW  = WATER_LINE + 1
+
+
+def write_layer(path: str, L: Level, fn) -> None:
+    rows = []
+    for y in range(L.height):
+        rows.append(",".join(str(fn(x, y)) for x in range(L.width)))
+    with open(path, "w") as f:
+        f.write("\n".join(rows) + "\n")
+
+
+def write_foreground(path: str, L: Level) -> None:
+    # Index platforms by column so the slice is chosen in O(1) per tile
+    # instead of scanning every platform for every one of 7200 cells.
+    plat_at = {}
+    for p in L.platforms:
+        for x in range(p.col, p.col + p.w):
+            plat_at[x] = p
+
+    def fn(x: int, y: int) -> int:
+        t = tile_for(x, y, L.ground)
+        p = plat_at.get(x)
+        if p is not None and p.row <= y < p.row + p.h:
+            # A floating platform is ONE slab, not w copies of one tile.
+            # Emitting the left cap for every column repeated a ragged left
+            # edge right across the span, so a 4-wide platform read as four
+            # separate blocks with seams between them.  Slice it instead:
+            # left cap, seamless fills, right cap.
+            if p.w == 1:                 i = 1
+            elif x == p.col:             i = 0
+            elif x == p.col + p.w - 1:   i = 2
+            else:                        i = 1
+            # Grass-fringed cap on top, seamless fill through the middle, and
+            # -- for the two-tile platforms -- the pair whose fringe hangs
+            # down (15/16) along the underside, so a slab has a finished
+            # bottom instead of a raw cut.
+            if y == p.row:
+                return TEAL_TOP[i]
+            if y == p.row + p.h - 1:
+                return TEAL_BOTTOM[i]
+            return FILL_TEAL
+        return t
+    write_layer(path, L, fn)
+
+
+# --- distant silhouettes ---------------------------------------------------
+#
+# The background layer used to be the playable heightmap shifted down one row
+# and repainted navy.  The foreground covers that pixel for pixel, so the
+# layer drew nothing at all -- 2000 tiles of invisible work.
+#
+# A backdrop has to sit HIGHER in frame than the ground the hero walks on, or
+# there is nothing for it to be seen against.  Both profiles below are
+# independent of L.ground on purpose: an echo of the playable hills reads as a
+# second copy of the same hill, not as distance.  Longer wavelengths and a
+# higher baseline are what put them further back.
+
+def _far_profile(x: int) -> int:
+    """Ridgeline for the far layer (parallax 0.30), shaped per biome zone."""
+    if x < 50:
+        # Meadow: gentle rolling horizon
+        return GROUND_ROW - 5 + int(round(2.0 * math.sin(x * 0.025 + 0.5)))
+    elif x < 120:
+        # Moss Ruins: ancient ruined peaks and broken spires
+        return GROUND_ROW - 7 + int(round(2.6 * math.sin(x * 0.045 + 1.2) + 1.2 * math.sin(x * 0.09)))
+    elif x < 175:
+        # Sunken Water: deep basin dipping low into the earth
+        return GROUND_ROW - 4 + int(round(2.2 * math.sin(x * 0.022 + 2.0)))
+    else:
+        # Boss Arena: towering citadel walls enclosing the arena
+        return GROUND_ROW - 8 + int(round(2.5 * math.sin(x * 0.06 + 0.8)))
+
+
+def _mid_profile(x: int) -> int:
+    """Ridgeline for the mid layer (parallax 0.62), between far and near."""
+    if x < 50:
+        return GROUND_ROW - 2 + int(round(1.6 * math.sin(x * 0.035 + 1.8)))
+    elif x < 120:
+        return GROUND_ROW - 3 + int(round(2.2 * math.sin(x * 0.05 + 0.4)))
+    elif x < 175:
+        return GROUND_ROW - 1 + int(round(1.5 * math.sin(x * 0.03 + 2.8)))
+    else:
+        return GROUND_ROW - 4 + int(round(2.0 * math.sin(x * 0.07 + 1.5)))
+
+
+def _ridge_props(width: int, prof: List[int], density: float
+                 ) -> Dict[Tuple[int, int], int]:
+    """Scatter trees, spires and rocks along the flat stretches of a ridge, zoned by biome.
+
+    Only columns level with both neighbours get anything -- a prop on a slope
+    looks like it is sliding off.  The two-cell trees are placed as a matched
+    pair with the trunk cell (40/41) on the ridge and the canopy cell
+    (31/32) directly above it.
+    """
+    cells: Dict[Tuple[int, int], int] = {}
+    last = -99
+    for x in range(2, width - 2):
+        if prof[x - 1] != prof[x] or prof[x + 1] != prof[x]:
+            continue
+        if x - last < 5:
+            continue
+        v = _h(x * 89 + 51)
+        if v > density:
+            continue
+        zone = get_zone(x)
+        k = v / density if density else 0.0
+        if zone == "meadow":
+            if k < 0.45:
+                cells[(x, prof[x] - 1)] = TREE_G_TOP
+                cells[(x, prof[x])] = TREE_G_BOT
+            elif k < 0.75:
+                cells[(x, prof[x])] = BUSH
+            else:
+                cells[(x, prof[x])] = BOULDER_TEAL
+        elif zone == "ruins":
+            if k < 0.45:
+                cells[(x, prof[x] - 1)] = TREE_A_TOP
+                cells[(x, prof[x])] = TREE_A_BOT
+            elif k < 0.75:
+                cells[(x, prof[x])] = CRYSTAL
+            else:
+                cells[(x, prof[x])] = SHARD
+        elif zone == "sunken":
+            if k < 0.40:
+                cells[(x, prof[x])] = BOULDER_NAVY
+            elif k < 0.75:
+                cells[(x, prof[x])] = CRYSTAL
+            else:
+                cells[(x, prof[x])] = SHARD
+        else:  # arena
+            if k < 0.50:
+                cells[(x, prof[x])] = CRYSTAL
+            else:
+                cells[(x, prof[x])] = SHARD
+        last = x
+    return cells
+
+
+def _ridge_layer(L: Level, prof: List[int], props: Dict[Tuple[int, int], int],
+                 fill: int, surf_set: Tuple[int, int, int],
+                 bot_set: Tuple[int, int, int]):
+    def fn(x: int, y: int) -> int:
+        if not (0 <= x < len(prof)):
+            return EMPTY
+        if y < prof[x] and (x, y) in props:
+            return props[(x, y)]
+        if y <= prof[x]:
+            return EMPTY
+
+        def inside(c: int) -> bool:
+            return 0 <= c < len(prof) and y > prof[c]
+        i = _edge_index(x, inside)
+        if y == prof[x] + 1:
+            return surf_set[i]
+        if y == L.height - 1:
+            return bot_set[i]
+        return fill
+    return fn
+
+
+def write_background(path: str, L: Level) -> None:
+    """Far panorama: navy ridge, trees and spires, parallax 0.30."""
+    prof = [_far_profile(x) for x in range(L.width)]
+    props = _ridge_props(L.width, prof, 0.34)
+    write_layer(path, L, _ridge_layer(L, prof, props, FILL_NAVY,
+                                      NAVY_SET, NAVY_BOTTOM))
+
+
+def write_mid(path: str, L: Level) -> None:
+    """Mid-ground: teal ridge between the far hills and the playable ground."""
+    prof = [_mid_profile(x) for x in range(L.width)]
+    props = _ridge_props(L.width, prof, 0.26)
+    # CHUNK_TEAL (38) has a rounded top and a fully opaque bottom, so it caps
+    # the ridge; 15/16 close the underside at the bottom of the map.
+    write_layer(path, L, _ridge_layer(L, prof, props, FILL_TEAL,
+                                      (CHUNK_TEAL, FILL_TEAL, CHUNK_TEAL_B),
+                                      TEAL_BOTTOM))
+
+
+def write_decor(path: str, L: Level) -> None:
+    decor = {(c, r): t for (c, r, t) in L.decor}
+    def fn(x: int, y: int) -> int:
+        return decor.get((x, y), EMPTY)
+    write_layer(path, L, fn)
+
+
+def write_coins(path: str, L: Level) -> None:
+    coin_set = set(L.coins)
+    def fn(x: int, y: int) -> int:
+        return 1 if (x, y) in coin_set else 0
+    write_layer(path, L, fn)
+
+
+def write_colliders(path: str, L: Level) -> None:
+    rects = []
+    for y in range(L.height):
+        x = 0
+        while x < L.width:
+            top = L.ground[x]
+            if top is None or top < 0 or y <= top:
+                x += 1
+                continue
+            run_start = x
+            while x < L.width and L.ground[x] is not None \
+                    and L.ground[x] >= 0 and y > L.ground[x]:
+                x += 1
+            rects.append((run_start, y, x - run_start, 1))
+    for p in L.platforms:
+        rects.append((p.col, p.row, p.w, p.h))
+    with open(path, "w") as f:
+        for (x, y, w, h) in rects:
+            f.write(f"{x} {y} {w} {h}\n")
+
+
+# ---------------------------------------------------------------------------
+# Emit src/Level.h
+# ---------------------------------------------------------------------------
+
+HEADER = '''#pragma once
+// Auto-generated by tools/build_level.py — do not edit by hand.
+// All coordinates are in TILE units (1 tile = {TILE} px).
+#include <cstddef>
+#include <utility>
+
+namespace Level {{
+    inline constexpr int  TILE              = {TILE};
+    inline constexpr int  WIDTH_TILES       = {WIDTH};
+    inline constexpr int  HEIGHT_TILES      = {HEIGHT};
+    inline constexpr int  PIXEL_WIDTH       = WIDTH_TILES  * TILE;
+    inline constexpr int  PIXEL_HEIGHT      = HEIGHT_TILES * TILE;
+    inline constexpr int  GROUND_TILE_ROW   = {GROUND_ROW};
+    inline constexpr const char* NAME       = "{name}";
+
+    // Row of the water surface inside a chasm.  tile_for() emits the bright
+    // water tile here and Parallax::drawWater animates its crest at exactly
+    // this row, so both read the same constant and cannot drift apart.
+    inline constexpr int  WATER_SURFACE_ROW = {WATER_ROW};
+
+    // Traversal limits the physics can actually clear (see tools/build_level.py)
+    inline constexpr int  MAX_STEP_UP       = {MAX_STEP_UP};
+    inline constexpr int  MAX_GAP           = {MAX_GAP};
+
+    // player spawn
+    inline constexpr std::pair<int,int> PLAYER_TILE = {{{pc}, {pr}}};
+    inline constexpr float PLAYER_X = {px:.4f}f;
+    inline constexpr float PLAYER_Y = {py:.4f}f;
+
+    // solid ground (col -> top row, -1 for chasm)
+    inline constexpr int GROUND_TOP[{WIDTH}] = {{
+{ground}
+    }};
+
+    // platforms
+    struct PlatformDef {{ int col, row, w, h; bool moving, vertical; float range, speed; }};
+    inline constexpr int N_PLATFORMS = {np};
+    inline constexpr PlatformDef PLATFORMS[{np}] = {{
+{platforms}
+    }};
+
+    // hazards (spikes)
+    struct HazardDef {{ const char* kind; int col, row, w, h; }};
+    inline constexpr int N_HAZARDS = {nh};
+    inline constexpr HazardDef HAZARDS[{nh}] = {{
+{hazards}
+    }};
+
+    // facilities (checkpoint / shrine / key / door)
+    struct FacilityDef {{ const char* kind; int col, row; }};
+    inline constexpr int N_FACILITIES = {nf};
+    inline constexpr FacilityDef FACILITIES[{nf}] = {{
+{facilities}
+    }};
+
+    // powerups
+    struct PowerupDef {{ const char* kind; int col, row; }};
+    inline constexpr int N_POWERUPS = {nw};
+    inline constexpr PowerupDef POWERUPS[{nw}] = {{
+{powerups}
+    }};
+
+    // enemies
+    struct EnemyDef {{ const char* kind; int col, row; }};
+    inline constexpr int N_ENEMIES = {ne};
+    inline constexpr EnemyDef ENEMIES[{ne}] = {{
+{enemies}
+    }};
+
+    // coin anchors
+    struct CoinDef {{ int col, row; }};
+    inline constexpr int N_COINS = {nc};
+    inline constexpr CoinDef COINS[{nc}] = {{
+{coins}
+    }};
+
+    // Scenery: whole props assembled from platformer.png.  `id` indexes
+    // Objects::Id from src/Objects.h (generated by tools/build_objects.py) and
+    // `row` is the tile row whose top edge the object stands on -- the sprite
+    // is drawn with its bottom centre on that edge, so a two-tile tree simply
+    // rises above it.  These are NOT tile ids: placing them by tile id used to
+    // scatter severed tree halves around the level.
+    struct SceneryDef {{ int id; int col, row; float scale; bool flip; }};
+    inline constexpr int N_SCENERY = {ns};
+    inline constexpr SceneryDef SCENERY[{ns}] = {{
+{scenery}
+    }};
+}}
+'''
+
+
+def load_object_ids(root: str) -> Dict[str, int]:
+    """Parse src/Objects.h so scenery kinds map to the real enum values.
+
+    Reading the generated header rather than hard-coding the order means the
+    two generators cannot drift apart if an object is added or reordered.
+    """
+    import re as _re
+    path = os.path.join(root, "src", "Objects.h")
+    ids = {}
+    with open(path) as f:
+        for name, val in _re.findall(r"OBJ_(\w+) = (\d+),", f.read()):
+            ids[name.lower()] = int(val)
+    if not ids:
+        raise SystemExit("src/Objects.h has no object ids - run tools/build_objects.py")
+    return ids
+
+
+def emit_header(out_path: str, L: Level) -> None:
+    def ints(vals):
+        return ",\n".join(f"        {v}" for v in vals)
+
+    pc, pr = L.player
+    txt = HEADER.format(
+        TILE=TILE, WIDTH=L.width, HEIGHT=L.height, GROUND_ROW=GROUND_ROW,
+        MAX_STEP_UP=MAX_STEP_UP, MAX_GAP=MAX_GAP, WATER_ROW=WATER_ROW,
+        name=L.name, pc=pc, pr=pr,
+        px=pc * TILE, py=pr * TILE,
+        ground=ints([-1 if (v is None or v < 0) else v for v in L.ground]),
+        np=len(L.platforms),
+        platforms=",\n".join(
+            f'        {{ {p.col}, {p.row}, {p.w}, {p.h}, '
+            f'{"true" if p.moving else "false"}, '
+            f'{"true" if p.vertical else "false"}, '
+            f'{float(p.range):.4f}f, {float(p.speed):.4f}f }}'
+            for p in L.platforms),
+        nh=len(L.hazards),
+        hazards=",\n".join(
+            f'        {{ "{h.kind}", {h.col}, {h.row}, {h.w}, {h.h} }}'
+            for h in L.hazards),
+        nf=len(L.facilities),
+        facilities=",\n".join(
+            f'        {{ "{f.kind}", {f.col}, {f.row} }}' for f in L.facilities),
+        nw=len(L.powerups),
+        powerups=",\n".join(
+            f'        {{ "{p.kind}", {p.col}, {p.row} }}' for p in L.powerups),
+        ne=len(L.enemies),
+        enemies=",\n".join(
+            f'        {{ "{e.kind}", {e.col}, {e.row} }}' for e in L.enemies),
+        nc=len(L.coins),
+        coins=",\n".join(f"        {{ {c}, {r} }}" for (c, r) in L.coins),
+        ns=len(L.scenery),
+        scenery=",\n".join(
+            f'        {{ {OBJ_IDS[s.kind]}, {s.col}, {s.row}, '
+            f'{float(s.scale):.4f}f, {"true" if s.flip else "false"} }}'
+            for s in L.scenery),
+    )
+    with open(out_path, "w") as f:
+        f.write(txt)
+
+
+# ---------------------------------------------------------------------------
+# main
+# ---------------------------------------------------------------------------
+
+def main() -> int:
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    tileset = os.path.join(root, "assets", "tileset")
+    src = os.path.join(root, "src")
+
+    global OBJ_IDS
+    OBJ_IDS = load_object_ids(root)
+
+    L = build_level()
+
+    problems = validate_level(L)
+    print(f"level      : {L.name}  {L.width}x{L.height} tiles")
+    print(f"jump budget: {JUMP_HEIGHT:.0f} px high ({JUMP_HEIGHT/TILE:.2f} tiles), "
+          f"{JUMP_LENGTH:.0f} px long ({JUMP_LENGTH/TILE:.2f} tiles)")
+    print(f"limits     : step up <= {MAX_STEP_UP} tile, gap <= {MAX_GAP} tiles")
+    if problems:
+        print(f"\n*** {len(problems)} PLAYABILITY VIOLATIONS ***")
+        for p in problems:
+            print(f"  - {p}")
+        return 1
+    print("validation : OK - every step and gap is within the jump budget")
+
+    os.makedirs(tileset, exist_ok=True)
+    write_foreground(os.path.join(tileset, "ForegroundLayer.map"), L)
+    write_background(os.path.join(tileset, "BackgroundLayer.map"), L)
+    write_mid(os.path.join(tileset, "MidLayer.map"), L)
+    write_decor(os.path.join(tileset, "DecorLayer.map"), L)
+    write_coins(os.path.join(tileset, "CoinLayer.map"), L)
+    write_colliders(os.path.join(tileset, "Colliders.txt"), L)
+    emit_header(os.path.join(src, "Level.h"), L)
+
+    print(f"wrote      : {len(L.platforms)} platforms, {len(L.enemies)} enemies, "
+          f"{len(L.coins)} coins, {len(L.scenery)} scenery objects, "
+          f"{len(L.decor)} decor tiles")
+
+    # Coverage report: which of the sheet's 36 usable cells the level actually
+    # draws.  The point of the exercise is to use the art that exists, so an
+    # unused tile is a bug report rather than a curiosity.
+    used: set = set()
+    for rel in ("ForegroundLayer.map", "BackgroundLayer.map",
+                "MidLayer.map", "DecorLayer.map"):
+        p = os.path.join(tileset, rel)
+        if not os.path.exists(p):
+            continue
+        with open(p) as fh:
+            for line in fh:
+                for tok in line.split(","):
+                    tok = tok.strip()
+                    if tok and tok != str(EMPTY):
+                        used.add(int(tok))
+    missing = [t for t in ALL_USABLE_TILES if t not in used]
+    print(f"tile usage : {len(used)}/{len(ALL_USABLE_TILES)} usable cells drawn"
+          + (f"  -- unused: {missing}" if missing else "  (every one used)"))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

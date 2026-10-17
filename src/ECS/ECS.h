@@ -55,14 +55,16 @@ private:
     bool active = true;
     std::vector<std::unique_ptr<Component>> components;
 
-    ComponentArray componentArray;
+    ComponentArray componentArray{};
     ComponentBitSet componentBitset;
     GroupBitset groupBitset;
 
 public:
     std::string tag;
 
-    Entity(Manager &mManager) : manager(mManager) {}
+    Entity(Manager &mManager) : manager(mManager) {
+        componentArray.fill(nullptr);
+    }
 
     void update() {
         for (auto &c : components) c->update();

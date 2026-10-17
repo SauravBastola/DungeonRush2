@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <title>power_coins</title>
+  <polygon points="32,3 61,16 61,48 32,61 3,48 3,16" fill="#8a4836" stroke="#1c121c" stroke-width="3"/>
+  <polygon points="32,6.38 57.62,13.92 57.62,41.76 32,57.62 6.38,41.76 6.38,13.92" fill="#1a1932"/>
+  <polygon points="32,6 58,20 58,35.2 32,39.68 6,35.2 6,20" fill="#bf6f4a"/>
+  <ellipse cx="32" cy="47" rx="15" ry="7" fill="#bf6f4a"/>
+  <ellipse cx="32" cy="44" rx="15" ry="7" fill="#ffc825" stroke="#1c121c" stroke-width="2"/>
+  <ellipse cx="32" cy="42.5" rx="8.25" ry="3.5" fill="#ffeb57"/>
+  <ellipse cx="32" cy="39" rx="15" ry="7" fill="#bf6f4a"/>
+  <ellipse cx="32" cy="36" rx="15" ry="7" fill="#ffc825" stroke="#1c121c" stroke-width="2"/>
+  <ellipse cx="32" cy="34.5" rx="8.25" ry="3.5" fill="#ffeb57"/>
+  <ellipse cx="32" cy="31" rx="15" ry="7" fill="#bf6f4a"/>
+  <ellipse cx="32" cy="28" rx="15" ry="7" fill="#ffc825" stroke="#1c121c" stroke-width="2"/>
+  <ellipse cx="32" cy="26.5" rx="8.25" ry="3.5" fill="#ffeb57"/>
+</svg>

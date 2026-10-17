@@ -1,0 +1,161 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="144" viewBox="0 0 192 144">
+  <!-- cell 0,0 -->
+  <g transform="translate(0,0)">
+    <title>idle 0</title>
+    <rect x="18" y="34" width="5" height="11" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <rect x="25" y="34" width="5" height="11" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="16,20 32,20 34,36 14,36" fill="#8a4836" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="24,20 32,20 34,36 24,36" fill="#5d2c28"/>
+    <polygon points="16,20 24,6 32,20" fill="#1e6f50" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="24,6 32,20 26,20" fill="#134c4c"/>
+    <rect x="19" y="14" width="10" height="4" fill="#1c121c"/>
+    <rect x="21" y="15" width="3" height="2" fill="#ffeb57"/>
+    <polyline points="36,8 41,20 36,34" fill="none" stroke="#bf6f4a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <polyline points="36,8 31,21 36,34" fill="none" stroke="#f9e6cf" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="17" y="44" width="6" height="1" fill="#391f21"/>
+  </g>
+  <!-- cell 1,0 -->
+  <g transform="translate(48,0)">
+    <title>idle 1</title>
+    <rect x="18" y="34" width="5" height="11" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <rect x="25" y="34" width="5" height="11" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="16,20 32,20 34,36 14,36" fill="#8a4836" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="24,20 32,20 34,36 24,36" fill="#5d2c28"/>
+    <polygon points="16,20 24,6 32,20" fill="#1e6f50" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="24,6 32,20 26,20" fill="#134c4c"/>
+    <rect x="19" y="14" width="10" height="4" fill="#1c121c"/>
+    <rect x="21" y="15" width="3" height="2" fill="#ffeb57"/>
+    <polyline points="36,8 41,20 36,34" fill="none" stroke="#bf6f4a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <polyline points="36,8 31,21 36,34" fill="none" stroke="#f9e6cf" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="17" y="44" width="6" height="2" fill="#391f21"/>
+  </g>
+  <!-- cell 2,0 -->
+  <g transform="translate(96,0)">
+    <title>idle 2</title>
+    <rect x="18" y="34" width="5" height="11" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <rect x="25" y="34" width="5" height="11" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="16,20 32,20 34,36 14,36" fill="#8a4836" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="24,20 32,20 34,36 24,36" fill="#5d2c28"/>
+    <polygon points="16,20 24,6 32,20" fill="#1e6f50" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="24,6 32,20 26,20" fill="#134c4c"/>
+    <rect x="19" y="14" width="10" height="4" fill="#1c121c"/>
+    <rect x="21" y="15" width="3" height="2" fill="#ffeb57"/>
+    <polyline points="36,8 41,20 36,34" fill="none" stroke="#bf6f4a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <polyline points="36,8 31,21 36,34" fill="none" stroke="#f9e6cf" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="17" y="44" width="6" height="1" fill="#391f21"/>
+  </g>
+  <!-- cell 3,0 -->
+  <g transform="translate(144,0)">
+    <title>idle 3</title>
+    <rect x="18" y="34" width="5" height="11" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <rect x="25" y="34" width="5" height="11" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="16,20 32,20 34,36 14,36" fill="#8a4836" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="24,20 32,20 34,36 24,36" fill="#5d2c28"/>
+    <polygon points="16,20 24,6 32,20" fill="#1e6f50" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="24,6 32,20 26,20" fill="#134c4c"/>
+    <rect x="19" y="14" width="10" height="4" fill="#1c121c"/>
+    <rect x="21" y="15" width="3" height="2" fill="#ffeb57"/>
+    <polyline points="36,8 41,20 36,34" fill="none" stroke="#bf6f4a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <polyline points="36,8 31,21 36,34" fill="none" stroke="#f9e6cf" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="17" y="44" width="6" height="2" fill="#391f21"/>
+  </g>
+  <!-- cell 0,1 -->
+  <g transform="translate(0,48)">
+    <title>shoot 0</title>
+    <rect x="18" y="34" width="5" height="11" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <rect x="25" y="34" width="5" height="11" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="16,20 32,20 34,36 14,36" fill="#8a4836" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="24,20 32,20 34,36 24,36" fill="#5d2c28"/>
+    <polygon points="16,20 24,6 32,20" fill="#1e6f50" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="24,6 32,20 26,20" fill="#134c4c"/>
+    <rect x="19" y="14" width="10" height="4" fill="#1c121c"/>
+    <rect x="21" y="15" width="3" height="2" fill="#ffeb57"/>
+    <polyline points="36,8 41,20 36,34" fill="none" stroke="#bf6f4a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <polyline points="36,8 31,21 36,34" fill="none" stroke="#f9e6cf" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <!-- cell 1,1 -->
+  <g transform="translate(48,48)">
+    <title>shoot 1</title>
+    <rect x="18" y="34" width="5" height="11" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <rect x="25" y="34" width="5" height="11" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="16,20 32,20 34,36 14,36" fill="#8a4836" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="24,20 32,20 34,36 24,36" fill="#5d2c28"/>
+    <polygon points="16,20 24,6 32,20" fill="#1e6f50" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="24,6 32,20 26,20" fill="#134c4c"/>
+    <rect x="19" y="14" width="10" height="4" fill="#1c121c"/>
+    <rect x="21" y="15" width="3" height="2" fill="#ffeb57"/>
+    <polyline points="34.67,8 39.33,20 34.67,34" fill="none" stroke="#bf6f4a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <polyline points="34.67,8 31.67,21 34.67,34" fill="none" stroke="#f9e6cf" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="26.67" y="20" width="14" height="2" fill="#e69c69" stroke="#1c121c" stroke-width="1"/>
+  </g>
+  <!-- cell 2,1 -->
+  <g transform="translate(96,48)">
+    <title>shoot 2</title>
+    <rect x="18" y="34" width="5" height="11" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <rect x="25" y="34" width="5" height="11" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="16,20 32,20 34,36 14,36" fill="#8a4836" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="24,20 32,20 34,36 24,36" fill="#5d2c28"/>
+    <polygon points="16,20 24,6 32,20" fill="#1e6f50" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="24,6 32,20 26,20" fill="#134c4c"/>
+    <rect x="19" y="14" width="10" height="4" fill="#1c121c"/>
+    <rect x="21" y="15" width="3" height="2" fill="#ffeb57"/>
+    <polyline points="33.33,8 37.67,20 33.33,34" fill="none" stroke="#bf6f4a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <polyline points="33.33,8 32.33,21 33.33,34" fill="none" stroke="#f9e6cf" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="25.33" y="20" width="14" height="2" fill="#e69c69" stroke="#1c121c" stroke-width="1"/>
+  </g>
+  <!-- cell 3,1 -->
+  <g transform="translate(144,48)">
+    <title>shoot 3</title>
+    <rect x="18" y="34" width="5" height="11" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <rect x="25" y="34" width="5" height="11" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="16,20 32,20 34,36 14,36" fill="#8a4836" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="24,20 32,20 34,36 24,36" fill="#5d2c28"/>
+    <polygon points="16,20 24,6 32,20" fill="#1e6f50" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="24,6 32,20 26,20" fill="#134c4c"/>
+    <rect x="19" y="14" width="10" height="4" fill="#1c121c"/>
+    <rect x="21" y="15" width="3" height="2" fill="#ffeb57"/>
+    <polyline points="32,8 36,20 32,34" fill="none" stroke="#bf6f4a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <polyline points="32,8 33,21 32,34" fill="none" stroke="#f9e6cf" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="24" y="20" width="14" height="2" fill="#e69c69" stroke="#1c121c" stroke-width="1"/>
+  </g>
+  <!-- cell 0,2 -->
+  <g transform="translate(0,96)">
+    <title>die 0</title>
+    <polygon points="10,26 30,22 34,29 14,33" fill="#8a4836" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="22,24 30,22 34,29 24,31" fill="#5d2c28"/>
+    <polygon points="8,22 16,20 20,28 12,31" fill="#1e6f50" stroke="#1c121c" stroke-width="2"/>
+    <rect x="11" y="24" width="6" height="3" fill="#1c121c"/>
+    <rect x="30" y="28" width="10" height="5" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <polyline points="34,32 38,40 34,48" fill="none" stroke="#bf6f4a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <!-- cell 1,2 -->
+  <g transform="translate(48,96)">
+    <title>die 1</title>
+    <polygon points="10,33 30,29 34,36 14,40" fill="#8a4836" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="22,31 30,29 34,36 24,38" fill="#5d2c28"/>
+    <polygon points="8,29 16,27 20,35 12,38" fill="#1e6f50" stroke="#1c121c" stroke-width="2"/>
+    <rect x="11" y="31" width="6" height="3" fill="#1c121c"/>
+    <rect x="30" y="35" width="10" height="5" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <polyline points="38,27 42,35 38,43" fill="none" stroke="#bf6f4a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <!-- cell 2,2 -->
+  <g transform="translate(96,96)">
+    <title>die 2</title>
+    <polygon points="10,40 30,36 34,43 14,47" fill="#8a4836" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="22,38 30,36 34,43 24,45" fill="#5d2c28"/>
+    <polygon points="8,36 16,34 20,42 12,45" fill="#1e6f50" stroke="#1c121c" stroke-width="2"/>
+    <rect x="11" y="38" width="6" height="3" fill="#1c121c"/>
+    <rect x="30" y="42" width="10" height="5" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <polyline points="42,22 46,30 42,38" fill="none" stroke="#bf6f4a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <!-- cell 3,2 -->
+  <g transform="translate(144,96)">
+    <title>die 3</title>
+    <polygon points="10,40 30,36 34,43 14,47" fill="#8a4836" stroke="#1c121c" stroke-width="2"/>
+    <polygon points="22,38 30,36 34,43 24,45" fill="#5d2c28"/>
+    <polygon points="8,36 16,34 20,42 12,45" fill="#1e6f50" stroke="#1c121c" stroke-width="2"/>
+    <rect x="11" y="38" width="6" height="3" fill="#1c121c"/>
+    <rect x="30" y="42" width="10" height="5" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <polyline points="42,22 46,30 42,38" fill="none" stroke="#bf6f4a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

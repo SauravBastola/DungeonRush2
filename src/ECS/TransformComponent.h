@@ -1,70 +1,59 @@
 #pragma once
-
-#include <algorithm>
-#include "Components.h"
+#include "ECS.h"
+#include "Config.h"
 #include "Vector2D.h"
+#include "Components.h"
+#include <algorithm>
 
 extern float lastFrameTime;
-extern float gameTime;
 
+// World-space transform.  width/height are the collider dimensions
+// (== the visual size of the entity in pixels).  scale is reserved for
+// texture art that needs to be larger than its collider (used sparingly).
 class TransformComponent : public Component {
 public:
     Vector2D position;
     Vector2D velocity;
     Vector2D acceleration;
 
-    int height = 32;
-    int width = 32;
-    float scale = 1;
+    int   width  = 32;
+    int   height = 32;
+    float scale  = 1.f;
 
-    float health = 100;
+    bool dead        = false;
+    bool facingRight = true;
 
-    int speed = 3;
+    // Set by Physics::moveAndCollide / moveAndCollideOneWay on the first call
+    // for an entity.  Those functions integrate velocity themselves, so if
+    // update() also integrated it the entity would move twice per frame and —
+    // far worse — would begin each physics step already buried inside the
+    // ground, because the free integration runs before collision. The X pass
+    // then resolved that vertical penetration sideways and flung the hero to
+    // the map edge. Motion for these entities belongs to physics alone.
+    bool physicsOwnsMotion = false;
 
-    bool blocked = false;
-
-    TransformComponent() {
-        position.Zero();
+    TransformComponent() { position.Zero(); }
+    TransformComponent(int sc) { position.Zero(); scale = sc; }
+    TransformComponent(float x, float y) : position(x, y) { velocity.Zero(); acceleration.Zero(); }
+    TransformComponent(float x, float y, int w, int h, float sc = 1.f)
+        : position(x, y), width(w), height(h), scale(sc)
+    {
+        velocity.Zero(); acceleration.Zero();
     }
 
-    TransformComponent(int sc) {
-        position.Zero();
-        scale = sc;
-    }
-
-    TransformComponent(float x, float y) {
-        position.Zero();
-        acceleration.Zero();
-    }
-
-    TransformComponent(float x, float y, int w, int h, float sc) {
-        position.x = x;
-        position.y = y;
-        height = h;
-        width = w;
-        scale = sc;
-    }
-
-    void init() override {
-        velocity.Zero();
-    }
-
+    void init() override { velocity.Zero(); }
     void update() override {
-        position.x += static_cast<int>(velocity.x * lastFrameTime);
-        position.y += static_cast<int>(velocity.y * lastFrameTime);
-        if(position.x < 0) {
-            position.x = 0;
-        } else if(position.x > 14225) {
-            position.x = 14225;
-        } else if(position.y < 0) {
-            position.y = 0;
+        if (!physicsOwnsMotion) {
+            position.x += velocity.x * lastFrameTime;
+            position.y += velocity.y * lastFrameTime;
         }
-
+        if (position.x < 0) position.x = 0;
+        if (position.x > Config::MAP_PIXEL_WIDTH - width)
+            position.x = (float)(Config::MAP_PIXEL_WIDTH - width);
+        if (position.y < -200) position.y = -200;
     }
-
     void updatePosition() {
-        position.x += static_cast<int>(velocity.x * lastFrameTime);
-        position.y += static_cast<int>(velocity.y * lastFrameTime);
+        position.x += velocity.x * lastFrameTime;
+        position.y += velocity.y * lastFrameTime;
     }
-
 };

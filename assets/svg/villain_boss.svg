@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="150" height="150" viewBox="0 0 150 150">
+  <defs>
+    <radialGradient id="body" cx="50%" cy="40%" r="60%"><stop offset="0%" stop-color="#6b4a8a"/><stop offset="100%" stop-color="#2a0a3a"/></radialGradient>
+    <linearGradient id="cape" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#1a0033"/><stop offset="100%" stop-color="#4a0080"/></linearGradient>
+  </defs>
+  <!-- cape -->
+  <path d="M25 45 Q75 140 125 45 L115 40 Q75 120 35 40 Z" fill="url(#cape)" opacity="0.9"/>
+  <!-- body -->
+  <ellipse cx="75" cy="85" rx="38" ry="42" fill="url(#body)" stroke="#000" stroke-width="3"/>
+  <!-- head -->
+  <circle cx="75" cy="45" r="32" fill="#3a1a5a" stroke="black" stroke-width="3"/>
+  <path d="M55 35 Q75 50 95 35 Q75 55 55 35" fill="#ff453a" opacity="0.9"/>
+  <!-- eyes -->
+  <ellipse cx="62" cy="42" rx="9" ry="11" fill="#ff3b30"/><ellipse cx="88" cy="42" rx="9" ry="11" fill="#ff3b30"/>
+  <circle cx="62" cy="44" r="3" fill="black"/><circle cx="88" cy="44" r="3" fill="black"/>
+  <circle cx="64" cy="39" r="2" fill="white" opacity="0.8"/><circle cx="90" cy="39" r="2" fill="white" opacity="0.8"/>
+  <!-- horns -->
+  <path d="M48 25 L38 8 L52 18 Z" fill="#1a1a1a" stroke="black" stroke-width="1.5"/><path d="M102 25 L112 8 L98 18 Z" fill="#1a1a1a" stroke="black" stroke-width="1.5"/>
+  <!-- chest emblem -->
+  <circle cx="75" cy="88" r="16" fill="#ff9f0a" stroke="black" stroke-width="2"/>
+  <path d="M75 76 L80 86 L90 86 L82 92 L85 102 L75 95 L65 102 L68 92 L60 86 L70 86 Z" fill="black"/>
+</svg>

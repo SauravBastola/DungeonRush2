@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="96" viewBox="0 0 128 96">
+  <!-- cell 0,0 -->
+  <g transform="translate(0,0)">
+    <title>walk 0</title>
+    <ellipse cx="16" cy="22" rx="9" ry="8" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <ellipse cx="14" cy="20" rx="6" ry="5.33" fill="#424c6e"/>
+    <polyline points="16,14 19,10 17,6" fill="none" stroke="#bf6f4a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <!-- cell 1,0 -->
+  <g transform="translate(32,0)">
+    <title>walk 1</title>
+    <ellipse cx="16" cy="20" rx="10" ry="7" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <ellipse cx="14" cy="18" rx="6.67" ry="4.67" fill="#424c6e"/>
+    <polyline points="16,12 19,8 17,4" fill="none" stroke="#bf6f4a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="17" cy="3" r="3" fill="#ffeb57" stroke="#1c121c" stroke-width="1"/>
+    <circle cx="17" cy="3" r="1.5" fill="#f9e6cf"/>
+  </g>
+  <!-- cell 2,0 -->
+  <g transform="translate(64,0)">
+    <title>walk 2</title>
+    <ellipse cx="16" cy="22" rx="9" ry="8" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <ellipse cx="14" cy="20" rx="6" ry="5.33" fill="#424c6e"/>
+    <polyline points="16,14 19,10 17,6" fill="none" stroke="#bf6f4a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <!-- cell 3,0 -->
+  <g transform="translate(96,0)">
+    <title>walk 3</title>
+    <ellipse cx="16" cy="20" rx="10" ry="7" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <ellipse cx="14" cy="18" rx="6.67" ry="4.67" fill="#424c6e"/>
+    <polyline points="16,12 19,8 17,4" fill="none" stroke="#bf6f4a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="17" cy="3" r="3" fill="#ffeb57" stroke="#1c121c" stroke-width="1"/>
+    <circle cx="17" cy="3" r="1.5" fill="#f9e6cf"/>
+  </g>
+  <!-- cell 0,1 -->
+  <g transform="translate(0,32)">
+    <title>fuse 0</title>
+    <ellipse cx="16" cy="22" rx="9" ry="8" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <ellipse cx="14" cy="20" rx="6" ry="5.33" fill="#424c6e"/>
+    <polyline points="16,14 19,10 17,6" fill="none" stroke="#bf6f4a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="17" cy="5" r="3" fill="#ffeb57" stroke="#1c121c" stroke-width="1"/>
+    <circle cx="17" cy="5" r="1.5" fill="#f9e6cf"/>
+  </g>
+  <!-- cell 1,1 -->
+  <g transform="translate(32,32)">
+    <title>fuse 1</title>
+    <ellipse cx="16" cy="21" rx="9.5" ry="7.5" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <ellipse cx="14" cy="19" rx="6.33" ry="5" fill="#424c6e"/>
+    <polyline points="16,13 19,9 17,5" fill="none" stroke="#bf6f4a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="17" cy="4" r="3.8" fill="#ffeb57" stroke="#1c121c" stroke-width="1"/>
+    <circle cx="17" cy="4" r="1.9" fill="#f9e6cf"/>
+  </g>
+  <!-- cell 2,1 -->
+  <g transform="translate(64,32)">
+    <title>fuse 2</title>
+    <ellipse cx="16" cy="20" rx="10" ry="7" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <ellipse cx="14" cy="18" rx="6.67" ry="4.67" fill="#424c6e"/>
+    <polyline points="16,12 19,8 17,4" fill="none" stroke="#bf6f4a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="17" cy="3" r="4.6" fill="#ffeb57" stroke="#1c121c" stroke-width="1"/>
+    <circle cx="17" cy="3" r="2.3" fill="#f9e6cf"/>
+  </g>
+  <!-- cell 3,1 -->
+  <g transform="translate(96,32)">
+    <title>fuse 3</title>
+    <ellipse cx="16" cy="19" rx="10.5" ry="6.5" fill="#391f21" stroke="#1c121c" stroke-width="2"/>
+    <ellipse cx="14" cy="17" rx="7" ry="4.33" fill="#424c6e"/>
+    <polyline points="16,11 19,7 17,3" fill="none" stroke="#bf6f4a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="17" cy="2" r="5.4" fill="#ffeb57" stroke="#1c121c" stroke-width="1"/>
+    <circle cx="17" cy="2" r="2.7" fill="#f9e6cf"/>
+  </g>
+  <!-- cell 0,2 -->
+  <g transform="translate(0,64)">
+    <title>explode 0</title>
+    <circle cx="16" cy="16" r="5" fill="#ff5000" stroke="#1c121c" stroke-width="2"/>
+    <circle cx="16" cy="16" r="3.6" fill="#ffa214"/>
+    <circle cx="16" cy="16" r="2.2" fill="#ffeb57"/>
+    <circle cx="16" cy="16" r="1.1" fill="#f9e6cf"/>
+  </g>
+  <!-- cell 1,2 -->
+  <g transform="translate(32,64)">
+    <title>explode 1</title>
+    <circle cx="16" cy="16" r="8.67" fill="#ff5000" stroke="#1c121c" stroke-width="2"/>
+    <circle cx="16" cy="16" r="6.24" fill="#ffa214"/>
+    <circle cx="16" cy="16" r="3.81" fill="#ffeb57"/>
+    <circle cx="16" cy="16" r="1.91" fill="#f9e6cf"/>
+  </g>
+  <!-- cell 2,2 -->
+  <g transform="translate(64,64)">
+    <title>explode 2</title>
+    <circle cx="16" cy="16" r="12.33" fill="#ff5000" stroke="#1c121c" stroke-width="2"/>
+    <circle cx="16" cy="16" r="8.88" fill="#ffa214"/>
+    <circle cx="16" cy="16" r="5.43" fill="#ffeb57"/>
+    <circle cx="16" cy="16" r="2.71" fill="#f9e6cf"/>
+  </g>
+  <!-- cell 3,2 -->
+  <g transform="translate(96,64)">
+    <title>explode 3</title>
+    <circle cx="16" cy="16" r="16" fill="#ff5000" stroke="#1c121c" stroke-width="2"/>
+    <circle cx="16" cy="16" r="11.52" fill="#ffa214"/>
+    <circle cx="16" cy="16" r="7.04" fill="#ffeb57"/>
+  </g>
+</svg>

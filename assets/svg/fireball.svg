@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <title>fireball</title>
+  <circle cx="16" cy="16" r="14" fill="#ff5000" stroke="#1c121c" stroke-width="2"/>
+  <circle cx="16" cy="16" r="10" fill="#ed7614"/>
+  <circle cx="16" cy="16" r="6" fill="#ffa214"/>
+  <circle cx="15" cy="14" r="3" fill="#ffeb57"/>
+</svg>

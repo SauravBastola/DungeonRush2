@@ -1,100 +1,41 @@
 #pragma once
-#include <string>
-#include <SDL.h>
+#include "ECS.h"
 #include "Components.h"
-#include "TextureManager.h"
+#include "TransformComponent.h"
+#include "Game.h"
+#include <string>
 
 class ColliderComponent : public Component {
 public:
-    SDL_Rect collider = {0, 0, 0, 0};
-    std::string tag;
+    std::string tag = "default";
+    SDL_Rect collider{0,0,0,0};
+    TransformComponent* transform = nullptr;
+    int  w = 0, h = 0;
+    bool solid = true;
+    bool sensor = false;
+    int  xOffset = 0, yOffset = 0;
 
-    SDL_Texture *tex;
-    SDL_Rect srcR = {0, 0, 32, 32}, destR = {0, 0, 32, 32};
-
-    int colliderWidth = 0, colliderHeight = 0;
-
-    TransformComponent *transform;
-
-    ColliderComponent(std::string t) {
-        tag = t;
-    }
-
-    ColliderComponent(std::string t, int xpos, int ypos, int size) {
-        tag = t;
-        collider.x = xpos;
-        collider.y = ypos;
-        collider.h = collider.w = size;
-    }
-
-    ColliderComponent(std::string t, int colWidth, int colHeight) {
-        tag = t;
-        colliderWidth = colWidth;
-        colliderHeight = colHeight;
-    }
-
-    ColliderComponent(std::string t, int xpos, int ypos, int colWidth, int colHeight) {
-        tag = t;
-        collider.x = xpos;
-        collider.y = ypos;
-        collider.w = colWidth;
-        collider.h = colHeight;
+    ColliderComponent() = default;
+    ColliderComponent(std::string t) : tag(std::move(t)) {}
+    ColliderComponent(std::string t, int cw, int ch) : tag(std::move(t)), w(cw), h(ch) {}
+    ColliderComponent(std::string t, int x, int y, int cw, int ch)
+        : tag(std::move(t)), w(cw), h(ch)
+    {
+        collider.x = x; collider.y = y; collider.w = cw; collider.h = ch;
     }
 
     void init() override {
-        if (!entity->hasComponent<TransformComponent>()) {
+        if (!entity->hasComponent<TransformComponent>())
             entity->addComponent<TransformComponent>();
-        }
-
         transform = &entity->getComponent<TransformComponent>();
-
-        if (colliderWidth == 0 && colliderHeight == 0) {
-            colliderWidth = transform->width;
-            colliderHeight = transform->height;
-        }
-
-        if (entity->tag != "tileCollider") {
-            collider.w = colliderWidth * transform->scale;
-            collider.h = colliderHeight * transform->scale;
-        }
-
-        if (tag != "terrain") {
-            collider.x = static_cast<int>(transform->position.x);
-            collider.x += (transform->width - colliderWidth) * transform->scale / 2.0;
-            collider.y = static_cast<int>(transform->position.y);
-            collider.y += (transform->height - colliderHeight) * transform->scale / 2.0;
-            collider.w =colliderWidth * transform->scale;
-            collider.h = colliderHeight * transform->scale;
-            destR.w = colliderWidth * transform->scale;
-            destR.h = colliderHeight * transform->scale;
-        }
-
-        tex = TextureManager::LoadTexture("../assets/sprites/ColTex.png");
-        srcR = {0, 0, 32, 32};
-        destR = {collider.x, collider.y, collider.w, collider.h};
-
+        if (w == 0) w = transform->width;
+        if (h == 0) h = transform->height;
     }
-
     void update() override {
-        if (tag != "terrain") {
-            collider.x = static_cast<int>(transform->position.x);
-            collider.x += (transform->width - colliderWidth) * transform->scale / 2.0;
-            collider.y = static_cast<int>(transform->position.y);
-            collider.y += (transform->height - colliderHeight) * transform->scale / 2.0;
-            collider.w =colliderWidth * transform->scale;
-            collider.h = colliderHeight * transform->scale;
-            destR.w = colliderWidth * transform->scale;
-            destR.h = colliderHeight * transform->scale;
-        }
-
-        destR.x = collider.x - Game::camera.x;
-        destR.y = collider.y - Game::camera.y;
+        if (!transform) return;
+        collider.w = w;
+        collider.h = h;
+        collider.x = (int)transform->position.x + xOffset;
+        collider.y = (int)transform->position.y + yOffset;
     }
-
-    void draw() override {
-//        TextureManager::Draw(tex, srcR, destR, SDL_FLIP_NONE);
-    }
-
-private:
-
 };

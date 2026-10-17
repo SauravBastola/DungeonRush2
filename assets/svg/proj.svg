@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <title>projectile</title>
+  <polygon points="4,16 13,9 13,16" fill="#0069aa"/>
+  <polygon points="4,16 13,23 13,16" fill="#0069aa"/>
+  <ellipse cx="19" cy="16" rx="11" ry="7" fill="#0098dc" stroke="#1c121c" stroke-width="2"/>
+  <ellipse cx="17" cy="14" rx="6" ry="3.2" fill="#f9e6cf"/>
+</svg>

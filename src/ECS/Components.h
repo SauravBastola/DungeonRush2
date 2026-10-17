@@ -1,11 +1,19 @@
 #pragma once
-
+// Umbrella header for all ECS components.
 #include "ECS.h"
+#include "Animation.h"
 #include "TransformComponent.h"
-#include "ScriptComponent.h"
-#include "RigidBodyComponent.h"
 #include "SpriteComponent.h"
 #include "ColliderComponent.h"
-#include "TileComponent.h"
+#include "RigidBodyComponent.h"
+#include "HealthComponent.h"
+#include "HitboxComponent.h"
+#include "EnemyAIComponent.h"
+#include "PowerUpComponent.h"
+#include "MovingPlatformComponent.h"
+#include "BobbingComponent.h"
+#include "AfterimageComponent.h"
 #include "ProjectileComponent.h"
+#include "TileComponent.h"
+#include "ParticleComponent.h"
 #include "UILabel.h"

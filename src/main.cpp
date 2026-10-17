@@ -1,47 +1,39 @@
 #include "Game.h"
+#include "Config.h"
+#include <memory>
 
 Game *game = nullptr;
 
-float gameTime;
-float lastFrameTime;
+float gameTime = 0.f;
+float lastFrameTime = 1.f / Config::FPS;
 
 int main(int argc, char *argv[]) {
-
-    const int FPS = 60;
-    const int frameDelay = 1000 / FPS;
-
-
-    Uint32 gameStart;
-    Uint32 gameTimee;
-    Uint32 frameStart;
-    Uint32 frameTime;
-
+    (void)argc; (void)argv;
 
     game = new Game();
-    game->init("GameWindow", 1350, 850, false);
+    game->init("DungeonRush", Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT, false);
 
-    gameStart = SDL_GetTicks();
+    Uint32 gameStart = SDL_GetTicks();
     while (game->running()) {
-        frameStart = SDL_GetTicks();
+        Uint32 frameStart = SDL_GetTicks();
 
         game->handleEvents();
         game->update();
-        game->clearEventProcessing();
         game->render();
 
-        frameTime = SDL_GetTicks() - frameStart;
-
-        if (frameDelay > frameTime) {
-            SDL_Delay(frameDelay - frameTime);
+        Uint32 frameTimeMs = SDL_GetTicks() - frameStart;
+        if (Config::FRAME_DELAY_MS > frameTimeMs) {
+            SDL_Delay(Config::FRAME_DELAY_MS - frameTimeMs);
+            frameTimeMs = SDL_GetTicks() - frameStart;
         }
-
-        frameTime = SDL_GetTicks() - frameStart;
-        gameTimee = SDL_GetTicks() - gameStart;
-
-        gameTime = static_cast<float>(gameTimee/1000.0);
-        lastFrameTime = static_cast<float>(frameTime / 1000.0);
+        lastFrameTime = static_cast<float>(frameTimeMs) / 1000.0f;
+        // clamp delta to avoid huge jumps when debugging
+        if (lastFrameTime > 0.05f) lastFrameTime = 0.05f;
+        if (lastFrameTime < 0.001f) lastFrameTime = 1.f / Config::FPS;
+        gameTime = static_cast<float>(SDL_GetTicks() - gameStart) / 1000.0f;
     }
 
     game->clean();
+    delete game;
     return 0;
 }

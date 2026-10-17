@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450">
+  <rect width="800" height="450" rx="16" fill="#0a0a1a" stroke="#30d158" stroke-width="3"/>
+  <rect x="12" y="12" width="776" height="426" rx="12" fill="none" stroke="white" stroke-width="1" opacity="0.2"/>
+  <text x="400" y="48" text-anchor="middle" font-family="monospace" font-size="28" fill="#30d158" font-weight="bold">HOW TO PLAY</text>
+  <text x="40" y="90" font-family="monospace" font-size="16" fill="white">MOVE:   A / D  or  ◀ ▶</text>
+  <text x="40" y="118" font-family="monospace" font-size="16" fill="white">JUMP:   W  (hold for higher, double-tap for double jump)</text>
+  <text x="40" y="146" font-family="monospace" font-size="16" fill="#0a84ff">DASH:   LSHIFT / K  (air &amp; ground, cooldown 0.9s)</text>
+  <text x="40" y="174" font-family="monospace" font-size="16" fill="#ff9f0a">ATTACK: Q / E / F  (three combos, extends hitbox)</text>
+  <text x="40" y="202" font-family="monospace" font-size="16" fill="#bf5af2">POWERUPS: ♥ Health  ⚡ Speed  🛡 Invincible (6s / 4s)</text>
+  <text x="40" y="230" font-family="monospace" font-size="16" fill="white">ENEMIES: Skeleton chases if &lt;520px, Bat patrols, Boss at end</text>
+  <text x="40" y="258" font-family="monospace" font-size="16" fill="#30d158">PLATFORM: Grey stone moves horizontally, carry player</text>
+  <text x="40" y="286" font-family="monospace" font-size="16" fill="white">LIVES:  3 hearts top-left • Coins = +10 • Powerups = +25</text>
+  <text x="40" y="314" font-family="monospace" font-size="14" fill="#aaa">PAUSE: P    MUTE: M    RESTART: R (on Game Over)</text>
+  <text x="400" y="360" text-anchor="middle" font-family="monospace" font-size="15" fill="#ffd60a">Collect all coins, defeat villains, reach the end!</text>
+  <text x="400" y="390" text-anchor="middle" font-family="monospace" font-size="13" fill="#888">Tip: Use dash to cross gaps, coyote time 0.15s helps jumps</text>
+  <rect x="300" y="405" width="200" height="28" rx="8" fill="#30d158"/><text x="400" y="424" text-anchor="middle" font-family="monospace" font-size="14" fill="black" font-weight="bold">Press ESC or ENTER to return</text>
+</svg>

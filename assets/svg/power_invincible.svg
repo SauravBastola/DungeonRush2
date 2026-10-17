@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <title>power_invincible</title>
+  <polygon points="32,3 61,16 61,48 32,61 3,48 3,16" fill="#424c6e" stroke="#1c121c" stroke-width="3"/>
+  <polygon points="32,6.38 57.62,13.92 57.62,41.76 32,57.62 6.38,41.76 6.38,13.92" fill="#1a1932"/>
+  <polygon points="32,6 58,20 58,35.2 32,39.68 6,35.2 6,20" fill="#657392"/>
+  <polygon points="13,11 51,11 51,36.52 32,55 13,36.52" fill="#ffc825" stroke="#1c121c" stroke-width="2"/>
+  <polygon points="32,11 51,11 51,36.52 32,55" fill="#bf6f4a"/>
+  <rect x="28.96" y="18.04" width="6.08" height="27.28" fill="#ffeb57"/>
+  <rect x="18.32" y="31.72" width="27.36" height="6.08" fill="#ffeb57"/>
+</svg>

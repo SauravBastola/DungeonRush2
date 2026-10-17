@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <title>power_magnet</title>
+  <polygon points="32,3 61,16 61,48 32,61 3,48 3,16" fill="#391f21" stroke="#1c121c" stroke-width="3"/>
+  <polygon points="32,6.38 57.62,13.92 57.62,41.76 32,57.62 6.38,41.76 6.38,13.92" fill="#1a1932"/>
+  <polygon points="32,6 58,20 58,35.2 32,39.68 6,35.2 6,20" fill="#8a4836"/>
+  <polygon points="18,20 46,20 46,40 38,40 38,28 26,28 26,40 18,40" fill="#92a1b9" stroke="#1c121c" stroke-width="3"/>
+  <polygon points="32,20 46,20 46,40 38,40 38,28 32,28" fill="#657392"/>
+  <rect x="18" y="38" width="10" height="10" fill="#c42430" stroke="#1c121c" stroke-width="2"/>
+  <rect x="36" y="38" width="10" height="10" fill="#c42430" stroke="#1c121c" stroke-width="2"/>
+</svg>

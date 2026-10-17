@@ -5,10 +5,10 @@
 #include "TextureManager.h"
 #include "Vector2D.h"
 #include "ECS.h"
-#include <SDL/SDL_ttf.h>
-#include <SDL/SDL_mixer.h>
+#include <SDL_ttf.h>
+#include <SDL_mixer.h>
 
-class AssetManagerd
+class AssetManager
 {
 public:
 	AssetManager(Manager* man);

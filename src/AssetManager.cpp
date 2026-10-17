@@ -2,38 +2,49 @@
 #include "Components.h"
 
 AssetManager::AssetManager(Manager *man) : manager(man) {}
-
-AssetManager::~AssetManager() {}
-
-void AssetManager::CreateProjectile(Vector2D pos, Vector2D vel, int range, int speed, std::string id) {
-    auto &projectile(manager->addEntity("projectile"));
-    projectile.addComponent<TransformComponent>(pos.x, pos.y, 32, 32, 1);
-    projectile.addComponent<SpriteComponent>(id, false);
-    projectile.addComponent<ProjectileComponent>(range, speed, vel);
-    projectile.addComponent<ColliderComponent>("projectile");
-    projectile.addGroup(Game::groupProjectiles);
-}
+AssetManager::~AssetManager() = default;
 
 void AssetManager::AddTexture(std::string id, const char *path) {
-    textures.emplace(id, TextureManager::LoadTexture(path));
+    SDL_Texture* tex = TextureManager::LoadTexture(path);
+    if (!tex) {
+        std::cerr << "[AssetManager] Failed to load texture '" << id
+                  << "' at " << path << "\n";
+    }
+    textures[id] = tex;
 }
 
 SDL_Texture *AssetManager::GetTexture(std::string id) {
-    return textures[id];
+    auto it = textures.find(id);
+    if (it == textures.end()) return nullptr;
+    return it->second;
 }
 
 void AssetManager::AddFont(std::string id, std::string path, int fontSize) {
-    fonts.emplace(id, TTF_OpenFont(path.c_str(), fontSize));
+    TTF_Font* font = TTF_OpenFont(path.c_str(), fontSize);
+    if (!font) {
+        std::cerr << "[AssetManager] TTF_OpenFont failed '" << id
+                  << "' at " << path << ": " << TTF_GetError() << "\n";
+    }
+    fonts[id] = font;
 }
 
 TTF_Font *AssetManager::GetFont(std::string id) {
-    return fonts[id];
+    auto it = fonts.find(id);
+    if (it == fonts.end()) return nullptr;
+    return it->second;
 }
 
 void AssetManager::AddSound(std::string id, const char *path) {
-    sounds.emplace(id, Mix_LoadWAV(path));
+    Mix_Chunk* chunk = Mix_LoadWAV(path);
+    if (!chunk) {
+        std::cerr << "[AssetManager] Mix_LoadWAV failed '" << id
+                  << "' at " << path << ": " << Mix_GetError() << "\n";
+    }
+    sounds[id] = chunk;
 }
 
 Mix_Chunk* AssetManager::GetSound(std::string id) {
-    return sounds[id];
+    auto it = sounds.find(id);
+    if (it == sounds.end()) return nullptr;
+    return it->second;
 }

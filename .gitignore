@@ -1,3 +1,14 @@
 cmake-build-debug/
+cmake-build-release/
+build/
 .idea/
+.vscode/
 bin/
+*.dSYM/
+.DS_Store
+lib/
+
+# agent / review / runtime artifacts (added 2026-10-17)
+.workbuddy-ai/
+artifacts/
+dungeonrush.save

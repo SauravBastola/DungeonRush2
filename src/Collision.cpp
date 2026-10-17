@@ -4,11 +4,20 @@
 extern float lastFrameTime;
 
 bool Collision::AABB(const SDL_Rect& recA, const SDL_Rect& recB) {
+    // Strictly-greater on every axis: two boxes that merely TOUCH edge-to-edge
+    // do not overlap.
+    //
+    // This used to be >= on all four axes.  A body resting on the ground ends
+    // every frame with bottom == ground top, so the inclusive test reported a
+    // permanent overlap; the X pass of Physics::moveAndCollide then treated
+    // the floor as a wall and pushed the hero sideways through every ground
+    // column until the position clamped at x = 0.  Resting stopped being
+    // resting the instant the player pressed a direction key.
     if (
-        recA.x + recA.w >= recB.x &&
-            recB.x + recB.w >= recA.x &&
-            recA.y + recA.h >= recB.y &&
-            recB.y + recB.h >= recA.y
+        recA.x + recA.w > recB.x &&
+            recB.x + recB.w > recA.x &&
+            recA.y + recA.h > recB.y &&
+            recB.y + recB.h > recA.y
         ) {
         return true;
     }

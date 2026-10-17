@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="600" viewBox="0 0 1000 600">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1a1a2e"/><stop offset="100%" stop-color="#0f0f1a"/></linearGradient>
+    <linearGradient id="header" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#30d158"/><stop offset="100%" stop-color="#5ddb88"/></linearGradient>
+    <radialGradient id="fire" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#ffde59" stop-opacity="0.8"/><stop offset="100%" stop-color="#ff3b30" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect x="0" y="0" width="1000" height="600" rx="20" fill="url(#bg)" stroke="#30d158" stroke-width="4"/>
+  <rect x="0" y="0" width="1000" height="70" rx="20" fill="url(#header)"/>
+  <rect x="0" y="50" width="1000" height="20" fill="#30d158"/>
+  <text x="40" y="44" font-family="monospace" font-size="28" fill="white" font-weight="bold">HOW TO PLAY — Dungeon Rush</text>
+  <text x="700" y="44" font-family="monospace" font-size="14" fill="#0a3a1a">Wind • Water • Grass Sway • Fog • Fire Light</text>
+  <!-- Row 1: MOVE -->
+  <rect x="30" y="90" width="940" height="60" rx="12" fill="white" fill-opacity="0.06" stroke="white" stroke-opacity="0.1"/>
+  <rect x="40" y="100" width="70" height="40" rx="8" fill="#5cb85c"/><text x="75" y="126" font-family="monospace" font-size="16" fill="white" text-anchor="middle" font-weight="bold">MOVE</text>
+  <g transform="translate(130,100)"><rect x="0" y="0" width="36" height="28" rx="6" fill="white" stroke="#333" stroke-width="2"/><text x="18" y="18" font-family="monospace" font-size="12" fill="black" text-anchor="middle">A</text></g>
+  <g transform="translate(170,100)"><rect x="0" y="0" width="36" height="28" rx="6" fill="white" stroke="#333" stroke-width="2"/><text x="18" y="18" font-family="monospace" font-size="12" fill="black" text-anchor="middle">D</text></g>
+  <text x="220" y="118" font-family="monospace" font-size="12" fill="#aaa">or ← →  •  Coyote 0.15s • Friction 1800</text>
+  <circle cx="900" cy="120" r="16" fill="url(#fire)" opacity="0.6"><animate attributeName="r" values="16;18;16" dur="1.2s" repeatCount="indefinite"/></circle>
+  <text x="900" y="124" font-family="monospace" font-size="10" fill="#ff9500" text-anchor="middle">🔥</text>
+  <!-- Row 2: JUMP -->
+  <rect x="30" y="160" width="940" height="60" rx="12" fill="white" fill-opacity="0.06" stroke="white" stroke-opacity="0.1"/>
+  <rect x="40" y="170" width="70" height="40" rx="8" fill="#0a84ff"/><text x="75" y="196" font-family="monospace" font-size="16" fill="white" text-anchor="middle" font-weight="bold">JUMP</text>
+  <g transform="translate(130,170)"><rect x="0" y="0" width="36" height="28" rx="6" fill="#5dade2" stroke="#1a5490" stroke-width="2"/><text x="18" y="18" font-family="monospace" font-size="12" fill="black" text-anchor="middle">W</text></g>
+  <g transform="translate(170,170)"><rect x="0" y="0" width="50" height="28" rx="6" fill="#5dade2" stroke="#1a5490" stroke-width="2"/><text x="25" y="18" font-family="monospace" font-size="8" fill="black" text-anchor="middle">SPACE</text></g>
+  <text x="240" y="188" font-family="monospace" font-size="12" fill="#aaa">Hold higher • Double jump • Wall slide 120 • Buffer 0.15s</text>
+  <!-- wind hint -->
+  <path d="M800,185 Q820,180 840,185 T880,185" stroke="#a0d8ef" stroke-width="2" fill="none" opacity="0.6"><animate attributeName="d" values="M800,185 Q820,180 840,185 T880,185;M800,185 Q820,190 840,185 T880,185;M800,185 Q820,180 840,185 T880,185" dur="2s" repeatCount="indefinite"/></path>
+  <!-- Row 3: DASH -->
+  <rect x="30" y="230" width="940" height="60" rx="12" fill="white" fill-opacity="0.06" stroke="white" stroke-opacity="0.1"/>
+  <rect x="40" y="240" width="70" height="40" rx="8" fill="#ff9500"/><text x="75" y="266" font-family="monospace" font-size="16" fill="white" text-anchor="middle" font-weight="bold">DASH</text>
+  <g transform="translate(130,240)"><rect x="0" y="0" width="56" height="28" rx="6" fill="#ffcc02" stroke="#7a3a00" stroke-width="2"/><text x="28" y="18" font-family="monospace" font-size="8" fill="black" text-anchor="middle">LSHIFT</text></g>
+  <g transform="translate(190,240)"><rect x="0" y="0" width="36" height="28" rx="6" fill="#ffcc02" stroke="#7a3a00" stroke-width="2"/><text x="18" y="18" font-family="monospace" font-size="12" fill="black" text-anchor="middle">K</text></g>
+  <text x="240" y="258" font-family="monospace" font-size="12" fill="#aaa">Air &amp; ground • Invincible 0.18s • Cooldown 0.9s • 800 px/s</text>
+  <!-- Row 4: ATTACK -->
+  <rect x="30" y="300" width="940" height="60" rx="12" fill="white" fill-opacity="0.06" stroke="white" stroke-opacity="0.1"/>
+  <rect x="40" y="310" width="70" height="40" rx="8" fill="#ff2d55"/><text x="75" y="336" font-family="monospace" font-size="14" fill="white" text-anchor="middle" font-weight="bold">ATTACK</text>
+  <g transform="translate(130,310)"><rect x="0" y="0" width="36" height="28" rx="6" fill="#ff2d55" stroke="#7a001a" stroke-width="2"/><text x="18" y="18" font-family="monospace" font-size="12" fill="white" text-anchor="middle">Q</text></g>
+  <g transform="translate(170,310)"><rect x="0" y="0" width="36" height="28" rx="6" fill="#ff2d55" stroke="#7a001a" stroke-width="2"/><text x="18" y="18" font-family="monospace" font-size="12" fill="white" text-anchor="middle">E</text></g>
+  <g transform="translate(210,310)"><rect x="0" y="0" width="36" height="28" rx="6" fill="#ff2d55" stroke="#7a001a" stroke-width="2"/><text x="18" y="18" font-family="monospace" font-size="12" fill="white" text-anchor="middle">F</text></g>
+  <text x="260" y="328" font-family="monospace" font-size="12" fill="#aaa">3 combos • Hitbox +12px • 12 dmg (boss 0.8×)</text>
+  <!-- Row 5: POWERUPS with sway grass -->
+  <rect x="30" y="370" width="940" height="60" rx="12" fill="white" fill-opacity="0.06" stroke="white" stroke-opacity="0.1"/>
+  <rect x="40" y="380" width="90" height="40" rx="8" fill="#bf5af2"/><text x="85" y="406" font-family="monospace" font-size="12" fill="white" text-anchor="middle" font-weight="bold">POWERUPS</text>
+  <circle cx="150" cy="400" r="14" fill="#ff3b30" stroke="white" stroke-width="2"/><text x="150" y="404" font-family="monospace" font-size="14" fill="white" text-anchor="middle">+</text>
+  <circle cx="180" cy="400" r="14" fill="#30d158" stroke="white" stroke-width="2"/><text x="180" y="404" font-family="monospace" font-size="10" fill="white" text-anchor="middle">⚡</text>
+  <circle cx="210" cy="400" r="14" fill="#0a84ff" stroke="white" stroke-width="2"/><text x="210" y="404" font-family="monospace" font-size="12" fill="white" text-anchor="middle">◈</text>
+  <text x="240" y="404" font-family="monospace" font-size="12" fill="#aaa">Health +30 • Speed 6s ×1.6 • Invincible 4s • +25 pts • Fog heals</text>
+  <!-- grass sway hint -->
+  <path d="M800,400 L802,380 L804,400" stroke="#5cb85c" stroke-width="2" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" values="0 801 400; 3 801 400; -2 801 400; 0 801 400" dur="1.8s" repeatCount="indefinite"/></path>
+  <path d="M820,400 L822,375 L824,400" stroke="#7ed67e" stroke-width="2"><animateTransform attributeName="transform" type="rotate" values="0 821 400; -3 821 400; 2 821 400; 0 821 400" dur="2.1s" repeatCount="indefinite"/></path>
+  <!-- Row 6: WORLD -->
+  <rect x="30" y="440" width="940" height="60" rx="12" fill="white" fill-opacity="0.06" stroke="white" stroke-opacity="0.1"/>
+  <rect x="40" y="450" width="70" height="40" rx="8" fill="#a0a0a0"/><text x="75" y="476" font-family="monospace" font-size="12" fill="white" text-anchor="middle" font-weight="bold">WORLD</text>
+  <text x="130" y="468" font-family="monospace" font-size="11" fill="#aaa">Parallax 0.15/0.55/1.0 • Swaying grass • Water ripples • Wind • Fog • Fire light</text>
+  <text x="130" y="484" font-family="monospace" font-size="11" fill="#7ed67e">Lighting flickers • Atmospheric fog scrolls • Grass sways with wind</text>
+  <!-- Footer -->
+  <rect x="30" y="520" width="940" height="1" fill="white" opacity="0.1"/>
+  <text x="40" y="544" font-family="monospace" font-size="11" fill="#aaa">P Pause • M Mute • H Help • R Restart • ESC Menu • Coyote 0.15s helps</text>
+  <rect x="750" y="528" width="220" height="28" rx="14" fill="#30d158"/><text x="860" y="546" font-family="monospace" font-size="12" fill="black" text-anchor="middle" font-weight="bold">ESC to return</text>
+</svg>
