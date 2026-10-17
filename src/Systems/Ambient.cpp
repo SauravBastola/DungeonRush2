@@ -15,9 +15,9 @@ float h01(int i) {
 enum Zone { MEADOW, RUINS, SUNKEN, ARENA };
 Zone zoneAt(float worldX) {
     const int col = (int)(worldX / Config::TILE_SIZE);
-    if (col < Level::ZONE_RUINS_COL)  return MEADOW;
-    if (col < Level::ZONE_SUNKEN_COL) return RUINS;
-    if (col < Level::ZONE_ARENA_COL)  return SUNKEN;
+    if (col < Level::stage().zoneRuins)  return MEADOW;
+    if (col < Level::stage().zoneSunken) return RUINS;
+    if (col < Level::stage().zoneArena)  return SUNKEN;
     return ARENA;
 }
 

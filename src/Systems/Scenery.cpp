@@ -55,15 +55,15 @@ int Scenery::drawnLastFrame() { return g_drawn; }
 
 void Scenery::draw(SDL_Renderer* r, const SDL_Rect& camera, float timeSecs) {
     g_drawn = 0;
-    for (int i = 0; i < Level::N_SCENERY; i++) drawProp(r, camera, timeSecs, i);
+    for (int i = 0; i < Level::stage().nScenery; i++) drawProp(r, camera, timeSecs, i);
 }
 
 void Scenery::drawProp(SDL_Renderer* r, const SDL_Rect& camera, float timeSecs,
                        int index) {
     if (!g_tex) return;
-    if (index < 0 || index >= Level::N_SCENERY) return;
+    if (index < 0 || index >= Level::stage().nScenery) return;
 
-    const Level::SceneryDef& S = Level::SCENERY[index];
+    const Level::SceneryDef& S = Level::stage().scenery[index];
     if (S.id < 0 || S.id >= Objects::OBJ_COUNT) return;
     const Objects::Rect& R = Objects::RECTS[S.id];
 

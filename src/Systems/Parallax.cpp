@@ -20,10 +20,28 @@ namespace {
     // ART-13: palette colours (tools/palette.py) seen through Depth::SKY.  The
     // old gradient was a saturated #6464ff from outside the palette; the
     // reference reads distance as pale, desaturated blue-green.
-    const SDL_Color SKY_TOP   = Depth::apply({ 0x00, 0x69, 0xaa, 255 }, Depth::SKY); // WATER_DK
-    const SDL_Color SKY_MID   = Depth::apply({ 0x00, 0x98, 0xdc, 255 }, Depth::SKY); // WATER
-    const SDL_Color SKY_LOW   = Depth::apply({ 0x1a, 0x98, 0x94, 255 }, Depth::SKY); // midway WATER..GRASS_MID
-    const SDL_Color SKY_HORIZ = Depth::apply({ 0x33, 0x98, 0x4b, 255 }, Depth::SKY); // GRASS_MID
+    // Batch B: one palette source set per stage theme, all through Depth::SKY.
+    //   0 Sunken Path  - pale blue-green haze  (WATER_DK, WATER, ->GRASS_MID)
+    //   1 Jungle Falls - misty jungle green    (TEAL_DK, TEAL, GRASS_MID, GRASS)
+    //   2 Ember Canyon - warm dusk             (RUST, ORANGE_DK, TAN_LT, CREAM)
+    struct SkyTheme { SDL_Color top, mid, low, horiz, ridge[3]; };
+    const SkyTheme THEMES[3] = {
+        { {0x00,0x69,0xaa,255}, {0x00,0x98,0xdc,255}, {0x1a,0x98,0x94,255}, {0x33,0x98,0x4b,255},
+          { {0x00,0x98,0xdc,255}, {0x00,0x69,0xaa,255}, {0x1e,0x6f,0x50,255} } },
+        { {0x13,0x4c,0x4c,255}, {0x1e,0x6f,0x50,255}, {0x33,0x98,0x4b,255}, {0x5a,0xc5,0x4f,255},
+          { {0x33,0x98,0x4b,255}, {0x1e,0x6f,0x50,255}, {0x13,0x4c,0x4c,255} } },
+        { {0xc6,0x45,0x24,255}, {0xed,0x76,0x14,255}, {0xe6,0x9c,0x69,255}, {0xf9,0xe6,0xcf,255},
+          { {0xe6,0x9c,0x69,255}, {0xbf,0x6f,0x4a,255}, {0x8a,0x48,0x36,255} } },
+    };
+    int g_theme = 0;
+    SDL_Color SKY_TOP, SKY_MID, SKY_LOW, SKY_HORIZ;
+    void applyTheme(int t) {
+        g_theme = (t >= 0 && t < 3) ? t : 0;
+        SKY_TOP   = Depth::apply(THEMES[g_theme].top,   Depth::SKY);
+        SKY_MID   = Depth::apply(THEMES[g_theme].mid,   Depth::SKY);
+        SKY_LOW   = Depth::apply(THEMES[g_theme].low,   Depth::SKY);
+        SKY_HORIZ = Depth::apply(THEMES[g_theme].horiz, Depth::SKY);
+    }
 
     // No peach sun in the reference.  A cool pale glow instead, so the light
     // reads as haze rather than as a second, warmer light source.
@@ -111,6 +129,7 @@ namespace {
 void Parallax::init(SDL_Renderer* r, int /*screenW*/, int screenH) {
     shutdown();
     if (!r) return;
+    applyTheme(g_theme);
 
     // A 1px-wide gradient stretched across the screen.  Far cheaper than the
     // ~850 draw-line calls this used to cost every single frame.
@@ -129,6 +148,11 @@ void Parallax::init(SDL_Renderer* r, int /*screenW*/, int screenH) {
     }
     SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
     SDL_SetRenderTarget(r, prev);
+}
+
+void Parallax::setTheme(SDL_Renderer* r, int theme, int screenW, int screenH) {
+    applyTheme(theme);
+    init(r, screenW, screenH);           // re-bake the sky gradient
 }
 
 void Parallax::shutdown() {
@@ -198,7 +222,7 @@ void Parallax::drawBackdrop(SDL_Renderer* r, int screenW, int screenH,
     const int step = 4;   // px per column; smooth enough and only ~340 rects
     for (const auto& R : RIDGES) {
         // R.col is a palette colour; the plane transform is applied here.
-        const SDL_Color c = Depth::apply(R.col, Depth::RIDGES);
+        const SDL_Color c = Depth::apply(THEMES[g_theme].ridge[&R - RIDGES], Depth::RIDGES);
         SDL_SetRenderDrawColor(r, c.r, c.g, c.b, c.a);
         for (int sx = 0; sx < screenW; sx += step) {
             float worldX = sx + camera.x * R.factor;
@@ -229,7 +253,7 @@ void Parallax::drawWater(SDL_Renderer* r, int screenW, int screenH,
 
     for (int col = firstCol; col <= lastCol; col++) {
         if (col < 0 || col >= Level::WIDTH_TILES) continue;
-        int top = Level::GROUND_TOP[col];
+        int top = Level::stage().groundTop[col];
         int sx  = col * T - camera.x;
 
         // Water exists only in the chasms.  GROUND_TOP >= 0 means solid

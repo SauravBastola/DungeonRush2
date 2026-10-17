@@ -20,9 +20,11 @@ namespace {
     // procedurally with their own trunk/canopy palette, but the sheet has two
     // hand-painted trees that look better and are guaranteed to match the
     // terrain, so Scenery draws those instead.
-    const SDL_Color GRASS_LIT  {  90, 197,  79, 255 };   // #5ac54f
-    const SDL_Color GRASS_MID  {  62, 154,  66, 255 };
-    const SDL_Color GRASS_DARK {  30, 111,  80, 255 };   // #1e6f50
+    // Batch B: the cap and blades follow the stage theme.  Ember Canyon's is
+    // dry grass (TAN_LT / ORANGE_DK / BROWN from the palette).
+    SDL_Color GRASS_LIT  {  90, 197,  79, 255 };   // #5ac54f
+    SDL_Color GRASS_MID  {  62, 154,  66, 255 };
+    SDL_Color GRASS_DARK {  30, 111,  80, 255 };   // #1e6f50
 
     const SDL_Color FOG_NEAR   { 196, 214, 246, 255 };
     const SDL_Color FOG_FAR    { 150, 176, 226, 255 };
@@ -159,6 +161,18 @@ void Atmosphere::shutdown() {
 
 void Atmosphere::update(float dt) { g_time += dt; }
 
+void Atmosphere::setTheme(int theme) {
+    if (theme == 2) {                       // Ember Canyon: dry grass
+        GRASS_LIT  = { 0xe6, 0x9c, 0x69, 255 };   // TAN_LT
+        GRASS_MID  = { 0xed, 0x76, 0x14, 255 };   // ORANGE_DK
+        GRASS_DARK = { 0x8a, 0x48, 0x36, 255 };   // BROWN
+    } else {
+        GRASS_LIT  = {  90, 197,  79, 255 };
+        GRASS_MID  = {  62, 154,  66, 255 };
+        GRASS_DARK = {  30, 111,  80, 255 };
+    }
+}
+
 // ---------------------------------------------------------------------------
 float Atmosphere::windAt(float worldX, float timeSecs) {
     // Two sines at different spatial frequencies: the slow one is the gust
@@ -187,14 +201,14 @@ void Atmosphere::drawGrass(SDL_Renderer* r, const SDL_Rect& camera) {
 
     for (int col = firstCol; col <= lastCol; col++) {
         if (col < 0 || col >= Level::WIDTH_TILES) continue;
-        int top = Level::GROUND_TOP[col];
+        int top = Level::stage().groundTop[col];
         if (top < 0) continue;                       // chasm: no ground to grow on
         int sx = col * T - camera.x;
 
         // A chasm edge should not sprout grass sideways into thin air.
-        bool leftOpen  = (col == 0) || (Level::GROUND_TOP[col - 1] < 0);
+        bool leftOpen  = (col == 0) || (Level::stage().groundTop[col - 1] < 0);
         bool rightOpen = (col == Level::WIDTH_TILES - 1)
-                         || (Level::GROUND_TOP[col + 1] < 0);
+                         || (Level::stage().groundTop[col + 1] < 0);
 
         float surfaceY = (float)((top + 1) * T) - camera.y;
         if (surfaceY < -40.f || surfaceY > camera.h + 40.f) continue;

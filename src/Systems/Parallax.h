@@ -21,6 +21,8 @@ namespace Parallax {
 
     // Free the cached texture.
     void shutdown();
+    // Batch B: switch the sky/ridge palette to a stage theme and re-bake.
+    void setTheme(SDL_Renderer* r, int theme, int screenW, int screenH);
 
     // Sky + sun + hills + clouds.  Draw before any world geometry.
     void drawBackdrop(SDL_Renderer* r, int screenW, int screenH,

@@ -200,6 +200,42 @@ void Game::loadAssets() {
 // ===========================================================================
 // level
 // ===========================================================================
+// Batch B: "tileset/" for stage 1, "tileset/stage2/" ... for the others.
+std::string Game::stagePath(const char* file) const {
+    return std::string(Level::stage().dir) + file;
+}
+float Game::stageSpawnX() const { return Level::stage().playerX; }
+float Game::stageSpawnY() const {
+    return Level::stage().playerY + Level::TILE - Config::PLAYER_H;
+}
+
+// Batch B: tear the world down to the player and build stage `n`.  Score,
+// lives and the run clock carry over; key, door, checkpoints do not.
+void Game::loadStage(int n) {
+    if (n < 0 || n >= Level::N_STAGES) return;
+    for (std::size_t g : { groupMap, groupColliders, groupEnemies, groupCoins, groupPowerups,
+                           groupPlatforms, groupHazards, groupFacilities, groupProjectiles,
+                           groupParticles, groupAfterimages, groupHitboxes, groupLabels })
+        for (auto* e : manager.getGroup(g)) e->destroy();
+    manager.refresh();
+    delete g_map; g_map = nullptr;
+    Level::g_stage = n;
+    Parallax::setTheme(renderer, Level::stage().theme, Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT);
+    Atmosphere::setTheme(Level::stage().theme);
+    // loadLevel() is also the cold start, so it resets the run (score 0, full
+    // lives, Menu).  A stage switch continues the run: keep those three.
+    const int keepScore = gameScore, keepLives = lives;
+    const State keepState = state;
+    loadLevel();
+    gameScore = keepScore; lives = keepLives; state = keepState;
+    totalCoins = (int)manager.getGroup(groupCoins).size();
+    coinsCollected = 0;
+    keys = 0; doorUnlocked = false; reachedCheckpoint = false; checkpointIndex = -1;
+    respawnX = stageSpawnX(); respawnY = stageSpawnY();
+    respawn();
+    stageBannerT = 3.0f;
+}
+
 void Game::loadLevel() {
     // platformer.png is a 9x5 grid of 64px cells, which is exactly the world
     // tile size, so terrain now draws 1:1 instead of being upscaled 2x from
@@ -220,13 +256,19 @@ void Game::loadLevel() {
     // the old (96,132,176) tint, and the mid layer (Q19: load it) reads the
     // Depth::MID bake of the same sheet.  Both parallax factors come from the
     // same table the generator was told about (BG_PARALLAX / MID_PARALLAX).
-    Map("terrain2_bg", 64).LoadLayer(assetPath("tileset/BackgroundLayer.map"),
+    // Batch B: each theme tints the two back planes (255 = untouched).
+    static const SDL_Color BG_TINT[3]  = { {255,255,255,255}, {205,235,220,255}, {255,196,160,255} };
+    static const SDL_Color MID_TINT[3] = { {255,255,255,255}, {170,215,190,255}, {235,150,110,255} };
+    const int th = Level::stage().theme;
+    Map("terrain2_bg", 64).LoadLayer(assetPath(stagePath("BackgroundLayer.map")),
                         Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES,
-                        Level::TERRAIN_V2_COLS, Depth::BG_TILES.parallax);
-    Map("terrain2_mid", 64).LoadLayer(assetPath("tileset/MidLayer.map"),
+                        Level::TERRAIN_V2_COLS, Depth::BG_TILES.parallax,
+                        BG_TINT[th].r, BG_TINT[th].g, BG_TINT[th].b);
+    Map("terrain2_mid", 64).LoadLayer(assetPath(stagePath("MidLayer.map")),
                         Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES,
-                        Level::TERRAIN_V2_COLS, Depth::MID.parallax);
-    terrainV2.LoadLayer(assetPath("tileset/ForegroundLayer.map"),
+                        Level::TERRAIN_V2_COLS, Depth::MID.parallax,
+                        MID_TINT[th].r, MID_TINT[th].g, MID_TINT[th].b);
+    terrainV2.LoadLayer(assetPath(stagePath("ForegroundLayer.map")),
                         Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES,
                         32, 1.0f);
     // Decor is props sitting ON the surface (rocks, crystals, lamps).  It was
@@ -234,45 +276,45 @@ void Game::loadLevel() {
     // to the ground it stands on as the camera moved — rocks visibly sliding
     // along the terrain.  Props share the foreground's depth, so they now
     // share its parallax; they get a slight cool tint to sit back a touch.
-    g_map->LoadLayer(assetPath("tileset/DecorLayer.map"),
+    g_map->LoadLayer(assetPath(stagePath("DecorLayer.map")),
                      Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES,
                      9, 1.0f, 224, 236, 246);
     // Batch A: clustered props from the generated props_v2.png (8 columns of
     // 64px cells; ids owned by tools/build_props.py), same plane as decor.
-    Map("props", 64).LoadLayer(assetPath("tileset/PropsLayer.map"),
+    Map("props", 64).LoadLayer(assetPath(stagePath("PropsLayer.map")),
                      Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES,
                      8, 1.0f, 224, 236, 246);
-    Map("props", 64).LoadLayer(assetPath("tileset/PropsSideLayer.map"),
+    Map("props", 64).LoadLayer(assetPath(stagePath("PropsSideLayer.map")),
                      Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES,
                      8, 1.0f, 224, 236, 246);
-    g_map->LoadColliders(assetPath("tileset/Colliders.txt"));
-    g_map->LoadCoins(assetPath("tileset/CoinLayer.map"),
+    g_map->LoadColliders(assetPath(stagePath("Colliders.txt")));
+    g_map->LoadCoins(assetPath(stagePath("CoinLayer.map")),
                      Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES);
 
     // platforms
-    for (int i = 0; i < Level::N_PLATFORMS; i++) {
-        const auto& p = Level::PLATFORMS[i];
+    for (int i = 0; i < Level::stage().nPlatforms; i++) {
+        const auto& p = Level::stage().platforms[i];
         spawnPlatform(p.col, p.row, p.w, p.h, p.moving, p.vertical,
                       p.range, p.speed);
     }
     // hazards
-    for (int i = 0; i < Level::N_HAZARDS; i++) {
-        const auto& h = Level::HAZARDS[i];
+    for (int i = 0; i < Level::stage().nHazards; i++) {
+        const auto& h = Level::stage().hazards[i];
         spawnHazard(h.kind, h.col, h.row, h.w, h.h);
     }
     // facilities
-    for (int i = 0; i < Level::N_FACILITIES; i++) {
-        const auto& f = Level::FACILITIES[i];
+    for (int i = 0; i < Level::stage().nFacilities; i++) {
+        const auto& f = Level::stage().facilities[i];
         spawnFacility(f.kind, f.col, f.row);
     }
     // powerups
-    for (int i = 0; i < Level::N_POWERUPS; i++) {
-        const auto& p = Level::POWERUPS[i];
+    for (int i = 0; i < Level::stage().nPowerups; i++) {
+        const auto& p = Level::stage().powerups[i];
         spawnPowerup(p.kind, p.col, p.row);
     }
     // enemies
-    for (int i = 0; i < Level::N_ENEMIES; i++) {
-        const auto& e = Level::ENEMIES[i];
+    for (int i = 0; i < Level::stage().nEnemies; i++) {
+        const auto& e = Level::stage().enemies[i];
         spawnEnemy(e.kind, e.col, e.row);
     }
 
@@ -968,6 +1010,7 @@ void Game::respawn() {
 }
 
 void Game::restartLevel() {
+    if (Level::g_stage != 0) loadStage(0);      // Batch B: a new run starts at stage 1
     // clear all dynamic entities but keep the world tiles
     for (auto* e : manager.getGroup(groupEnemies))   e->destroy();
     for (auto* c : manager.getGroup(groupCoins))     c->destroy();
@@ -982,26 +1025,26 @@ void Game::restartLevel() {
     manager.refresh();
 
     // reload coins + respawn everything
-    g_map->LoadCoins(assetPath("tileset/CoinLayer.map"),
+    g_map->LoadCoins(assetPath(stagePath("CoinLayer.map")),
                      Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES);
-    for (int i = 0; i < Level::N_PLATFORMS; i++) {
-        const auto& p = Level::PLATFORMS[i];
+    for (int i = 0; i < Level::stage().nPlatforms; i++) {
+        const auto& p = Level::stage().platforms[i];
         spawnPlatform(p.col, p.row, p.w, p.h, p.moving, p.vertical, p.range, p.speed);
     }
-    for (int i = 0; i < Level::N_HAZARDS; i++) {
-        const auto& h = Level::HAZARDS[i];
+    for (int i = 0; i < Level::stage().nHazards; i++) {
+        const auto& h = Level::stage().hazards[i];
         spawnHazard(h.kind, h.col, h.row, h.w, h.h);
     }
-    for (int i = 0; i < Level::N_FACILITIES; i++) {
-        const auto& f = Level::FACILITIES[i];
+    for (int i = 0; i < Level::stage().nFacilities; i++) {
+        const auto& f = Level::stage().facilities[i];
         spawnFacility(f.kind, f.col, f.row);
     }
-    for (int i = 0; i < Level::N_POWERUPS; i++) {
-        const auto& p = Level::POWERUPS[i];
+    for (int i = 0; i < Level::stage().nPowerups; i++) {
+        const auto& p = Level::stage().powerups[i];
         spawnPowerup(p.kind, p.col, p.row);
     }
-    for (int i = 0; i < Level::N_ENEMIES; i++) {
-        const auto& e = Level::ENEMIES[i];
+    for (int i = 0; i < Level::stage().nEnemies; i++) {
+        const auto& e = Level::stage().enemies[i];
         spawnEnemy(e.kind, e.col, e.row);
     }
     totalCoins = (int)G(groupCoins).size();
@@ -1015,8 +1058,9 @@ void Game::restartLevel() {
     speedBoostTimer = invincibleTimer = dmgBoostTimer = magnetTimer = coinMultTimer = 0.f;
     m_deathTimer = 0.f;
     checkpointIndex = -1;
-    respawnX = Config::PLAYER_X; respawnY = Config::PLAYER_Y;
+    respawnX = stageSpawnX(); respawnY = stageSpawnY();
     respawn();
+    stageBannerT = 3.0f;
     state = State::Playing;
     isPaused = false;
     pauseSelection = 0;
@@ -1117,7 +1161,9 @@ void Game::checkLevelState() {
             }
         }
         if (!bossAlive && state == State::Playing) {
-            state = State::Victory;
+            // Batch B: every stage but the last ends in "Stage clear"
+            state = (Level::g_stage + 1 < Level::N_STAGES) ? State::LevelComplete
+                                                           : State::Victory;
             m_victoryTimer = 9999.f;
             gameScore += Config::BOSS_SCORE;
             if (auto* s = assets->GetSound("powerup")) Mix_PlayChannel(-1, s, 0);
@@ -1131,6 +1177,7 @@ void Game::checkLevelState() {
 
 void Game::update() {
     updateUIAnimations(lastFrameTime);
+    if (state == State::Playing && stageBannerT > 0.f) stageBannerT -= lastFrameTime;
     if (state == State::Menu || state == State::Instructions) {
         handlePlayerInput();
         manager.refresh();
@@ -1637,6 +1684,14 @@ void Game::handleEvents() {
                 case SDLK_r:
                     if (state == State::GameOver || state == State::Victory) restartLevel();
                     break;
+                case SDLK_RETURN:
+                case SDLK_KP_ENTER:
+                    // Batch B: on to the next stage (Space stays the jump key)
+                    if (state == State::LevelComplete) {
+                        loadStage(Level::g_stage + 1);
+                        state = State::Playing;
+                    }
+                    break;
                 case SDLK_ESCAPE:
                     if (state == State::Playing) state = State::Paused;
                     else if (state == State::Paused) state = State::Playing;
@@ -1960,6 +2015,14 @@ void Game::drawMinimap() {
 }
 
 void Game::drawHUD() {
+    // Batch B: "Stage N - Name" for the first seconds of every stage
+    if (stageBannerT > 0.f) {
+        const float a = std::min(1.f, stageBannerT / 0.6f);
+        char b[96];
+        std::snprintf(b, sizeof(b), "Stage %d  -  %s", Level::g_stage + 1, Level::stage().name);
+        drawText("big", b, Config::WINDOW_WIDTH / 2, 150,
+                 SDL_Color{255, 230, 150, (Uint8)(255 * a)}, true);
+    }
     // top bar
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 110);
@@ -2837,14 +2900,25 @@ void Game::drawGameOverOverlay() {
 void Game::drawVictoryOverlay() {
     drawScrim(180);
     const int W = Config::WINDOW_WIDTH, H = Config::WINDOW_HEIGHT;
-    drawText("big",  "VICTORY!", W / 2, H / 2 - 70,
+    const bool stageClear = (state == State::LevelComplete);
+    char title[96];
+    if (stageClear) std::snprintf(title, sizeof(title), "STAGE %d CLEAR", Level::g_stage + 1);
+    else            std::snprintf(title, sizeof(title), "VICTORY!");
+    drawText("big",  title, W / 2, H / 2 - 70,
              SDL_Color{255, 230, 90, 255}, true);
     char buf[80];
     std::snprintf(buf, sizeof(buf), "Score %d     Time %02d:%02d     Deaths %d",
                   gameScore, (int)runTime / 60, (int)runTime % 60, deaths);
     drawText("body", buf, W / 2, H / 2 + 2, SDL_Color{235,235,240,255}, true);
-    drawText("body", "Press R to play again   |   ESC for menu",
-             W / 2, H / 2 + 42, SDL_Color{200,205,220,230}, true);
+    if (stageClear) {
+        char next[128];
+        std::snprintf(next, sizeof(next), "Press Enter for Stage %d: %s",
+                      Level::g_stage + 2, Level::STAGES[Level::g_stage + 1].name);
+        drawText("body", next, W / 2, H / 2 + 42, SDL_Color{200,205,220,230}, true);
+    } else {
+        drawText("body", "Press R to play again   |   ESC for menu",
+                 W / 2, H / 2 + 42, SDL_Color{200,205,220,230}, true);
+    }
 }
 
 void Game::render() {

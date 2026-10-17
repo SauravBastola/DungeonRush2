@@ -146,6 +146,14 @@ private:
     void updateHeroState();
     void checkLevelState();
     void respawn();
+public:
+    // Batch B: stages (public: the harness and a future level select use it)
+    void loadStage(int n);
+    std::string stagePath(const char* file) const;
+    float stageSpawnX() const;
+    float stageSpawnY() const;
+    float stageBannerT = 0.f;      // seconds left on the "Stage N" banner
+private:
     void addLockedDoors(std::vector<SDL_Rect>& solids);
     void restartLevel();
 

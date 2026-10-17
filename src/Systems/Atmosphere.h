@@ -29,6 +29,8 @@ namespace Atmosphere {
     // Advance the wind.  Driven by real time so it stays smooth regardless
     // of frame rate.
     void update(float dt);
+    // Batch B: grass colours for a stage theme (0 default, 2 dry canyon)
+    void setTheme(int theme);
 
     // Wind strength at a world position, roughly -1..1.  Positive leans right.
     float windAt(float worldX, float timeSecs);

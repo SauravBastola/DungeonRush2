@@ -356,15 +356,22 @@ ZONE_SUNKEN = (120, 175)
 ZONE_ARENA  = (175, 200)
 
 
+# Zone table of the stage being built: (name, first col, end col).  main()
+# swaps it per stage; stage 1's is the original four-zone layout.  Every
+# zone-aware step (materials, props, ambient export) reads it through
+# get_zone(), so a stage changes its look by changing this table.
+STAGE1_ZONES = [("meadow", *ZONE_MEADOW), ("ruins", *ZONE_RUINS),
+                ("sunken", *ZONE_SUNKEN), ("arena", *ZONE_ARENA)]
+ZONES = list(STAGE1_ZONES)
+# Material of the walkable top row; Ember Canyon walks on pebbly soil.
+SURFACE_MATERIAL = "teal"
+
+
 def get_zone(col: int) -> str:
-    if col < ZONE_MEADOW[1]:
-        return "meadow"
-    elif col < ZONE_RUINS[1]:
-        return "ruins"
-    elif col < ZONE_SUNKEN[1]:
-        return "sunken"
-    else:
-        return "arena"
+    for name, a, b in ZONES:
+        if a <= col < b:
+            return name
+    return ZONES[-1][0]
 
 
 DECOR_KEEP = {21, 22, 23, 31, 32}   # rocks, crystal + branch, small trees
@@ -1012,6 +1019,249 @@ def build_level() -> Level:
 
 
 # ---------------------------------------------------------------------------
+# Stages 2 and 3 (Batch B): built from a recipe instead of by hand
+# ---------------------------------------------------------------------------
+@dataclass
+class StageSpec:
+    """Everything that makes a stage different; the rules are shared.
+
+    zones       (name, first col, end col) - drives materials, props, ambient
+    hills       (amp1, freq1, amp2, freq2) of the rolling ground
+    rises       (first col, end col, rows up) authored bumps
+    chasms      first column of each 2-wide water gap
+    ledges      (col, width) static platforms 3 rows over the ground
+    movers      (col, vertical) moving platforms 2 rows over the ground
+    mix         enemy kind -> weight; n_enemies is the target count
+    """
+    name: str
+    folder: str
+    theme: int
+    zones: List[Tuple[str, int, int]]
+    seed: float
+    hills: Tuple[float, float, float, float]
+    rises: List[Tuple[int, int, int]]
+    chasms: List[int]
+    ledges: List[Tuple[int, int]]
+    movers: List[Tuple[int, bool]]
+    checkpoints: List[int]
+    shrines: List[int]
+    key_col: int
+    mix: Dict[str, int]
+    n_enemies: int
+
+
+STAGE_SPECS = [
+    StageSpec(
+        name="Jungle Falls", folder="stage2", theme=1,
+        zones=[("meadow", 0, 36), ("sunken", 36, 110), ("ruins", 110, 175), ("arena", 175, 200)],
+        seed=1.7, hills=(1.8, 0.071, 1.0, 0.029),
+        rises=[(48, 58, 2), (84, 96, 3), (128, 140, 3), (156, 166, 2)],
+        chasms=[34, 66, 100, 120, 146],
+        ledges=[(52, 4), (74, 3), (88, 4), (108, 3), (134, 4), (160, 3), (170, 3)],
+        movers=[(62, False), (116, True), (142, False)],
+        checkpoints=[30, 72, 112, 152], shrines=[58, 128], key_col=164,
+        mix={"slime": 4, "bat": 4, "archer": 3, "skeleton": 3, "bomber": 1, "mage": 2},
+        n_enemies=38),
+    StageSpec(
+        name="Ember Canyon", folder="stage3", theme=2,
+        zones=[("ruins", 0, 70), ("arena", 70, 112), ("ruins", 112, 175), ("arena", 175, 200)],
+        seed=4.2, hills=(1.2, 0.093, 1.4, 0.041),
+        rises=[(30, 38, 2), (58, 70, 3), (92, 104, 4), (124, 134, 3), (150, 162, 4)],
+        chasms=[44, 80, 112, 140],
+        ledges=[(26, 3), (40, 4), (54, 3), (64, 3), (86, 4), (98, 3), (118, 4), (130, 3),
+                (146, 4), (158, 3), (170, 3)],
+        movers=[(76, True), (108, False), (136, True)],
+        checkpoints=[34, 74, 116, 154], shrines=[60, 126], key_col=166,
+        mix={"skeleton": 4, "mage": 3, "bomber": 3, "archer": 3, "bat": 2, "slime": 1},
+        n_enemies=40),
+]
+
+
+def build_stage(spec: StageSpec) -> Level:
+    """A full stage from a recipe; validate_level() has the last word."""
+    L = Level(name=spec.name, width=WIDTH, height=HEIGHT, ground=[GROUND_ROW] * WIDTH)
+    g = L.ground
+    a1, f1, a2, f2 = spec.hills
+    for x in range(WIDTH):
+        g[x] = GROUND_ROW + int(round(a1 * math.sin(x * f1 + spec.seed)
+                                      + a2 * math.sin(x * f2 + 2 * spec.seed)))
+    for x in range(0, 10):                    # the same gentle opening ramp
+        g[x] = GROUND_ROW - min(3, x // 3)
+    for x in range(180, WIDTH):               # flat boss arena
+        g[x] = 31
+    for a, b, up in spec.rises:
+        for x in range(a, b):
+            g[x] = GROUND_ROW - up
+    _clamp_steps(g)
+    _clamp_steps(g)
+    for start in spec.chasms:
+        for x in range(start, start + MAX_GAP):
+            g[x] = -1
+        near = g[start - 1]
+        for x in range(start + MAX_GAP, min(WIDTH, start + MAX_GAP + 4)):
+            if g[x] >= 0 and g[x] < near:
+                g[x] = near
+    _clamp_steps(g)
+    # The gate run (168..180) is one flat stretch at the approach's height,
+    # as in stage 1: a step under the gate tower's 64 px opening left no
+    # headroom, and the fullrun bot stalled there with the door open.
+    gate = g[167] if g[167] is not None and g[167] >= 0 else 28
+    for x in range(168, 181):
+        g[x] = gate
+    _clamp_steps(g)
+
+    def surf(c: int) -> int:
+        return _solid_row(L, c)
+
+    def flat(c: int, n: int = 1) -> bool:
+        return all(0 <= c + k < WIDTH and g[c + k] is not None and g[c + k] >= 0
+                   and g[c + k] == g[c] for k in range(-n, n + 1))
+
+    chasm_cols = {c for s0 in spec.chasms for c in range(s0, s0 + MAX_GAP)}
+
+    # platforms: a stepping stone before every chasm, ledges, movers
+    # Stepping stones end one column BEFORE the lip: a stone over the take-off
+    # column leaves 78 px of headroom, so a jump from the lip hit its
+    # underside and dropped into the pit (the fullrun bot found this).
+    for s0 in spec.chasms:
+        L.platforms.append(Platform(s0 - 4, _clamp_row(surf(s0 - 4) - 2), 3, 1))
+    for c, w in spec.ledges:
+        L.platforms.append(Platform(c, _clamp_row(surf(c) - 3), w, 1))
+    for c, vert in spec.movers:
+        L.platforms.append(Platform(c, _clamp_row(surf(c) - 2), 3, 1, moving=True,
+                                    range=64 if vert else 96, speed=75 + (c % 3) * 5,
+                                    vertical=vert))
+    # spikes near every chasm, but never in the take-off run (under the stone)
+    # or the landing zone on the far side
+    for i, s0 in enumerate(spec.chasms):
+        for c in ((s0 - 7,) if i % 2 == 0 else (s0 + 6,)):
+            if flat(c, 1) and flat(c + 1, 0) and not chasm_cols & {c - 1, c, c + 1, c + 2}:
+                L.hazards.append(Hazard("spikes", c, 2, 1))
+    if not L.hazards:
+        raise SystemExit(f"{spec.name}: no flat lip for a spike strip")
+
+    # facilities
+    def walkable_near(c: int) -> int:
+        for d in (0, 1, -1, 2, -2, 3, -3):
+            if 0 <= c + d < WIDTH and g[c + d] is not None and g[c + d] >= 0 \
+                    and (c + d) not in chasm_cols:
+                return c + d
+        return c
+    for c in spec.checkpoints:
+        L.facilities.append(Facility("checkpoint", walkable_near(c)))
+    for c in spec.shrines:
+        L.facilities.append(Facility("shrine", walkable_near(c)))
+    # the key is mandatory: put it on a flat stretch, where nobody (bot or
+    # player) jumps over it - at the foot of a staircase a hop skipped it
+    key_col = next((spec.key_col + d for d in (0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6)
+                    if 0 < spec.key_col + d < WIDTH - 1 and (spec.key_col + d) not in chasm_cols
+                    and flat(spec.key_col + d, 1)), walkable_near(spec.key_col))
+    L.facilities.append(Facility("key", key_col))
+    L.facilities.append(Facility("door", 175))
+    L.facilities.append(Facility("checkpoint", 178))
+
+    # enemies: a weighted mix on a jittered grid, the fairness rules applied
+    # while placing (validate_level() checks them again)
+    kinds = [k for k, w in sorted(spec.mix.items()) for _ in range(w)]
+    hazard_cols = {c for h in L.hazards for c in range(h.col, h.col + h.w)}
+    cp_cols = [f.col for f in L.facilities if f.kind == "checkpoint"]
+    static_ledges = [p for p in L.platforms if not p.moving and (p.col, p.w) in spec.ledges]
+    placed: List[int] = []
+    step = (172 - 14) / spec.n_enemies
+    for i in range(spec.n_enemies):
+        c = int(14 + i * step + _h(i * 31 + int(spec.seed * 100)) * 3)
+        kind = kinds[int(_h(i * 17 + int(spec.seed * 10)) * len(kinds))]
+        offsets = (0, 1, -1, 2, -2, 3, -3)
+        if kind == "mage":
+            # a mage takes the nearest ledge whose centre is free - never a
+            # jittered column, which the final snap would move again
+            free = [p for p in static_ledges if (p.col + p.w // 2) not in placed]
+            if not free:
+                continue
+            ledge = min(free, key=lambda p: abs(p.col + p.w // 2 - c))
+            c, offsets = ledge.col + ledge.w // 2, (0,)
+        for d in offsets:
+            cc = c + d
+            if not (10 <= cc <= 172) or abs(cc - L.player[0]) < 8:
+                continue
+            if any(abs(cc - k) <= 2 for k in cp_cols) or abs(cc - key_col) <= 1:
+                continue
+            ground = kind not in ("bat", "mage")
+            if ground and (cc in chasm_cols or cc in hazard_cols or g[cc] is None or g[cc] < 0):
+                continue
+            if sum(1 for x in placed if cc - 11 <= x <= cc + 11) >= 4:
+                continue
+            if cc in placed:
+                continue
+            if kind == "bat":
+                L.enemies.append(EnemySpawn("bat", cc, _clamp_row(surf(cc) - 5 - int(_h(cc) * 3)),
+                                            stands_on="air"))
+            elif kind == "mage":
+                L.enemies.append(EnemySpawn("mage", cc, stands_on="platform"))
+            else:
+                L.enemies.append(EnemySpawn(kind, cc))
+            placed.append(cc)
+            break
+    L.enemies.append(EnemySpawn("boss", 192, 30))
+
+    # powerups every 16 columns, on solid ground
+    cycle = ["Health", "Speed", "Shield", "Damage", "Magnet", "Health", "DoubleJump",
+             "CoinX2", "Invincible", "Health"]
+    for i, c in enumerate(range(20, 172, 16)):
+        L.powerups.append(Powerup(cycle[i % len(cycle)], walkable_near(c)))
+
+    # scenery: zone-themed whole objects on flat runs, clear of the action
+    busy_cols = hazard_cols | {f.col + d for f in L.facilities for d in (-1, 0, 1)} \
+        | set(range(0, 8))
+    by_zone = {"meadow": ("tree_green", "tree_green", "crystal"),
+               "ruins": ("tree_autumn", "branch_red", "crystal"),
+               "sunken": ("crystal", "shard", "branch_red"),
+               "arena": ("shard", "crystal", "branch_red")}
+    for c in range(10, WIDTH - 3, 6):
+        c2 = c + int(_h(c * 7 + int(spec.seed * 10)) * 3)
+        if c2 in busy_cols or c2 in chasm_cols or not flat(c2, 1):
+            continue
+        opts = by_zone[get_zone(c2)]
+        kind = opts[int(_h(c2 * 13) * len(opts))]
+        L.scenery.append(SceneryItem(kind, c2, surf(c2) + 1,
+                                     scale=0.9 + _h(c2 * 3) * 0.25, flip=_h(c2 * 5) < 0.5))
+
+    scatter_decor(L)
+
+    # coins: hop arcs on flat ground, arcs over every chasm, ledge rewards
+    coins: List[Tuple[int, int]] = []
+    for c in range(12, 172, 5):
+        if flat(c, 1) and not ({c - 1, c, c + 1} & (hazard_cols | chasm_cols)):
+            coins += [(c - 1, g[c - 1] - 1), (c, g[c] - 2), (c + 1, g[c + 1] - 1)]
+    for s0 in spec.chasms:
+        top = _clamp_row(surf(s0 - 4) - 2)
+        coins += [(s0 - 1, top - 2), (s0, top - 3), (s0 + 1, top - 3), (s0 + 2, g[s0 + 2] - 2)]
+    for p in L.platforms:
+        if not p.moving and (p.col, p.w) in spec.ledges:
+            coins += [(x, p.row - 1) for x in range(p.col, p.col + p.w)]
+    coins += [(194, 30), (195, 29), (196, 28), (197, 27), (198, 28), (199, 29)]
+    seen = set()
+    px, py = L.player
+    L.coins = []
+    for (c, r) in coins:
+        if (c, r) in seen or not (0 <= c < WIDTH and 0 <= r < HEIGHT):
+            continue
+        if abs(c - px) <= 1 and abs(r - py) <= 1:
+            continue
+        seen.add((c, r))
+        L.coins.append((c, r))
+
+    resolve_rows(L)
+    for e in L.enemies:
+        if e.stands_on == "platform":
+            # the same ledges the placement used, so the density check holds
+            best = min(static_ledges, key=lambda p: abs(p.col + p.w // 2 - e.col))
+            e.col = best.col + best.w // 2
+            e.row = best.row - 1
+    return L
+
+
+# ---------------------------------------------------------------------------
 # Validation — refuse to emit a level the hero cannot finish
 # ---------------------------------------------------------------------------
 
@@ -1156,7 +1406,7 @@ def _ground_material(col: int, row: int, top: int) -> str:
     way to close a mass; with real autotiling the bottom is interior stone.
     """
     if row == top + 1:
-        return "teal"
+        return SURFACE_MATERIAL
     d = row - top
     zone = get_zone(col)
     if zone == "meadow":
@@ -1225,7 +1475,7 @@ def terrain_cells(L: Level) -> Dict[Tuple[int, int], Tuple[str, str, int]]:
         for x in range(p.col, p.col + p.w):
             for y in range(p.row, p.row + p.h):
                 if 0 <= x < L.width and 0 <= y < L.height:
-                    cells[(x, y)] = ("g", "teal", 0)
+                    cells[(x, y)] = ("g", SURFACE_MATERIAL, 0)
     for (x, y) in gate_wall(L):
         cells[(x, y)] = ("g", "stone", 0)
     return cells
@@ -1782,22 +2032,16 @@ def load_object_ids(root: str) -> Dict[str, int]:
     return ids
 
 
-def emit_header(out_path: str, L: Level) -> None:
+def _stage_args(L: Level, zones) -> Dict[str, object]:
+    """The per-stage fields of Level.h (shared by stage 1 and S2/S3)."""
     def ints(vals):
         return ",\n".join(f"        {v}" for v in vals)
-
     pc, pr = L.player
-    txt = HEADER.format(
-        tv2_cols=BT.COLS,
-        zone_ruins=ZONE_RUINS[0], zone_sunken=ZONE_SUNKEN[0], zone_arena=ZONE_ARENA[0],
-        sil_canopy=", ".join(str(BT.BG["CANOPY_%d" % i]) for i in range(3)),
-        sil_edge=", ".join(str(BT.BG["CANOPY_EDGE_%d" % i]) for i in range(3)),
-        sil_roots=", ".join(str(BT.BG["ROOTS_%d" % i]) for i in range(2)),
-        sil_root_end=", ".join(str(BT.BG["ROOT_END_%d" % i]) for i in range(2)),
-        TILE=TILE, WIDTH=L.width, HEIGHT=L.height, GROUND_ROW=GROUND_ROW,
-        MAX_STEP_UP=MAX_STEP_UP, MAX_GAP=MAX_GAP, WATER_ROW=WATER_ROW,
-        name=L.name, pc=pc, pr=pr,
-        px=pc * TILE, py=pr * TILE,
+    zstart = {name: a for name, a, _ in reversed(zones)}
+    starts = [a for _, a, _ in zones]
+    return dict(
+        name=L.name, pc=pc, pr=pr, px=pc * TILE, py=pr * TILE,
+        zone_ruins=starts[1], zone_sunken=starts[2], zone_arena=starts[3],
         ground=ints([-1 if (v is None or v < 0) else v for v in L.ground]),
         np=len(L.platforms),
         platforms=",\n".join(
@@ -1808,8 +2052,7 @@ def emit_header(out_path: str, L: Level) -> None:
             for p in L.platforms),
         nh=len(L.hazards),
         hazards=",\n".join(
-            f'        {{ "{h.kind}", {h.col}, {h.row}, {h.w}, {h.h} }}'
-            for h in L.hazards),
+            f'        {{ "{h.kind}", {h.col}, {h.row}, {h.w}, {h.h} }}' for h in L.hazards),
         nf=len(L.facilities),
         facilities=",\n".join(
             f'        {{ "{f.kind}", {f.col}, {f.row} }}' for f in L.facilities),
@@ -1827,6 +2070,100 @@ def emit_header(out_path: str, L: Level) -> None:
             f'{float(s.scale):.4f}f, {"true" if s.flip else "false"} }}'
             for s in L.scenery),
     )
+
+
+STAGE_TEMPLATE = '''
+    // ---- stage {n}: {name} (tools/build_level.py STAGE_SPECS) ----
+    namespace S{n} {{
+        inline constexpr const char* NAME = "{name}";
+        inline constexpr float PLAYER_X = {px:.4f}f;
+        inline constexpr float PLAYER_Y = {py:.4f}f;
+        inline constexpr int ZONE_RUINS_COL = {zone_ruins}, ZONE_SUNKEN_COL = {zone_sunken},
+                             ZONE_ARENA_COL = {zone_arena};
+        inline constexpr int GROUND_TOP[WIDTH_TILES] = {{
+{ground}
+        }};
+        inline constexpr int N_PLATFORMS = {np};
+        inline constexpr PlatformDef PLATFORMS[{np}] = {{
+{platforms}
+        }};
+        inline constexpr int N_HAZARDS = {nh};
+        inline constexpr HazardDef HAZARDS[{nh}] = {{
+{hazards}
+        }};
+        inline constexpr int N_FACILITIES = {nf};
+        inline constexpr FacilityDef FACILITIES[{nf}] = {{
+{facilities}
+        }};
+        inline constexpr int N_POWERUPS = {nw};
+        inline constexpr PowerupDef POWERUPS[{nw}] = {{
+{powerups}
+        }};
+        inline constexpr int N_ENEMIES = {ne};
+        inline constexpr EnemyDef ENEMIES[{ne}] = {{
+{enemies}
+        }};
+        inline constexpr int N_COINS = {nc};
+        inline constexpr int N_SCENERY = {ns};
+        inline constexpr SceneryDef SCENERY[{ns}] = {{
+{scenery}
+        }};
+    }}
+'''
+
+STAGE_TABLE = '''
+    // ---- every stage, and which one is loaded (Batch B) ----
+    struct StageData {{
+        const char* name;  const char* dir;  int theme;
+        float playerX, playerY;
+        const int* groundTop;
+        int zoneRuins, zoneSunken, zoneArena;
+        const PlatformDef* platforms;   int nPlatforms;
+        const HazardDef* hazards;       int nHazards;
+        const FacilityDef* facilities;  int nFacilities;
+        const PowerupDef* powerups;     int nPowerups;
+        const EnemyDef* enemies;        int nEnemies;
+        const SceneryDef* scenery;      int nScenery;
+        int nCoins;
+    }};
+#define DR_STAGE(NS, DIR, THEME) {{ NS NAME, DIR, THEME, NS PLAYER_X, NS PLAYER_Y, NS GROUND_TOP, \\
+        NS ZONE_RUINS_COL, NS ZONE_SUNKEN_COL, NS ZONE_ARENA_COL, NS PLATFORMS, NS N_PLATFORMS, \\
+        NS HAZARDS, NS N_HAZARDS, NS FACILITIES, NS N_FACILITIES, NS POWERUPS, NS N_POWERUPS, \\
+        NS ENEMIES, NS N_ENEMIES, NS SCENERY, NS N_SCENERY, NS N_COINS }}
+    inline constexpr int N_STAGES = {n_stages};
+    inline constexpr StageData STAGES[N_STAGES] = {{
+        DR_STAGE(, "tileset/", 0),
+{rows}
+    }};
+#undef DR_STAGE
+    // Index of the stage that is loaded; Game::loadStage() sets it.
+    inline int g_stage = 0;
+    inline const StageData& stage() {{ return STAGES[g_stage]; }}
+'''
+
+
+def emit_header(out_path: str, L: Level, extra=()) -> None:
+    """Stage 1 keeps the exact Level.h it always had; `extra` is a list of
+    (StageSpec, Level) for stages 2..n, appended as Level::S2... plus the
+    STAGES table the game reads through Level::stage()."""
+    args = _stage_args(L, STAGE1_ZONES)
+    txt = HEADER.format(
+        tv2_cols=BT.COLS,
+        sil_canopy=", ".join(str(BT.BG["CANOPY_%d" % i]) for i in range(3)),
+        sil_edge=", ".join(str(BT.BG["CANOPY_EDGE_%d" % i]) for i in range(3)),
+        sil_roots=", ".join(str(BT.BG["ROOTS_%d" % i]) for i in range(2)),
+        sil_root_end=", ".join(str(BT.BG["ROOT_END_%d" % i]) for i in range(2)),
+        TILE=TILE, WIDTH=L.width, HEIGHT=L.height, GROUND_ROW=GROUND_ROW,
+        MAX_STEP_UP=MAX_STEP_UP, MAX_GAP=MAX_GAP, WATER_ROW=WATER_ROW,
+        **args)
+    if extra:
+        blocks = []
+        rows = []
+        for n, (spec, Ls) in enumerate(extra, start=2):
+            blocks.append(STAGE_TEMPLATE.format(n=n, **_stage_args(Ls, spec.zones)))
+            rows.append(f'        DR_STAGE(S{n}::, "tileset/{spec.folder}/", {spec.theme})')
+        txt += "\nnamespace Level {\n" + "".join(blocks) + STAGE_TABLE.format(
+            n_stages=1 + len(extra), rows=",\n".join(rows)) + "}\n"
     with open(out_path, "w") as f:
         f.write(txt)
 
@@ -1866,7 +2203,40 @@ def main() -> int:
                 os.path.join(tileset, "PropsSideLayer.map"), L)
     write_coins(os.path.join(tileset, "CoinLayer.map"), L)
     write_colliders(os.path.join(tileset, "Colliders.txt"), L)
-    emit_header(os.path.join(src, "Level.h"), L)
+
+    # Batch B: stages 2..n from their recipes, each validated by the same
+    # rules and written to its own folder.  ZONES is swapped while a stage is
+    # built and written, because every zone-aware step reads it.
+    global ZONES, SURFACE_MATERIAL
+    extra = []
+    for spec in STAGE_SPECS:
+        ZONES = list(spec.zones)
+        SURFACE_MATERIAL = "soil" if spec.theme == 2 else "teal"
+        Ls = build_stage(spec)
+        bad = validate_level(Ls)
+        if bad:
+            print(f"\n*** {spec.name}: {len(bad)} PLAYABILITY VIOLATIONS ***")
+            for p_ in bad:
+                print(f"  - {p_}")
+            ZONES = list(STAGE1_ZONES)
+            SURFACE_MATERIAL = "teal"
+            return 1
+        out = os.path.join(tileset, spec.folder)
+        os.makedirs(out, exist_ok=True)
+        write_foreground(os.path.join(out, "ForegroundLayer.map"), Ls)
+        write_background(os.path.join(out, "BackgroundLayer.map"), Ls)
+        write_mid(os.path.join(out, "MidLayer.map"), Ls)
+        write_decor(os.path.join(out, "DecorLayer.map"), Ls)
+        write_props(os.path.join(out, "PropsLayer.map"), os.path.join(out, "PropsSideLayer.map"), Ls)
+        write_coins(os.path.join(out, "CoinLayer.map"), Ls)
+        write_colliders(os.path.join(out, "Colliders.txt"), Ls)
+        print(f"stage      : {spec.name:<14} validation OK - {len(Ls.enemies)} enemies, "
+              f"{len(Ls.coins)} coins, {len(Ls.platforms)} platforms, {len(Ls.hazards)} spike strips, "
+              f"{len(Ls.scenery)} scenery")
+        extra.append((spec, Ls))
+    ZONES = list(STAGE1_ZONES)
+    SURFACE_MATERIAL = "teal"
+    emit_header(os.path.join(src, "Level.h"), L, extra)
 
     print(f"wrote      : {len(L.platforms)} platforms, {len(L.enemies)} enemies, "
           f"{len(L.coins)} coins, {len(L.scenery)} scenery objects, "
