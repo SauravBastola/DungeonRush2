@@ -129,6 +129,7 @@ void Game::loadAssets() {
     };
     tex("terrain",     "tileset/platformer.png");
     tex("terrain2",    "tileset/terrain_v2.png");
+    tex("props",       "tileset/props_v2.png");
     // ART-13: each depth plane is the same palette art seen through one
     // entry of Depth's table, baked once here rather than tinted per call.
     assets->AddTexture("terrain2_bg",  Depth::bake(renderer,
@@ -235,6 +236,14 @@ void Game::loadLevel() {
     g_map->LoadLayer(assetPath("tileset/DecorLayer.map"),
                      Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES,
                      9, 1.0f, 224, 236, 246);
+    // Batch A: clustered props from the generated props_v2.png (8 columns of
+    // 64px cells; ids owned by tools/build_props.py), same plane as decor.
+    Map("props", 64).LoadLayer(assetPath("tileset/PropsLayer.map"),
+                     Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES,
+                     8, 1.0f, 224, 236, 246);
+    Map("props", 64).LoadLayer(assetPath("tileset/PropsSideLayer.map"),
+                     Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES,
+                     8, 1.0f, 224, 236, 246);
     g_map->LoadColliders(assetPath("tileset/Colliders.txt"));
     g_map->LoadCoins(assetPath("tileset/CoinLayer.map"),
                      Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES);

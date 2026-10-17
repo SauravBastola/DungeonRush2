@@ -337,9 +337,8 @@ namespace Level {
 
     // coin anchors
     struct CoinDef { int col, row; };
-    inline constexpr int N_COINS = 129;
-    inline constexpr CoinDef COINS[129] = {
-        { 4, 27 },
+    inline constexpr int N_COINS = 128;
+    inline constexpr CoinDef COINS[128] = {
         { 7, 26 },
         { 10, 27 },
         { 14, 30 },
