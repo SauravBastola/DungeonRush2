@@ -64,6 +64,7 @@ add_executable(${PROJECT_NAME}
         src/Systems/Systems.cpp
         src/Systems/Parallax.cpp
         src/Systems/Atmosphere.cpp
+        src/Systems/Ambient.cpp
         src/Systems/Scenery.cpp
         src/Systems/Vfx.cpp
 )

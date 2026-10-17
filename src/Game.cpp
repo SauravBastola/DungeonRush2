@@ -32,6 +32,7 @@
 #include "Systems/Atmosphere.h"
 #include "Systems/Scenery.h"
 #include "Systems/Vfx.h"
+#include "Systems/Ambient.h"
 #include "Depth.h"
 #include <algorithm>
 #include <cmath>
@@ -1825,6 +1826,7 @@ void Game::drawWorld() {
     };
     drawTiles(0.f, 0.5f);
     drawLightShafts(renderer, camera);
+    Ambient::drawSky(renderer, camera, gameTime);
     drawTiles(0.5f, 1.f);
     drawTiles(1.f, 99.f);
     // animated water sits over the water tiles, under everything else
@@ -1866,6 +1868,7 @@ void Game::drawWorld() {
     Particles::draw(manager.getGroup(groupParticles));
     Vfx::draw(manager.getGroup(groupParticles));
     drawNumbers();
+    Ambient::drawWorld(renderer, camera, gameTime);
     // Fog last: it has to veil the hero and the enemies by exactly as much as
     // it veils the terrain, or the foreground pops out of the weather.
     Atmosphere::drawFog(renderer, Config::WINDOW_WIDTH,
