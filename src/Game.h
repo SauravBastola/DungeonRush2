@@ -56,6 +56,8 @@ public:
     bool  reachedCheckpoint = false;
     bool  doorUnlocked = false;
     int   checkpointIndex = -1;
+    // Batch B: where respawn() puts the hero; checkpoints move it forward.
+    float respawnX = Config::PLAYER_X, respawnY = Config::PLAYER_Y;
 
     bool  isGrounded = false;
     bool  wasGrounded = false;
@@ -144,6 +146,7 @@ private:
     void updateHeroState();
     void checkLevelState();
     void respawn();
+    void addLockedDoors(std::vector<SDL_Rect>& solids);
     void restartLevel();
 
     // ---- attacks -------------------------------------------------------

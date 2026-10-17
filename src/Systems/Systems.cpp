@@ -886,6 +886,15 @@ static bool overlaps(Entity& a, Entity& b) {
                            b.getComponent<ColliderComponent>().collider);
 }
 
+// A solid thing can only ever be touched, never overlapped: test against its
+// collider grown by `pad` px on every side.
+static bool touches(Entity& a, Entity& b, int pad) {
+    if (!a.hasComponent<ColliderComponent>() || !b.hasComponent<ColliderComponent>()) return false;
+    SDL_Rect r = b.getComponent<ColliderComponent>().collider;
+    r.x -= pad; r.y -= pad; r.w += 2 * pad; r.h += 2 * pad;
+    return Collision::AABB(a.getComponent<ColliderComponent>().collider, r);
+}
+
 void step(Entity& player,
           std::vector<Entity*>& coins,
           std::vector<Entity*>& powerups,
@@ -978,10 +987,20 @@ void step(Entity& player,
     // facilities
     for (auto* f : facilities) {
         if (!f->isActive()) continue;
-        if (!overlaps(player, *f)) continue;
         const std::string& kind = f->tag;
+        // the door is solid while locked (Game::addLockedDoors), so touch it
+        if (!(kind == "door" ? touches(player, *f, 3) : overlaps(player, *f))) continue;
         if (kind == "checkpoint") {
             bag.reachedCheckpoint = true;
+            // Batch B: the respawn point moves forward, never back.
+            auto& ft = f->getComponent<TransformComponent>();
+            const float cx = ft.position.x + ft.width * ft.scale * 0.5f - Config::PLAYER_W * 0.5f;
+            if (cx > bag.respawnX + 1.f) {
+                bag.respawnX = cx;
+                bag.respawnY = ft.position.y + ft.height * ft.scale - Config::PLAYER_H - 1.f;
+                if (auto* s = Game::assets->GetSound("powerup")) Mix_PlayChannel(-1, s, 0);
+                Particles::emitHeal(ft.position.x + 16, ft.position.y + 16);
+            }
         } else if (kind == "shrine") {
             bag.hp = bag.maxHp;
             float fx = f->getComponent<TransformComponent>().position.x + 16;

@@ -284,6 +284,7 @@ void Game::loadLevel() {
     doorUnlocked = false;
     reachedCheckpoint = false;
     checkpointIndex = -1;
+    respawnX = Config::PLAYER_X; respawnY = Config::PLAYER_Y;
     state = State::Menu;
 }
 
@@ -945,7 +946,8 @@ void Game::respawn() {
     auto& p = *manager.getGroup(groupPlayers)[0];
     auto& tr = p.getComponent<TransformComponent>();
     auto& hp = p.getComponent<HealthComponent>();
-    tr.position = Vector2D(Config::PLAYER_X, Config::PLAYER_Y);
+    // Batch B: the last checkpoint touched, or the level start.
+    tr.position = Vector2D(respawnX, respawnY);
     tr.velocity.Zero();
     // INV-2: moveAndCollide reads the collider; keep it in sync with any
     // position write.
@@ -1013,6 +1015,7 @@ void Game::restartLevel() {
     speedBoostTimer = invincibleTimer = dmgBoostTimer = magnetTimer = coinMultTimer = 0.f;
     m_deathTimer = 0.f;
     checkpointIndex = -1;
+    respawnX = Config::PLAYER_X; respawnY = Config::PLAYER_Y;
     respawn();
     state = State::Playing;
     isPaused = false;
@@ -1022,15 +1025,24 @@ void Game::restartLevel() {
 // ===========================================================================
 // main update
 // ===========================================================================
+// Batch B: a locked door is solid.  It is destroyed when it opens, so "still
+// in the facilities group" is exactly "still locked".
+void Game::addLockedDoors(std::vector<SDL_Rect>& solids) {
+    for (auto* f : manager.getGroup(groupFacilities))
+        if (f->isActive() && f->tag == "door" && f->hasComponent<ColliderComponent>())
+            solids.push_back(f->getComponent<ColliderComponent>().collider);
+}
+
 void Game::stepPlayerPhysics() {
     auto& player = *manager.getGroup(groupPlayers)[0];
     // collect solid rects once per frame
     std::vector<SDL_Rect> solids;
-    solids.reserve(manager.getGroup(groupColliders).size());
+    solids.reserve(manager.getGroup(groupColliders).size() + 1);
     for (auto* c : manager.getGroup(groupColliders)) {
         if (c->hasComponent<ColliderComponent>())
             solids.push_back(c->getComponent<ColliderComponent>().collider);
     }
+    addLockedDoors(solids);
     auto r = Physics::moveAndCollide(player, solids);
     wasGrounded = isGrounded;
     isGrounded = r.grounded;
@@ -1077,6 +1089,7 @@ void Game::stepEnemyPhysics() {
         if (c->hasComponent<ColliderComponent>())
             solids.push_back(c->getComponent<ColliderComponent>().collider);
     }
+    addLockedDoors(solids);      // the boss stays in its arena until it opens
     for (auto* e : manager.getGroup(groupEnemies)) {
         if (!e->isActive() || !e->hasComponent<ColliderComponent>()) continue;
         // skip bats
@@ -1196,7 +1209,9 @@ void Game::update() {
             /*magnetT*/   magnetTimer,
             /*shield*/    shieldCharges,
             /*coinMultT*/ coinMultTimer,
-            /*banked*/    coinsBanked
+            /*banked*/    coinsBanked,
+            /*respawnX*/  respawnX,
+            /*respawnY*/  respawnY
         };
         Pickup::step(*manager.getGroup(groupPlayers)[0],
                      manager.getGroup(groupCoins),

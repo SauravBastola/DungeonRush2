@@ -117,6 +117,9 @@ struct PlayerBag {
     int&   shieldCharges;   // absorbs this many hits before HP is touched
     float& coinMultT;       // >0 => coins are worth POWERUP_COIN_MULT
     int&   coinsBanked;     // running total for the stats screen
+    // --- Batch B: checkpoints move the respawn point forward ---
+    float& respawnX;
+    float& respawnY;
 };
 
 void step(Entity& player,

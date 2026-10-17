@@ -1179,6 +1179,22 @@ def _variant(col: int, row: int) -> int:
     return int(_h(col * 7919 + row * 104729 + 17) * 12)
 
 
+def gate_wall(L: Level) -> List[Tuple[int, int]]:
+    """Batch B: the stone tower the arena door is set into.
+
+    The door is 88 px tall and the hero jumps 202 px - from the ledge at col
+    170 he could even land above it - so a lone door is no barrier.  A solid
+    column from the top of the map down to the row above the door closes
+    that; it overlaps the door's top and leaves a 64 px opening (the hero is
+    50 px) that the door fills until it is unlocked.
+    """
+    cells = []
+    for f in L.facilities:
+        if f.kind == "door" and f.row is not None:
+            cells += [(f.col, r) for r in range(0, f.row)]
+    return cells
+
+
 def terrain_cells(L: Level) -> Dict[Tuple[int, int], Tuple[str, str, int]]:
     """(col,row) -> (kind, material, band) for every foreground cell.
 
@@ -1207,6 +1223,8 @@ def terrain_cells(L: Level) -> Dict[Tuple[int, int], Tuple[str, str, int]]:
             for y in range(p.row, p.row + p.h):
                 if 0 <= x < L.width and 0 <= y < L.height:
                     cells[(x, y)] = ("g", "teal", 0)
+    for (x, y) in gate_wall(L):
+        cells[(x, y)] = ("g", "stone", 0)
     return cells
 
 
@@ -1627,6 +1645,10 @@ def write_colliders(path: str, L: Level) -> None:
     for p in L.platforms:
         if not p.moving:      # moving platforms carry their own collider
             rects.append((p.col, p.row, p.w, p.h))
+    wall = gate_wall(L)
+    if wall:
+        col = wall[0][0]
+        rects.append((col, 0, 1, max(r for _, r in wall) + 1))
     with open(path, "w") as f:
         for (x, y, w, h) in rects:
             f.write(f"{x} {y} {w} {h}\n")
