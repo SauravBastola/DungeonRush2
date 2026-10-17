@@ -1672,7 +1672,14 @@ void Game::drawWorld() {
         // compared screen pixels against world pixels and culled the entire
         // world the moment the camera drifted more than one screen from the
         // origin — the map vanished and only the backdrop was left.
-        const float wx = tc.position.x, wy = tc.position.y;
+        //
+        // R-16: a parallax layer is DRAWN at position - camera * parallax, so
+        // it has to be culled there too.  Culling the 0.30 background by its
+        // world position kept only tiles that draw off screen and dropped
+        // every one that should have been visible.  For parallax 1 this is
+        // exactly the old world-space test.
+        const float wx = tc.position.x - camera.x * (tc.parallax - 1.f);
+        const float wy = tc.position.y - camera.y * (tc.parallax - 1.f);
         if (wx + tc.destRect.w < camera.x - margin) continue;
         if (wx                 > camera.x + camera.w + margin) continue;
         if (wy + tc.destRect.h < camera.y - margin) continue;
