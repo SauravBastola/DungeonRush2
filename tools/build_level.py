@@ -50,6 +50,7 @@ OBJ_IDS: Dict[str, int] = {}
 import re
 
 import build_terrain as BT   # terrain_v2.png ids live there (ART-10)
+import build_props as BP     # props_v2.png ids live there (Batch A)
 
 CONFIG_H = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                         "src", "Config.h")
@@ -281,9 +282,14 @@ def resolve_rows(L: Level) -> None:
     for e in L.enemies:
         if e.row is None:
             e.row = _clamp_row(_solid_row(L, e.col) - 1)
+    # _solid_row() returns the last EMPTY row above the ground (its name says
+    # "topmost solid", which is one off).  Enemies tolerate the extra -1 -
+    # they fall onto the ground on the first frame - but facilities and
+    # hazards are static, so they used to float a tile up: spikes hung in the
+    # air and the door left a 64 px gap the 50 px hero walked under.
     for f in L.facilities:
         if f.row is None:
-            f.row = _clamp_row(_solid_row(L, f.col) - 1)
+            f.row = _clamp_row(_solid_row(L, f.col))
     for p in L.powerups:
         if p.row is None:
             p.row = _clamp_row(_solid_row(L, p.col) - 2)
@@ -291,7 +297,7 @@ def resolve_rows(L: Level) -> None:
         if h.row is None:
             cols = range(h.col, h.col + h.w)
             tops = [_solid_row(L, c) for c in cols]
-            h.row = _clamp_row(min(tops) - 1)
+            h.row = _clamp_row(min(tops))
 
 
 # ---------------------------------------------------------------------------
@@ -359,6 +365,10 @@ def get_zone(col: int) -> str:
         return "sunken"
     else:
         return "arena"
+
+
+DECOR_KEEP = {21, 22, 23, 31, 32}   # rocks, crystal + branch, small trees
+SCENERY_DROP = {"bush", "boulder_teal", "boulder_deep"}
 
 
 def scatter_decor(L: Level) -> None:
@@ -557,7 +567,12 @@ def scatter_decor(L: Level) -> None:
         elif solid(c) and not solid(c - 1) and _h(c * 83 + 43) < 0.5:
             put(c, surf(c) - 1, WATER_SHORE)
 
-    L.decor = [(c, r, t) for (c, r), t in sorted(cells.items())]
+    # Batch A: keep only platformer.png cells that are genuine small props.
+    # The rest (soil and navy blobs, water bands, teal blocks with mushrooms
+    # on top, tree halves) are terrain chunks that clash with the autotiled
+    # terrain_v2 ground; props_v2 fills the cells they leave.
+    L.decor = [(c, r, t) for (c, r), t in sorted(cells.items())
+               if t in DECOR_KEEP and L.ground[c] is not None and r == L.ground[c]]
 
 
 def build_level() -> Level:
@@ -661,12 +676,12 @@ def build_level() -> Level:
     # --- enemies -----------------------------------------------------------
     L.enemies += [
         EnemySpawn("skeleton", 18),
-        EnemySpawn("skeleton", 28),
+        EnemySpawn("skeleton", 26),         # was 28: on checkpoint 30's respawn
         EnemySpawn("skeleton", 50),
         EnemySpawn("skeleton", 60),
         EnemySpawn("skeleton", 73),
-        EnemySpawn("skeleton", 90),
-        EnemySpawn("skeleton", 108),
+        EnemySpawn("skeleton", 93),         # was 90: 5 enemies in cols 80..91
+        EnemySpawn("skeleton", 106),        # was 108: on checkpoint 110's respawn
         EnemySpawn("skeleton", 132),
         EnemySpawn("skeleton", 158),
         EnemySpawn("slime", 35),
@@ -676,16 +691,36 @@ def build_level() -> Level:
         EnemySpawn("bomber", 84),
         EnemySpawn("bomber", 126),
         EnemySpawn("archer", 66),
-        EnemySpawn("archer", 112),
+        EnemySpawn("archer", 116),          # was 112: on checkpoint 110's respawn (114-115 are spikes)
         EnemySpawn("archer", 160),
         EnemySpawn("bat", 48, 22, stands_on="air"),
         EnemySpawn("bat", 80, 18, stands_on="air"),
         EnemySpawn("bat", 115, 19, stands_on="air"),
         EnemySpawn("bat", 138, 20, stands_on="air"),
-        EnemySpawn("mage", 71, stands_on="platform"),
+        EnemySpawn("mage", 61, stands_on="platform"),   # was 71: ledge over checkpoint 70
         EnemySpawn("mage", 89, stands_on="platform"),
         EnemySpawn("mage", 131, stands_on="platform"),
         EnemySpawn("boss", 192, 30),
+        # --- Batch A: +11 (26 -> 37), placed as readable patterns ---------
+        # meadow: a slime joins the first skeleton pair; a bat meets you on
+        # the flat before the first spikes-and-chasm run (at col 37 its
+        # knockback threw you into the pit - unfair in the tutorial zone)
+        EnemySpawn("slime", 22),
+        EnemySpawn("bat", 24, 22, stands_on="air"),
+        # ruins: a skeleton pair; a second bat over the approach to chasm 2;
+        # an archer covering the far side of the ruins
+        EnemySpawn("skeleton", 63),
+        EnemySpawn("bat", 75, 19, stands_on="air"),
+        EnemySpawn("archer", 98),
+        # late ruins: a slime pack after the shrine; sunken: an archer
+        # guarding the key
+        EnemySpawn("slime", 101),
+        EnemySpawn("slime", 103),
+        EnemySpawn("archer", 140),
+        # arena approach: the gauntlet before the door, a mage on the ledge
+        EnemySpawn("skeleton", 165),
+        EnemySpawn("bomber", 168),
+        EnemySpawn("mage", 171, stands_on="platform"),
     ]
 
     # --- powerups ----------------------------------------------------------
@@ -820,7 +855,11 @@ def build_level() -> Level:
         SceneryItem("branch_red",   198, _surface_row(198), scale=1.05),
     ]
     # Filter so every scenery item is guaranteed to stand on a valid _flat_run
-    L.scenery = [s for s in scenery_specs if _flat_run(s.col)]
+    # Batch A: "bush" (a mushroom-planter block) and the two "boulder" blobs
+    # are platformer.png terrain cells, not props; next to terrain_v2 they
+    # read as stray chunks of ground.  Their columns go to the prop clusters.
+    L.scenery = [s for s in scenery_specs
+                 if _flat_run(s.col) and s.kind not in SCENERY_DROP]
 
     # --- decor layer: the detail that sits on the terrain ------------------
     # Runs last because it reads the finished heightmap, the platform rows and
@@ -951,7 +990,10 @@ def build_level() -> Level:
     ]  # 8
     # Arena subtotal: 16 coins. Total = 113 + 16 = 129 coins.
     assert len(coin_list) == 129, f"Expected 129 coins, got {len(coin_list)}"
-    L.coins = coin_list
+    # LVL-04: nothing on the spawn tile, so a fresh run starts at score 0
+    # (a coin there was collected on frame 1).
+    px, py = L.player
+    L.coins = [(c, r) for (c, r) in coin_list if not (abs(c - px) <= 1 and abs(r - py) <= 1)]
 
     resolve_rows(L)
 
@@ -1032,6 +1074,32 @@ def validate_level(L: Level) -> List[str]:
     pc, pr = L.player
     if g[pc] is None or g[pc] < 0:
         bad.append(f"player spawns over a chasm at col {pc}")
+
+    # 6. enemies (Batch A): fair placement, never a wall of them
+    checkpoints = [f.col for f in L.facilities if f.kind == "checkpoint"]
+    ground_kinds = [e for e in L.enemies if e.stands_on == "ground"]
+    for e in L.enemies:
+        if e.kind == "boss":
+            continue
+        if abs(e.col - pc) < 8:
+            bad.append(f"{e.kind} at col {e.col} is within 8 columns of spawn")
+        near = [c for c in checkpoints if abs(e.col - c) <= 2]
+        if near:
+            bad.append(f"{e.kind} at col {e.col} would hit a respawn at checkpoint {near[0]}")
+        if e.stands_on == "ground" and (g[e.col] is None or g[e.col] < 0):
+            bad.append(f"{e.kind} at col {e.col} stands over a chasm")
+        if e.stands_on == "ground" and any(h.col <= e.col < h.col + h.w for h in L.hazards):
+            bad.append(f"{e.kind} at col {e.col} stands on a hazard")
+        if e.stands_on == "platform":
+            on = [p for p in L.platforms if p.col <= e.col < p.col + p.w and p.row == e.row + 1]
+            if not on or on[0].moving:
+                bad.append(f"{e.kind} at col {e.col} is not on a static platform")
+    cols = sorted(e.col for e in L.enemies if e.kind != "boss")
+    for i, c in enumerate(cols):
+        window = [x for x in cols if c <= x < c + 12]
+        if len(window) > 4:
+            bad.append(f"{len(window)} enemies in cols {c}..{c + 11} (max 4 per 12)")
+            break
 
     return bad
 
@@ -1114,9 +1182,9 @@ def _variant(col: int, row: int) -> int:
 def terrain_cells(L: Level) -> Dict[Tuple[int, int], Tuple[str, str, int]]:
     """(col,row) -> (kind, material, band) for every foreground cell.
 
-    kind is "g" for solid ground (heightmap + platforms) and "w" for chasm
-    water.  Platforms - including the moving ones, whose spawn rect the old
-    writer also baked in - are teal slabs at band 0.
+    kind is "g" for solid ground (heightmap + static platforms) and "w" for
+    chasm water.  Static platforms are teal slabs at band 0; moving ones are
+    entities only (the old writer baked their spawn rect in as a ghost slab).
     """
     g = L.ground
     cells: Dict[Tuple[int, int], Tuple[str, str, int]] = {}
@@ -1133,6 +1201,8 @@ def terrain_cells(L: Level) -> Dict[Tuple[int, int], Tuple[str, str, int]]:
                 cells[(col, row)] = ("g", _ground_material(col, row, top),
                                      _depth_band(row, top))
     for p in L.platforms:
+        if p.moving:          # the game spawns it as an entity; a static copy
+            continue          # here would leave a solid ghost slab at its start
         for x in range(p.col, p.col + p.w):
             for y in range(p.row, p.row + p.h):
                 if 0 <= x < L.width and 0 <= y < L.height:
@@ -1423,6 +1493,116 @@ def write_decor(path: str, L: Level) -> None:
     write_layer(path, L, fn)
 
 
+def place_props(L: Level):
+    """Clusters of zone-themed props on walkable surfaces (Batch A, LVL-01).
+
+    Returns (props, side): centred props and the small side props that tuck
+    in beside a centred item - two layers, so one cell can show both.
+
+    A prop occupies the empty cell directly above a surface, or hangs in the
+    cell under a static platform.  It never shares a cell with decor, a coin
+    or a hazard, keeps clear of spawn, facilities, enemy spawns, scenery and
+    chasm edges, and props that read as solid (crates, barrels, pillars,
+    stumps) stay off step edges so nobody mistakes one for a ledge.
+    Deterministic: every choice is _h() of the column.
+    """
+    g = L.ground
+    busy = {(c, r) for (c, r, _) in L.decor}
+    coins = set(L.coins)
+    low = {BP.PROP[n] for n in BP.LOW}       # may sit under a floating coin
+    blocked_cols = set()
+    pc = L.player[0]
+    blocked_cols |= set(range(pc - 2, pc + 3))
+    for f in L.facilities:
+        blocked_cols |= {f.col - 1, f.col, f.col + 1}
+    for s_ in L.scenery:
+        blocked_cols.add(s_.col)
+    for hz in L.hazards:
+        blocked_cols |= set(range(hz.col - 1, hz.col + hz.w + 1))
+
+    def surface(c: int) -> Optional[int]:
+        if not (0 <= c < L.width) or g[c] is None or g[c] < 0:
+            return None
+        return g[c]
+
+    props: Dict[Tuple[int, int], int] = {}
+    col, last_zone = 1, None
+    while col < L.width - 1:
+        zone = get_zone(col)
+        if zone != last_zone and last_zone is not None:
+            # a signpost marks every zone entrance (first free surface cell)
+            for c in range(col, min(col + 6, L.width - 1)):
+                r = surface(c)
+                if r is not None and c not in blocked_cols and (c, r) not in busy \
+                        and (c, r) not in coins \
+                        and surface(c - 1) is not None and surface(c + 1) is not None:
+                    props[(c, r)] = BP.PROP["SIGNPOST"]
+                    break
+        last_zone = zone
+        if _h(col * 97 + 13) < 0.85:                       # start a cluster
+            length = 3 + int(_h(col * 89 + 5) * 3)        # 3..5 columns
+            for c in range(col, min(col + length, L.width - 1)):
+                r = surface(c)
+                if r is None or c in blocked_cols or (c, r) in busy or (c, r) in props:
+                    continue
+                if surface(c - 1) is None or surface(c + 1) is None:
+                    continue                               # chasm edge
+                pool = BP.ZONE_SET[get_zone(c)]
+                # earlier entries are commoner: weight n, n-1, ... 1
+                weights = list(range(len(pool), 0, -1))
+                pick = _h(c * 131 + 71) * sum(weights)
+                for name, w in zip(pool, weights):
+                    pick -= w
+                    if pick < 0:
+                        break
+                step = surface(c - 1) != r or surface(c + 1) != r
+                if step and name in BP.SOLID_LOOKING:
+                    name = "ROCKS"
+                if (c, r) in coins and BP.PROP[name] not in low:
+                    name = "GRASS_TALL" if zone != "sunken" else "FERN"
+                props[(c, r)] = BP.PROP[name]
+            col += length + 1 + int(_h(col * 71 + 3) * 2)  # gap 1..2
+        else:
+            col += 1
+    # side props beside the existing decor: same cell, one quarter of it
+    keep_clear = set(range(pc - 2, pc + 3))
+    for f in L.facilities:
+        keep_clear |= {f.col - 1, f.col, f.col + 1}
+    side: Dict[Tuple[int, int], int] = {}
+    every = [(c, surface(c)) for c in range(1, L.width - 1) if surface(c) is not None]
+    for (c, r) in every:
+        if c in keep_clear or any(hz.col <= c < hz.col + hz.w for hz in L.hazards):
+            continue
+        beside = (c, r) in busy or (c, r) in props
+        if _h(c * 59 + 23) < (0.75 if beside else 0.45):
+            kinds = BP.SIDE_SET[get_zone(c)]
+            kind = kinds[int(_h(c * 61 + 7) * len(kinds))]
+            sd = "_R" if _h(c * 67 + 1) < 0.5 else "_L"
+            side[(c, r)] = BP.PROP[kind + sd]
+    # static platforms: something small on top, vines or roots underneath
+    small = ("ROCKS", "GRASS_TALL", "MUSHROOMS", "FLOWERS", "FERN")
+    for p in L.platforms:
+        if p.moving:
+            continue
+        for c in range(p.col, p.col + p.w):
+            top = (c, p.row - 1)
+            if top not in busy and top not in props and top not in coins \
+                    and _h(c * 41 + p.row) < 0.45:
+                props[top] = BP.PROP[small[int(_h(c * 43 + 1) * len(small))]]
+            under = (c, p.row + p.h)
+            gr = surface(c)
+            if (gr is None or under[1] <= gr) and under not in busy \
+                    and _h(c * 47 + p.row) < 0.6:
+                props[under] = BP.PROP[BP.ZONE_HANG[get_zone(c)]]
+    return props, side
+
+
+def write_props(path: str, side_path: str, L: Level) -> None:
+    props, side = place_props(L)
+    write_layer(path, L, lambda x, y: props.get((x, y), EMPTY))
+    write_layer(side_path, L, lambda x, y: side.get((x, y), EMPTY))
+
+
 def write_coins(path: str, L: Level) -> None:
     coin_set = set(L.coins)
     def fn(x: int, y: int) -> int:
@@ -1445,7 +1625,8 @@ def write_colliders(path: str, L: Level) -> None:
                 x += 1
             rects.append((run_start, y, x - run_start, 1))
     for p in L.platforms:
-        rects.append((p.col, p.row, p.w, p.h))
+        if not p.moving:      # moving platforms carry their own collider
+            rects.append((p.col, p.row, p.w, p.h))
     with open(path, "w") as f:
         for (x, y, w, h) in rects:
             f.write(f"{x} {y} {w} {h}\n")
@@ -1478,6 +1659,11 @@ namespace Level {{
     // terrain_v2.png (tools/build_terrain.py): sheet width in cells and the
     // silhouette cells the foreground-silhouette plane draws (ART-13).
     inline constexpr int  TERRAIN_V2_COLS     = {tv2_cols};
+
+    // first column of each zone after the meadow (tools/build_level.py)
+    inline constexpr int  ZONE_RUINS_COL      = {zone_ruins};
+    inline constexpr int  ZONE_SUNKEN_COL     = {zone_sunken};
+    inline constexpr int  ZONE_ARENA_COL      = {zone_arena};
     inline constexpr int  SIL_CANOPY[3]       = {{ {sil_canopy} }};
     inline constexpr int  SIL_CANOPY_EDGE[3]  = {{ {sil_edge} }};
     inline constexpr int  SIL_ROOTS[2]        = {{ {sil_roots} }};
@@ -1578,6 +1764,7 @@ def emit_header(out_path: str, L: Level) -> None:
     pc, pr = L.player
     txt = HEADER.format(
         tv2_cols=BT.COLS,
+        zone_ruins=ZONE_RUINS[0], zone_sunken=ZONE_SUNKEN[0], zone_arena=ZONE_ARENA[0],
         sil_canopy=", ".join(str(BT.BG["CANOPY_%d" % i]) for i in range(3)),
         sil_edge=", ".join(str(BT.BG["CANOPY_EDGE_%d" % i]) for i in range(3)),
         sil_roots=", ".join(str(BT.BG["ROOTS_%d" % i]) for i in range(2)),
@@ -1650,6 +1837,8 @@ def main() -> int:
     write_background(os.path.join(tileset, "BackgroundLayer.map"), L)
     write_mid(os.path.join(tileset, "MidLayer.map"), L)
     write_decor(os.path.join(tileset, "DecorLayer.map"), L)
+    write_props(os.path.join(tileset, "PropsLayer.map"),
+                os.path.join(tileset, "PropsSideLayer.map"), L)
     write_coins(os.path.join(tileset, "CoinLayer.map"), L)
     write_colliders(os.path.join(tileset, "Colliders.txt"), L)
     emit_header(os.path.join(src, "Level.h"), L)
@@ -1673,10 +1862,38 @@ def main() -> int:
                     if tok and tok != str(EMPTY):
                         used.add(int(tok))
     missing = [t for t in ALL_USABLE_TILES if t not in used]
-    print(f"tile usage : {len(used)}/{len(ALL_USABLE_TILES)} platformer.png cells "
-          f"drawn by decor"
-          + (f"  -- unused: {missing}" if missing else "  (every one used)"))
+    print(f"tile usage : {len(used)} platformer.png cells still drawn by decor "
+          f"(the rest is superseded by terrain_v2 / props_v2)")
+    report_density(L)
     return report_v2(L)
+
+
+def report_density(L: Level) -> None:
+    """Visual items per walkable column, and how they cluster (LVL-01)."""
+    props, side = place_props(L)
+    surf = [c for c in range(L.width) if L.ground[c] is not None and L.ground[c] >= 0]
+    per = {c: 0 for c in surf}
+    for (c, _r, _t) in L.decor:
+        if c in per: per[c] += 1
+    for (c, _r) in list(props) + list(side):
+        if c in per: per[c] += 1
+    for s_ in L.scenery:
+        if s_.col in per: per[s_.col] += 1
+    total = sum(per.values())
+    runs, run = [], 0
+    for c in surf:
+        if per[c]:
+            run += 1
+        elif run:
+            runs.append(run); run = 0
+    if run: runs.append(run)
+    empty = sum(1 for c in surf if not per[c])
+    print(f"density    : {total} items over {len(surf)} walkable columns = "
+          f"{total / len(surf):.2f} per column (target 1.2-1.8); "
+          f"{len(props)} props + {len(side)} side props, {len(L.decor)} decor, "
+          f"{len(L.scenery)} scenery")
+    print(f"clusters   : {len(runs)} runs, mean {sum(runs) / max(1, len(runs)):.1f} columns, "
+          f"{empty} bare columns")
 
 
 def report_v2(L: Level) -> int:

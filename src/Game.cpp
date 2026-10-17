@@ -32,6 +32,7 @@
 #include "Systems/Atmosphere.h"
 #include "Systems/Scenery.h"
 #include "Systems/Vfx.h"
+#include "Systems/Ambient.h"
 #include "Depth.h"
 #include <algorithm>
 #include <cmath>
@@ -129,6 +130,7 @@ void Game::loadAssets() {
     };
     tex("terrain",     "tileset/platformer.png");
     tex("terrain2",    "tileset/terrain_v2.png");
+    tex("props",       "tileset/props_v2.png");
     // ART-13: each depth plane is the same palette art seen through one
     // entry of Depth's table, baked once here rather than tinted per call.
     assets->AddTexture("terrain2_bg",  Depth::bake(renderer,
@@ -235,6 +237,14 @@ void Game::loadLevel() {
     g_map->LoadLayer(assetPath("tileset/DecorLayer.map"),
                      Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES,
                      9, 1.0f, 224, 236, 246);
+    // Batch A: clustered props from the generated props_v2.png (8 columns of
+    // 64px cells; ids owned by tools/build_props.py), same plane as decor.
+    Map("props", 64).LoadLayer(assetPath("tileset/PropsLayer.map"),
+                     Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES,
+                     8, 1.0f, 224, 236, 246);
+    Map("props", 64).LoadLayer(assetPath("tileset/PropsSideLayer.map"),
+                     Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES,
+                     8, 1.0f, 224, 236, 246);
     g_map->LoadColliders(assetPath("tileset/Colliders.txt"));
     g_map->LoadCoins(assetPath("tileset/CoinLayer.map"),
                      Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES);
@@ -1816,6 +1826,7 @@ void Game::drawWorld() {
     };
     drawTiles(0.f, 0.5f);
     drawLightShafts(renderer, camera);
+    Ambient::drawSky(renderer, camera, gameTime);
     drawTiles(0.5f, 1.f);
     drawTiles(1.f, 99.f);
     // animated water sits over the water tiles, under everything else
@@ -1857,6 +1868,7 @@ void Game::drawWorld() {
     Particles::draw(manager.getGroup(groupParticles));
     Vfx::draw(manager.getGroup(groupParticles));
     drawNumbers();
+    Ambient::drawWorld(renderer, camera, gameTime);
     // Fog last: it has to veil the hero and the enemies by exactly as much as
     // it veils the terrain, or the foreground pops out of the weather.
     Atmosphere::drawFog(renderer, Config::WINDOW_WIDTH,

@@ -25,6 +25,9 @@ void Map::LoadLayer(const std::string& path, int sizeX, int sizeY,
     std::string line;
     for (int y = 0; y < sizeY && std::getline(f, line); y++) {
         if (line.empty()) { y--; continue; }
+        // R-10: getline() strips the '\n' the tokenizer flushes on, so the
+        // last value of every row was never stored (column 199 was missing).
+        line.push_back('\n');
         int col = 0;
         std::string tok;
         for (char c : line) {
@@ -84,6 +87,9 @@ void Map::LoadCoins(const std::string& path, int sizeX, int sizeY) {
     std::string line;
     for (int y = 0; y < sizeY && std::getline(f, line); y++) {
         if (line.empty()) { y--; continue; }
+        // R-10: getline() strips the '\n' the tokenizer flushes on, so the
+        // last value of every row was never stored (column 199 was missing).
+        line.push_back('\n');
         int col = 0;
         std::string tok;
         for (char c : line) {
