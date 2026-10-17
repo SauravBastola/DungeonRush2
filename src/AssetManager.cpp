@@ -13,6 +13,11 @@ void AssetManager::AddTexture(std::string id, const char *path) {
     textures[id] = tex;
 }
 
+void AssetManager::AddTexture(std::string id, SDL_Texture* tex) {
+    if (!tex) std::cerr << "[AssetManager] null texture for '" << id << "'\n";
+    textures[id] = tex;
+}
+
 SDL_Texture *AssetManager::GetTexture(std::string id) {
     auto it = textures.find(id);
     if (it == textures.end()) return nullptr;

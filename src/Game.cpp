@@ -32,6 +32,7 @@
 #include "Systems/Atmosphere.h"
 #include "Systems/Scenery.h"
 #include "Systems/Vfx.h"
+#include "Depth.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -128,6 +129,14 @@ void Game::loadAssets() {
     };
     tex("terrain",     "tileset/platformer.png");
     tex("terrain2",    "tileset/terrain_v2.png");
+    // ART-13: each depth plane is the same palette art seen through one
+    // entry of Depth's table, baked once here rather than tinted per call.
+    assets->AddTexture("terrain2_bg",  Depth::bake(renderer,
+        assetPath("tileset/terrain_v2.png").c_str(), Depth::BG_TILES));
+    assets->AddTexture("terrain2_sil", Depth::bake(renderer,
+        assetPath("tileset/terrain_v2.png").c_str(), Depth::FG_SIL));
+    assets->AddTexture("terrain2_mid", Depth::bake(renderer,
+        assetPath("tileset/terrain_v2.png").c_str(), Depth::MID));
     tex("player",      "sprites/player_sprites.png");
     tex("skeleton",    "sprites/skeleton_sprites.png");
     tex("slime",       "sprites/slime.png");
@@ -205,9 +214,16 @@ void Game::loadLevel() {
     // tools/build_terrain.py).  Map is only a loader -- every tile keeps its
     // own texture -- so a second one for the v2 sheet leaves draw order as is.
     Map terrainV2("terrain2", 64);
-    terrainV2.LoadLayer(assetPath("tileset/BackgroundLayer.map"),
+    // ART-13: the background reads the Depth::BG_TILES bake, which replaces
+    // the old (96,132,176) tint, and the mid layer (Q19: load it) reads the
+    // Depth::MID bake of the same sheet.  Both parallax factors come from the
+    // same table the generator was told about (BG_PARALLAX / MID_PARALLAX).
+    Map("terrain2_bg", 64).LoadLayer(assetPath("tileset/BackgroundLayer.map"),
                         Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES,
-                        32, 0.30f, 96, 132, 176);
+                        Level::TERRAIN_V2_COLS, Depth::BG_TILES.parallax);
+    Map("terrain2_mid", 64).LoadLayer(assetPath("tileset/MidLayer.map"),
+                        Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES,
+                        Level::TERRAIN_V2_COLS, Depth::MID.parallax);
     terrainV2.LoadLayer(assetPath("tileset/ForegroundLayer.map"),
                         Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES,
                         32, 1.0f);
@@ -1647,6 +1663,82 @@ void Game::handlePauseInput(SDL_Keycode key) {
 // ===========================================================================
 // render
 // ===========================================================================
+// ---------------------------------------------------------------------------
+// ART-13 depth helpers
+// ---------------------------------------------------------------------------
+namespace {
+float hash01(int i) {
+    Uint32 x = (Uint32)i * 0x9E3779B1u;
+    x ^= x >> 15; x *= 0x85EBCA6Bu; x ^= x >> 13; x *= 0xC2B2AE35u; x ^= x >> 16;
+    return (float)(x & 0xFFFFFF) / (float)0x1000000;
+}
+
+// 2-3 stepped light shafts per screen, anchored in the background plane.
+// TEAL (#1e6f50) at 15 % alpha, added rather than blended: a shaft is light
+// falling through the haze, so it may only ever brighten what is behind it.
+void drawLightShafts(SDL_Renderer* r, const SDL_Rect& cam) {
+    const float par = Depth::BG_TILES.parallax;
+    const int spacing = 480, step = 8, slant = 4;
+    const float origin = cam.x * par;
+    const int first = (int)std::floor(origin / spacing) - 1;
+    const int H = Config::WINDOW_HEIGHT;
+    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_ADD);
+    SDL_SetRenderDrawColor(r, 0x1e, 0x6f, 0x50, 38);
+    for (int k = first; k <= first + 5; ++k) {
+        if (hash01(k * 31 + 7) < 0.25f) continue;          // leave some gaps
+        const float x0 = k * spacing + hash01(k * 17 + 3) * 200.f - origin;
+        const int w = 56 + (int)(hash01(k * 13 + 1) * 40.f);
+        const int len = (int)(H * (0.55f + 0.2f * hash01(k * 11 + 5)));
+        for (int y = 0; y < len; y += step) {
+            SDL_Rect q{ (int)x0 + (y / step) * slant, y, w, step };
+            SDL_RenderFillRect(r, &q);
+        }
+    }
+    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_NONE);
+}
+
+// Foreground silhouette plane (Depth::FG_SIL): leaf clusters hanging into the
+// top of the frame and mounds rising from the bottom, 1.10 parallax sideways.
+// Pinned to the screen vertically so a jump can never pull them over the play
+// line: the top clusters end above y = 160, the mounds start below y = 750.
+void drawForegroundSilhouettes(SDL_Renderer* r, const SDL_Rect& cam) {
+    SDL_Texture* tex = Game::assets->GetTexture("terrain2_sil");
+    if (!tex) return;
+    const int T = Config::TILE_SIZE, C = Level::TERRAIN_V2_COLS;
+    const float origin = cam.x * Depth::FG_SIL.parallax;
+    const int spacing = 560;
+    auto cell = [&](int id, int x, int y, SDL_RendererFlip flip) {
+        SDL_Rect src{ (id % C) * T, (id / C) * T, T, T };
+        SDL_Rect dst{ x, y, T, T };
+        SDL_RenderCopyEx(r, tex, &src, &dst, 0.0, nullptr, flip);
+    };
+    const int first = (int)std::floor(origin / spacing) - 1;
+    for (int k = first; k <= first + 4; ++k) {
+        const int x0 = (int)(k * spacing + hash01(k * 7 + 1) * 240.f - origin);
+        const int n = 2 + (int)(hash01(k * 5 + 2) * 2.f);       // 2-3 cells
+        if (hash01(k * 3 + 9) < 0.6f) {                         // hanging cluster
+            for (int i = 0; i < n; ++i) {
+                const int x = x0 + i * T;
+                const int drop = (i == 0 || i == n - 1) ? 0 : 22;   // fuller middle
+                cell(Level::SIL_CANOPY[(k + i) % 3], x, -40 + drop, SDL_FLIP_NONE);
+                cell(Level::SIL_CANOPY_EDGE[(k + i) % 3], x, 24 + drop, SDL_FLIP_NONE);
+                if (hash01(k * 19 + i) < 0.5f)
+                    cell(Level::SIL_ROOT_END[(k + i) & 1], x, 70 + drop, SDL_FLIP_NONE);
+            }
+        } else {                                                // ground mound
+            for (int i = 0; i < n; ++i)
+            {
+                const int lift = (i == 0 || i == n - 1) ? 0 : 20;
+                cell(Level::SIL_CANOPY_EDGE[(k + i) % 3], x0 + i * T,
+                     Config::WINDOW_HEIGHT - 84 - lift, SDL_FLIP_VERTICAL);
+                cell(Level::SIL_CANOPY[(k + i) % 3], x0 + i * T,
+                     Config::WINDOW_HEIGHT - 20 - lift, SDL_FLIP_NONE);
+            }
+        }
+    }
+}
+} // namespace
+
 void Game::drawWorld() {
     // Backdrop — cached sky gradient, parallax ridges and drifting clouds.
     // Replaces the old per-pixel loop (850 draw calls a frame) and actually
@@ -1664,9 +1756,14 @@ void Game::drawWorld() {
     // nothing but the parallax backdrop. The per-tile culling below already
     // does the job the clip rect was meant to do.
     int margin = Config::TILE_SIZE;
+    // ART-13: tiles draw in depth passes -- background (< 0.5), then the light
+    // shafts, then mid (0.5 .. 1), then terrain and decor -- so the shafts can
+    // sit inside the background plane only.
+    auto drawTiles = [&](float minPar, float maxPar) {
     for (auto* t : manager.getGroup(groupMap)) {
         if (!t->isActive()) continue;
         auto& tc = t->getComponent<TileComponent>();
+        if (tc.parallax < minPar || tc.parallax >= maxPar) continue;
         // Cull in WORLD space.  TileComponent::update() rewrites destRect into
         // SCREEN space every frame (position - camera), so culling on destRect
         // compared screen pixels against world pixels and culled the entire
@@ -1686,6 +1783,11 @@ void Game::drawWorld() {
         if (wy                 > camera.y + camera.h + margin) continue;
         t->draw();
     }
+    };
+    drawTiles(0.f, 0.5f);
+    drawLightShafts(renderer, camera);
+    drawTiles(0.5f, 1.f);
+    drawTiles(1.f, 99.f);
     // animated water sits over the water tiles, under everything else
     Parallax::drawWater(renderer, Config::WINDOW_WIDTH,
                         Config::WINDOW_HEIGHT, camera, gameTime);
@@ -1729,6 +1831,8 @@ void Game::drawWorld() {
     // it veils the terrain, or the foreground pops out of the weather.
     Atmosphere::drawFog(renderer, Config::WINDOW_WIDTH,
                         Config::WINDOW_HEIGHT, camera, gameTime);
+    // Nearest plane, in front of the weather: dark out-of-focus leaves.
+    drawForegroundSilhouettes(renderer, camera);
 }
 
 // Floating damage numbers.  Drawn in world space so they stay pinned to the

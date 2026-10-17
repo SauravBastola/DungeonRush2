@@ -1323,7 +1323,7 @@ def _ridge_layer(L: Level, prof: List[int], props: Dict[Tuple[int, int], int],
     return fn
 
 
-BG_PARALLAX = 0.30   # must match the BackgroundLayer.map line in Game::loadLevel
+BG_PARALLAX = 0.30   # must match Depth::BG_TILES in src/Depth.h
 
 
 def _read_config_int(name: str, default: int) -> int:
@@ -1335,43 +1335,34 @@ def _read_config_int(name: str, default: int) -> int:
         return default
 
 
-def background_cells(L: Level) -> Dict[Tuple[int, int], int]:
-    """Silhouette backdrop for the 0.30 parallax plane (ART_STYLE_V2 4.4).
+def _visible_extent(L: Level, parallax: float) -> Tuple[int, int]:
+    """Last col/row of a layer at `parallax` that the clamped camera can show.
 
-    Designed in the layer's OWN space: a tile at world (x, y) appears on
-    screen at (x - cam.x * 0.3, y - cam.y * 0.3).  The camera is clamped to
-    the map, so only cols 0..last_col and rows 0..last_row can ever be seen;
-    the old layer put its ridge at row ~24, which lands below the bottom of
-    the frame at every camera height the hero reaches.  Two silhouette bands:
-
-      canopy  hanging from the top: CANOPY mass, a scalloped CANOPY_EDGE, and
-              ROOTS / ROOT_END strands under some of it
-      ridge   rising from below: TEETH (spires) or RIDGE_TOP on the skyline,
-              then MASS, then the darker DEEP body down to the last row
+    A tile at world (x, y) draws at (x - cam.x * p, y - cam.y * p) and the
+    camera never leaves the map, so nothing past these can reach the screen.
     """
     win_w = _read_config_int("WINDOW_WIDTH", 1350)
     win_h = _read_config_int("WINDOW_HEIGHT", 850)
     max_cam_x = L.width * TILE - win_w
     max_cam_y = L.height * TILE - win_h
-    last_col = min(L.width - 1, int(math.ceil((max_cam_x * BG_PARALLAX + win_w) / TILE)))
-    last_row = min(L.height - 1, int(math.ceil((max_cam_y * BG_PARALLAX + win_h) / TILE)) - 1)
+    last_col = min(L.width - 1, int(math.ceil((max_cam_x * parallax + win_w) / TILE)))
+    last_row = min(L.height - 1, int(math.ceil((max_cam_y * parallax + win_h) / TILE)) - 1)
+    return last_col, last_row
 
+
+def background_cells(L: Level) -> Dict[Tuple[int, int], int]:
+    """Hazy ridge silhouette for the 0.30 parallax plane (ART_STYLE_V2 4.4).
+
+    Designed in the layer's OWN space (see _visible_extent): TEETH (spires) or
+    RIDGE_TOP on a skyline between rows 11 and 14, MASS below it, then the
+    DEEP body down to the last row the camera can reach.  The old layer put
+    its ridge at row ~24, below the frame at every camera height.  The canopy
+    cells in terrain_v2 belong to the foreground silhouette plane (ART-13).
+    """
+    last_col, last_row = _visible_extent(L, BG_PARALLAX)
     cells: Dict[Tuple[int, int], int] = {}
     for x in range(last_col + 1):
         v = int(_h(x * 131 + 7) * 3)
-        # canopy: its lower edge wanders between rows 6 and 9
-        edge = 7 + int(round(1.3 * math.sin(x * 0.23 + 0.4)
-                             + 0.9 * math.sin(x * 0.61 + 1.3)))
-        edge = max(6, min(9, edge))
-        for y in range(2, edge):
-            cells[(x, y)] = BT.BG["CANOPY_%d" % int(_h(x * 17 + y * 29) * 3)]
-        cells[(x, edge)] = BT.BG["CANOPY_EDGE_%d" % v]
-        if _h(x * 53 + 11) < 0.30:
-            drop = 1 + int(_h(x * 59 + 3) * 2)
-            for y in range(edge + 1, edge + drop):
-                cells[(x, y)] = BT.BG["ROOTS_%d" % (v & 1)]
-            cells[(x, edge + drop)] = BT.BG["ROOT_END_%d" % (v & 1)]
-        # ridge: skyline between rows 11 and 14
         top = 12 + int(round(1.6 * math.sin(x * 0.11 + 0.7)
                              + 1.0 * math.sin(x * 0.29 + 2.0)))
         top = max(11, min(14, top))
@@ -1392,15 +1383,37 @@ def write_background(path: str, L: Level) -> None:
     write_layer(path, L, fn)
 
 
+def mid_cells(L: Level) -> Dict[Tuple[int, int], int]:
+    """Mid plane (0.55): dark foliage mounds between the haze and the play line.
+
+    Built from terrain_v2's FOLIAGE_TOP / CANOPY cells - reference 1's mid
+    plane is leaf mass, not a second copy of the walkable ground (the old
+    layer was platformer.png's teal fill, a flat slab).  The authored
+    _mid_profile sat in world rows two tiles above the ground; it is shifted
+    up by cam.y * (1 - p) / TILE at the lowest camera so it still reads as
+    "just above the ground line" at 0.55, and clipped to what can be seen.
+    """
+    last_col, last_row = _visible_extent(L, MID_PARALLAX)
+    max_cam_y = L.height * TILE - _read_config_int("WINDOW_HEIGHT", 850)
+    shift = int(round(max_cam_y * (1.0 - MID_PARALLAX) / TILE))
+    cells: Dict[Tuple[int, int], int] = {}
+    for x in range(last_col + 1):
+        top = _mid_profile(x) - shift
+        cells[(x, top)] = BT.BG["FOLIAGE_TOP_%d" % int(_h(x * 61 + 9) * 3)]
+        for y in range(top + 1, last_row + 1):
+            cells[(x, y)] = BT.BG["CANOPY_%d" % int(_h(x * 23 + y * 47) * 3)]
+    return cells
+
+
+MID_PARALLAX = 0.55   # must match Depth::MID in src/Depth.h
+
+
 def write_mid(path: str, L: Level) -> None:
-    """Mid-ground: teal ridge between the far hills and the playable ground."""
-    prof = [_mid_profile(x) for x in range(L.width)]
-    props = _ridge_props(L.width, prof, 0.26)
-    # CHUNK_TEAL (38) has a rounded top and a fully opaque bottom, so it caps
-    # the ridge; 15/16 close the underside at the bottom of the map.
-    write_layer(path, L, _ridge_layer(L, prof, props, FILL_TEAL,
-                                      (CHUNK_TEAL, FILL_TEAL, CHUNK_TEAL_B),
-                                      TEAL_BOTTOM))
+    cells = mid_cells(L)
+
+    def fn(x: int, y: int) -> int:
+        return cells.get((x, y), EMPTY)
+    write_layer(path, L, fn)
 
 
 def write_decor(path: str, L: Level) -> None:
@@ -1461,6 +1474,14 @@ namespace Level {{
     // water tile here and Parallax::drawWater animates its crest at exactly
     // this row, so both read the same constant and cannot drift apart.
     inline constexpr int  WATER_SURFACE_ROW = {WATER_ROW};
+
+    // terrain_v2.png (tools/build_terrain.py): sheet width in cells and the
+    // silhouette cells the foreground-silhouette plane draws (ART-13).
+    inline constexpr int  TERRAIN_V2_COLS     = {tv2_cols};
+    inline constexpr int  SIL_CANOPY[3]       = {{ {sil_canopy} }};
+    inline constexpr int  SIL_CANOPY_EDGE[3]  = {{ {sil_edge} }};
+    inline constexpr int  SIL_ROOTS[2]        = {{ {sil_roots} }};
+    inline constexpr int  SIL_ROOT_END[2]     = {{ {sil_root_end} }};
 
     // Traversal limits the physics can actually clear (see tools/build_level.py)
     inline constexpr int  MAX_STEP_UP       = {MAX_STEP_UP};
@@ -1556,6 +1577,11 @@ def emit_header(out_path: str, L: Level) -> None:
 
     pc, pr = L.player
     txt = HEADER.format(
+        tv2_cols=BT.COLS,
+        sil_canopy=", ".join(str(BT.BG["CANOPY_%d" % i]) for i in range(3)),
+        sil_edge=", ".join(str(BT.BG["CANOPY_EDGE_%d" % i]) for i in range(3)),
+        sil_roots=", ".join(str(BT.BG["ROOTS_%d" % i]) for i in range(2)),
+        sil_root_end=", ".join(str(BT.BG["ROOT_END_%d" % i]) for i in range(2)),
         TILE=TILE, WIDTH=L.width, HEIGHT=L.height, GROUND_ROW=GROUND_ROW,
         MAX_STEP_UP=MAX_STEP_UP, MAX_GAP=MAX_GAP, WATER_ROW=WATER_ROW,
         name=L.name, pc=pc, pr=pr,
@@ -1636,7 +1662,7 @@ def main() -> int:
     # draws.  The point of the exercise is to use the art that exists, so an
     # unused tile is a bug report rather than a curiosity.
     used: set = set()
-    for rel in ("MidLayer.map", "DecorLayer.map"):
+    for rel in ("DecorLayer.map",):
         p = os.path.join(tileset, rel)
         if not os.path.exists(p):
             continue
@@ -1648,7 +1674,7 @@ def main() -> int:
                         used.add(int(tok))
     missing = [t for t in ALL_USABLE_TILES if t not in used]
     print(f"tile usage : {len(used)}/{len(ALL_USABLE_TILES)} platformer.png cells "
-          f"drawn by mid+decor"
+          f"drawn by decor"
           + (f"  -- unused: {missing}" if missing else "  (every one used)"))
     return report_v2(L)
 

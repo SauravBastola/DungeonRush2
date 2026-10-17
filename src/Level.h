@@ -18,6 +18,14 @@ namespace Level {
     // this row, so both read the same constant and cannot drift apart.
     inline constexpr int  WATER_SURFACE_ROW = 33;
 
+    // terrain_v2.png (tools/build_terrain.py): sheet width in cells and the
+    // silhouette cells the foreground-silhouette plane draws (ART-13).
+    inline constexpr int  TERRAIN_V2_COLS     = 32;
+    inline constexpr int  SIL_CANOPY[3]       = { 480, 481, 482 };
+    inline constexpr int  SIL_CANOPY_EDGE[3]  = { 483, 484, 485 };
+    inline constexpr int  SIL_ROOTS[2]        = { 486, 487 };
+    inline constexpr int  SIL_ROOT_END[2]     = { 488, 489 };
+
     // Traversal limits the physics can actually clear (see tools/build_level.py)
     inline constexpr int  MAX_STEP_UP       = 2;
     inline constexpr int  MAX_GAP           = 2;

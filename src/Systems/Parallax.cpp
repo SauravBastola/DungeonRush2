@@ -2,6 +2,7 @@
 #include "Parallax.h"
 #include "Config.h"
 #include "Level.h"
+#include "Depth.h"
 #include <cmath>
 #include <cstdlib>
 
@@ -16,15 +17,18 @@ namespace {
     // and y=300 it is byte-for-byte identical — so the old "warm dusk"
     // indigo-to-peach ramp was fighting the target art.  There is only a very
     // slight lift toward the horizon, just enough to avoid a dead flat field.
-    const SDL_Color SKY_TOP   {  92,  92, 240, 255 };
-    const SDL_Color SKY_MID   { 100, 100, 255, 255 };   // #6464ff
-    const SDL_Color SKY_LOW   { 108, 108, 255, 255 };
-    const SDL_Color SKY_HORIZ { 130, 132, 255, 255 };
+    // ART-13: palette colours (tools/palette.py) seen through Depth::SKY.  The
+    // old gradient was a saturated #6464ff from outside the palette; the
+    // reference reads distance as pale, desaturated blue-green.
+    const SDL_Color SKY_TOP   = Depth::apply({ 0x00, 0x69, 0xaa, 255 }, Depth::SKY); // WATER_DK
+    const SDL_Color SKY_MID   = Depth::apply({ 0x00, 0x98, 0xdc, 255 }, Depth::SKY); // WATER
+    const SDL_Color SKY_LOW   = Depth::apply({ 0x1a, 0x98, 0x94, 255 }, Depth::SKY); // midway WATER..GRASS_MID
+    const SDL_Color SKY_HORIZ = Depth::apply({ 0x33, 0x98, 0x4b, 255 }, Depth::SKY); // GRASS_MID
 
     // No peach sun in the reference.  A cool pale glow instead, so the light
     // reads as haze rather than as a second, warmer light source.
-    const SDL_Color SUN_CORE  { 226, 232, 255, 255 };
-    const SDL_Color SUN_HALO  { 198, 210, 255,  52 };
+    const SDL_Color SUN_CORE  = Depth::apply({ 0xf9, 0xe6, 0xcf, 255 }, Depth::SKY); // CREAM
+    const SDL_Color SUN_HALO  = Depth::apply({ 0xf9, 0xe6, 0xcf,  52 }, Depth::SKY);
 
     // Three ridges, far to near.  `factor` is how much of the camera's motion
     // the layer follows: 0 = locked to the screen, 1 = locked to the world.
@@ -45,9 +49,9 @@ namespace {
     // darker and more saturated as they come forward.  The old set went the
     // other way, which made the far hills read as holes in the sky.
     const Ridge RIDGES[] = {
-        { 0.06f, { 148, 152, 214, 255 }, 0.60f,  70.f, 620.f, 190.f,  22.f, 0.0f },
-        { 0.14f, { 108, 116, 186, 255 }, 0.68f,  95.f, 480.f, 150.f,  28.f, 2.7f },
-        { 0.26f, {  72,  84, 152, 255 }, 0.78f, 120.f, 360.f, 120.f,  34.f, 5.1f },
+        { 0.06f, { 0x00, 0x98, 0xdc, 255 }, 0.60f,  70.f, 620.f, 190.f,  22.f, 0.0f }, // WATER
+        { 0.14f, { 0x00, 0x69, 0xaa, 255 }, 0.68f,  95.f, 480.f, 150.f,  28.f, 2.7f }, // WATER_DK
+        { 0.26f, { 0x1e, 0x6f, 0x50, 255 }, 0.78f, 120.f, 360.f, 120.f,  34.f, 5.1f }, // TEAL
     };
 
     struct Cloud { float x, y, s, spd; };
@@ -193,7 +197,9 @@ void Parallax::drawBackdrop(SDL_Renderer* r, int screenW, int screenH,
     // ---- ridges ----
     const int step = 4;   // px per column; smooth enough and only ~340 rects
     for (const auto& R : RIDGES) {
-        SDL_SetRenderDrawColor(r, R.col.r, R.col.g, R.col.b, R.col.a);
+        // R.col is a palette colour; the plane transform is applied here.
+        const SDL_Color c = Depth::apply(R.col, Depth::RIDGES);
+        SDL_SetRenderDrawColor(r, c.r, c.g, c.b, c.a);
         for (int sx = 0; sx < screenW; sx += step) {
             float worldX = sx + camera.x * R.factor;
             float y = screenH * R.baseY

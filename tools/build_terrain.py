@@ -139,6 +139,7 @@ _BG_NAMES = (
     "TEETH_0", "TEETH_1", "TEETH_2", "RIDGE_TOP",        # ridge skyline
     "MASS_0", "MASS_1", "MASS_2",                        # ridge body
     "DEEP_0", "DEEP_1", "DEEP_2",                        # ridge body, lower
+    "FOLIAGE_TOP_0", "FOLIAGE_TOP_1", "FOLIAGE_TOP_2",   # mid-layer mound tops
 )
 BG = {name: BG_ROW0 * COLS + i for i, name in enumerate(_BG_NAMES)}
 
@@ -540,11 +541,14 @@ def band_coverage(material: str, interior) -> list:
 def _bg_cells():
     """20 cells: canopy, hanging roots, ridge teeth and ridge body.
 
-    Drawn in the hazy blue-green family; Game::loadLevel tints the layer on
-    top.  Horizontally periodic in 64 so any two cells of a row abut.
+    Ridge cells are the background layer (hazy); canopy and root cells are
+    the foreground silhouette plane (Game::drawForegroundSilhouettes).  Horizontally periodic in 64 so any two cells of a row abut.
     """
     cells = {}
-    hi, body, dk, xd = PAL.SLATE_LT, PAL.SLATE, PAL.SLATE_XD, PAL.NAVY_XD
+    # ART-13: the ridge is light haze (Depth::BG_TILES lifts it further); the
+    # canopy cells stay dark - they are drawn by the foreground-silhouette
+    # plane, not by the background layer.
+    hi, body, dk, xd = PAL.PLATE, PAL.SLATE_LT, PAL.SLATE, PAL.SLATE_XD
     leaf, leaf_dk = PAL.TEAL, PAL.TEAL_DK
 
     def canopy(v):
@@ -628,6 +632,22 @@ def _bg_cells():
                 elif y < top + 4:
                     t[y][x] = body
         return t
+
+    # mid-layer foliage mounds: canopy texture under a scalloped, lit crown
+    for v in range(3):
+        t = canopy(v)
+        for x in range(CELL):
+            a = 2 * math.pi * x / CELL
+            top = 26 + 8 * math.sin(3 * a + v * 1.3) + 4 * math.sin(7 * a + v)
+            top -= 6 * max(0.0, math.sin(a + v * 2.0))
+            for y in range(CELL):
+                if y < top:
+                    t[y][x] = None
+                elif y < top + 1:
+                    t[y][x] = PAL.INK
+                elif y < top + 3 and t[y][x] != PAL.NAVY:
+                    t[y][x] = PAL.GRASS_MID
+        cells["FOLIAGE_TOP_%d" % v] = t
 
     for v in range(3):
         cells["TEETH_%d" % v] = skyline(v, True)
