@@ -60,7 +60,10 @@ namespace Sprites {
     // figure, so the body overhangs the 32px collider by a few pixels — which
     // is what lets the sword-swing frames read at all.
     inline constexpr Spec PLAYER{
-        "player", 50, 37, 50.f / 37.f, 32, 50, Anchor::Feet, true };
+        "player", 48, 56, 1.00f, 32, 50, Anchor::Feet, true };
+    // ART-12: the sheet is now generated at 1:1 by tools/build_art.py hero()
+    // -- 7 x 8 cells of 48x56, same row meaning as above -- so the 50/37
+    // (1.35) exception is retired.  Collider unchanged: no physics change.
 
     // ---- enemies ----------------------------------------------------------
     // ART-11: every enemy sheet is generated at 1:1 by tools/build_art.py

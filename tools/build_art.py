@@ -853,6 +853,140 @@ def boss(path, svg):
             [_boss(die=d) for d in (0, 1, 2, 3, 4, 6)]], 96, 104, path, svg)
 
 
+# --------------------------------------------------------------------- hero
+def _hero(bob=0, lean=0, crouch=0, legs=(0, 0, 0, 0), lift=0, fhand=(5, 9),
+          bhand=(-4, 9), sword=70, scarf=(-9, 6), arc=None, glow=0, lie=0, kneel=0):
+    """ART-12 hero at 1:1, 48x56 cell, figure ~30x48, facing right.
+
+    Kept from the hand-made sheet: brown hair, red scarf trailing back, grey
+    tunic, white sleeves and gloves, dark trousers, brown boots, steel sword
+    with a gold guard.  `legs` = (front foot dx, back foot dx, front knee
+    lift, back knee lift); `sword` is the blade angle in degrees (0 = right,
+    90 = straight down); `arc` = (start, end) degrees of a swing trail.
+    """
+    c = Px(48, 56)
+    if lie:                                   # last death frames: lying down
+        y = 52
+        c.part(_rc(6, y - 4, 22, y), PAL.NAVY_XD, PAL.SLATE_XD, PAL.INK)
+        c.part(_rc(20, y - 7, 34, y), PAL.SLATE, PAL.SLATE_LT, PAL.SLATE_XD)
+        c.part(_pg([(30, y - 6), (40, y - 8 + lie), (36, y - 2)]), PAL.RED, PAL.PINK, PAL.RED_DK)
+        c.part(_el(33, y - 10, 44, y), PAL.TAN_LT, PAL.CREAM, PAL.TAN)
+        c.part(_el(35, y - 11, 46, y - 3), PAL.BROWN, PAL.TAN, PAL.BROWN_DK)
+        c.part(_rc(2, y - 2, 6, y + 1), PAL.BROWN_DK, PAL.BROWN, PAL.BROWN_XD)
+        c.part(_ln([(10, y - 9), (26, y - 12)], 2), PAL.PLATE, PAL.CREAM, PAL.SLATE_LT)
+        return c.outline()
+    hx, hy = 23 + lean // 2, 37 + crouch + kneel
+    sx, sy = 24 + lean, 22 + bob + crouch + kneel
+    feet_y = 54 - lift
+    # back leg, back arm, scarf tail behind the body
+    ffx, bfx, fkl, bkl = legs
+    for (fx, kl, col, shade) in ((bfx, bkl, PAL.NAVY_XD, PAL.INK),):
+        kx, ky = hx - 1 + fx // 2, hy + 9 - kl
+        c.part(_ln([(hx - 2, hy), (kx, ky)], 4), col, PAL.SLATE_XD, shade)
+        c.part(_ln([(kx, ky), (hx - 2 + fx, feet_y - 2 - kl // 2)], 4), col, PAL.SLATE_XD, shade)
+        c.part(_rc(hx - 4 + fx, feet_y - 3 - kl // 2, hx + 1 + fx, feet_y - kl // 2),
+               PAL.BROWN_DK, PAL.BROWN, PAL.BROWN_XD)
+    c.part(_ln([(sx - 4, sy + 2), (sx - 4 + bhand[0], sy + 2 + bhand[1])], 3),
+           PAL.PLATE, PAL.CREAM, PAL.SLATE_LT)
+    tx, ty = sx - 3 + scarf[0], sy + scarf[1]
+    c.part(_pg([(sx - 3, sy - 2), (tx - 2, ty - 2), (tx + 1, ty + 2), (sx - 1, sy + 3)]),
+           PAL.RED, PAL.PINK, PAL.RED_DK)
+    # torso: grey tunic and a belt
+    c.part(_pg([(sx - 6, sy), (sx + 5, sy), (hx + 5, hy), (hx - 5, hy)]),
+           PAL.SLATE, PAL.SLATE_LT, PAL.SLATE_XD)
+    c.part(_rc(hx - 5, hy - 3, hx + 5, hy - 2), PAL.BROWN, PAL.TAN, PAL.BROWN_DK)
+    c.dot(hx + 1, hy - 3, PAL.GOLD)
+    # front leg
+    kx, ky = hx + 2 + ffx // 2, hy + 9 - fkl
+    c.part(_ln([(hx + 2, hy), (kx, ky)], 4), PAL.NAVY_XD, PAL.SLATE_XD, PAL.INK, sep=True)
+    c.part(_ln([(kx, ky), (hx + 2 + ffx, feet_y - 2 - fkl // 2)], 4), PAL.NAVY_XD, PAL.SLATE_XD, PAL.INK)
+    c.part(_rc(hx + ffx, feet_y - 3 - fkl // 2, hx + 5 + ffx, feet_y - fkl // 2),
+           PAL.BROWN_DK, PAL.BROWN, PAL.BROWN_XD)
+    # head: face, hair swept back, an eye looking forward
+    hc = (sx + 1, sy - 7)
+    c.part(_el(hc[0] - 5, hc[1] - 6, hc[0] + 6, hc[1] + 6), PAL.TAN_LT, PAL.CREAM, PAL.TAN)
+    c.part(_pg([(hc[0] - 7, hc[1] + 3), (hc[0] - 6, hc[1] - 5), (hc[0] - 1, hc[1] - 8),
+                (hc[0] + 6, hc[1] - 6), (hc[0] + 7, hc[1] - 2), (hc[0] + 2, hc[1] - 3),
+                (hc[0] - 1, hc[1] + 1), (hc[0] - 3, hc[1] + 5)]), PAL.BROWN, PAL.TAN, PAL.BROWN_DK)
+    c.dot(hc[0] + 3, hc[1], PAL.INK); c.dot(hc[0] + 3, hc[1] + 1, PAL.INK)
+    # scarf knot over the collar
+    c.part(_rc(sx - 4, sy - 2, sx + 4, sy + 1), PAL.RED, PAL.PINK, PAL.RED_DK)
+    # front arm, glove, sword with a gold guard
+    hand = (sx + 3 + fhand[0], sy + 2 + fhand[1])
+    c.part(_ln([(sx + 3, sy + 2), hand], 3), PAL.PLATE, PAL.CREAM, PAL.SLATE_LT, sep=True)
+    if sword is not None:
+        a = math.radians(sword)
+        tip = (hand[0] + int(round(17 * math.cos(a))), hand[1] + int(round(17 * math.sin(a))))
+        gx, gy = int(round(2 * math.sin(a))), int(round(-2 * math.cos(a)))
+        c.part(_ln([hand, tip], 2), PAL.PLATE, PAL.CREAM, PAL.SLATE_LT, sep=True)
+        c.part(_ln([(hand[0] - gx, hand[1] - gy), (hand[0] + gx, hand[1] + gy)], 2), PAL.GOLD)
+    c.part(_el(hand[0] - 1, hand[1] - 1, hand[0] + 1, hand[1] + 1), PAL.CREAM)
+    if glow:                                  # charged bolt in the open hand
+        g = glow
+        c.part(_el(hand[0] + 2 - g, hand[1] - g, hand[0] + 2 + g, hand[1] + g),
+               PAL.WATER, PAL.CREAM, PAL.WATER_DK)
+    c.outline()
+    if arc:                                   # swing trail, drawn after the outline
+        r = 18
+        from PIL import ImageDraw
+        d = ImageDraw.Draw(c.img)
+        box = [hand[0] - r, hand[1] - r, hand[0] + r, hand[1] + r]
+        d.arc(box, arc[0], arc[1], fill=PAL.CREAM + (255,), width=2)
+        d.arc([box[0] + 2, box[1] + 2, box[2] - 2, box[3] - 2], arc[0], arc[1],
+              fill=PAL.PLATE + (255,), width=1)
+    return c
+
+
+def hero(path, svg):
+    """player_sprites.png v2 (ART-12): 7 cols x 8 rows of 48x56 at 1:1.
+
+    Rows keep their meaning: idle 3, run 6, power 5, slash 6, thrust 6,
+    jump 4, cast 3, die 7.  Collider stays 32x50, so no physics changes.
+    """
+    run = []
+    for i in range(6):
+        p = math.sin(i * math.pi / 3)
+        q = math.cos(i * math.pi / 3)
+        run.append(_hero(lean=3, bob=(1 if i % 3 == 0 else 0),
+                         legs=(int(7 * p), int(-7 * p), max(0, int(6 * q)), max(0, int(-6 * q))),
+                         fhand=(4 - int(3 * p), 8), bhand=(-3 + int(4 * p), 8),
+                         sword=40 - int(10 * p), scarf=(-12, 2 + (i % 2))))
+    rows = [
+        [_hero(), _hero(bob=1), _hero(bob=1, scarf=(-9, 7))],
+        run,
+        [_hero(crouch=2, fhand=(-4, -12), sword=-130, scarf=(-10, 4)),
+         _hero(crouch=2, fhand=(-2, -13), sword=-110, scarf=(-10, 4)),
+         _hero(fhand=(6, -8), sword=-40, arc=(-150, -30), legs=(5, -4, 0, 0)),
+         _hero(crouch=3, fhand=(8, 2), sword=30, arc=(-60, 40), legs=(6, -5, 0, 0)),
+         _hero(crouch=3, fhand=(7, 6), sword=70, legs=(6, -5, 0, 0))],
+        [_hero(fhand=(-6, 2), sword=170, legs=(3, -3, 0, 0)),
+         _hero(fhand=(-5, 1), sword=180, legs=(3, -3, 0, 0)),
+         _hero(lean=2, fhand=(3, 1), sword=-10, arc=(150, 230), legs=(5, -4, 0, 0)),
+         _hero(lean=3, fhand=(7, 1), sword=0, arc=(200, 330), legs=(6, -5, 0, 0)),
+         _hero(lean=2, fhand=(6, 3), sword=20, legs=(6, -5, 0, 0)),
+         _hero(fhand=(5, 6), sword=50, legs=(4, -3, 0, 0))],
+        [_hero(crouch=3, fhand=(-3, 4), sword=0, legs=(2, -4, 0, 0)),
+         _hero(crouch=4, fhand=(-5, 4), sword=0, legs=(2, -5, 0, 0)),
+         _hero(crouch=4, lean=4, fhand=(4, 2), sword=0, legs=(8, -7, 0, 0)),
+         _hero(crouch=4, lean=5, fhand=(8, 2), sword=0, legs=(9, -8, 0, 0)),
+         _hero(crouch=3, lean=4, fhand=(8, 3), sword=5, legs=(8, -7, 0, 0)),
+         _hero(crouch=1, lean=2, fhand=(5, 6), sword=40, legs=(4, -3, 0, 0))],
+        [_hero(crouch=4, legs=(3, -3, 0, 0), fhand=(4, 8), sword=60),
+         _hero(lift=2, legs=(1, -4, 0, 4), fhand=(5, 2), sword=20, scarf=(-10, 9)),
+         _hero(lift=6, legs=(3, -2, 6, 7), fhand=(5, 0), sword=10, scarf=(-11, 8)),
+         _hero(lift=7, legs=(4, -1, 8, 8), fhand=(6, -1), sword=0, scarf=(-11, 5))],
+        [_hero(fhand=(6, 2), sword=None, glow=1),
+         _hero(fhand=(7, 1), sword=None, glow=2),
+         _hero(fhand=(8, 1), sword=None, glow=3)],
+        [_hero(lean=-2, bob=1, fhand=(4, 10), sword=80),
+         _hero(lean=-3, crouch=3, fhand=(3, 12), sword=95),
+         _hero(kneel=6, legs=(4, -6, 4, 0), fhand=(4, 10), sword=100),
+         _hero(kneel=10, legs=(5, -7, 6, 0), fhand=(5, 8), sword=110),
+         _hero(lie=1), _hero(lie=2), _hero(lie=3)],
+    ]
+    _sheet(rows, 48, 56, path, svg)
+
+
 # ===========================================================================
 def main():
     os.makedirs(SPRITES, exist_ok=True)
@@ -880,6 +1014,7 @@ def main():
         (enemy_archer,   "enemy_archer.png"),
         (enemy_bomber,   "enemy_bomber.png"),
         (boss,           "enemy_boss.png"),
+        (hero,           "player_sprites.png"),
     ]
     only = set(sys.argv[1:])     # e.g. `build_art.py enemy_slime.png`
     if only:
