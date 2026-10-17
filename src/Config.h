@@ -80,6 +80,11 @@ namespace Config {
     constexpr float PARRY_STUN         = 0.90f;    // boss gets a third
     constexpr float PARRY_SHOT_SPEED   = 1.3f;     // reflected shot speed x
     constexpr float PARRY_SHOT_DAMAGE  = 1.5f;     // reflected shot damage x
+    // Batch C: grappling hook (E / V) on the generator's hook points
+    constexpr float GRAPPLE_RANGE      = 300.f;    // = GRAPPLE_RANGE in build_level.py
+    constexpr float GRAPPLE_MIN_LEN    = 110.f;    // the rope reels in to this
+    constexpr float GRAPPLE_REEL       = 120.f;    // px/s
+    constexpr float GRAPPLE_RELEASE_VY = -560.f;   // the fling when you jump off
 
     // ---- dash ----
     constexpr float DASH_SPEED         = 720.f;

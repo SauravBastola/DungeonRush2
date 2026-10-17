@@ -253,6 +253,7 @@ class Level:
     enemies:   List[EnemySpawn] = field(default_factory=list)
     facilities: List[Facility] = field(default_factory=list)
     player: Tuple[int, int] = (4, GROUND_ROW - 2)
+    hooks: List[Tuple[int, int]] = field(default_factory=list)   # grapple points (Batch C)
 
 
 # ---------------------------------------------------------------------------
@@ -1007,6 +1008,8 @@ def build_level() -> Level:
 
     resolve_rows(L)
 
+    place_hooks(L)                       # Batch C: grapple points
+
     # pin the mages onto the platform nearest their column
     for e in L.enemies:
         if e.stands_on == "platform":
@@ -1251,6 +1254,7 @@ def build_stage(spec: StageSpec) -> Level:
         seen.add((c, r))
         L.coins.append((c, r))
 
+    place_hooks(L)                       # Batch C: grapple points
     resolve_rows(L)
     for e in L.enemies:
         if e.stands_on == "platform":
@@ -1327,6 +1331,20 @@ def validate_level(L: Level) -> List[str]:
     pc, pr = L.player
     if g[pc] is None or g[pc] < 0:
         bad.append(f"player spawns over a chasm at col {pc}")
+
+    # 7. grapple points (Batch C): clear of terrain, in reach from the near lip
+    solid_cells = terrain_cells(L)
+    for (hc, hr) in L.hooks:
+        if any(solid_cells.get((hc + dx, hr + dy), ("",))[0] == "g"
+               for dx in (-1, 0, 1) for dy in (-1, 0, 1)):
+            bad.append(f"grapple point at col {hc} row {hr} is inside or touching terrain")
+        lip = hc
+        while lip > 0 and (g[lip] is None or g[lip] < 0):
+            lip -= 1
+        hx, hy = hc * TILE + TILE / 2, hr * TILE + TILE / 2
+        px_, py_ = lip * TILE + TILE / 2, (g[lip] + 1) * TILE - 25     # hero centre on the lip
+        if math.hypot(hx - px_, hy - py_) > GRAPPLE_RANGE or hy >= py_:
+            bad.append(f"grapple point at col {hc} is out of reach from the lip at col {lip}")
 
     # 6. enemies (Batch A): fair placement, never a wall of them
     checkpoints = [f.col for f in L.facilities if f.kind == "checkpoint"]
@@ -1430,6 +1448,41 @@ def _depth_band(row: int, top: int) -> int:
 def _variant(col: int, row: int) -> int:
     """0..11 from a deterministic hash of (col, row); interiors take % 4, edges % 3."""
     return int(_h(col * 7919 + row * 104729 + 17) * 12)
+
+
+GRAPPLE_RANGE = 300        # px, must match Config::GRAPPLE_RANGE
+
+
+def place_hooks(L: Level) -> None:
+    """Batch C: a grapple point over every chasm, 4 rows above the near lip.
+
+    A chasm is a run of columns whose ground is -1.  The hook goes over its
+    middle; the validator checks it is clear of terrain and in reach of a
+    hero standing on the near lip.
+    """
+    g = L.ground
+    cells = terrain_cells(L)
+    c = 1
+    while c < L.width - 1:
+        if g[c] is not None and g[c] < 0:
+            a = c
+            while c < L.width and g[c] is not None and g[c] < 0:
+                c += 1
+            near = g[a - 1] if a > 0 and g[a - 1] is not None and g[a - 1] >= 0 else GROUND_ROW
+            mid = (a + c - 1) // 2
+            lip_x, lip_y = (a - 1) * TILE + TILE / 2, (near + 1) * TILE - 25
+
+            def ok(col: int, row: int) -> bool:
+                clear = not any(cells.get((col + dx, row + dy), ("",))[0] == "g"
+                                for dx in (-1, 0, 1) for dy in (-1, 0, 1))
+                hx, hy = col * TILE + TILE / 2, row * TILE + TILE / 2
+                return clear and hy < lip_y and math.hypot(hx - lip_x, hy - lip_y) <= GRAPPLE_RANGE
+            # over the middle 4 rows up first; then a little higher, or one
+            # column further out, when a ledge or stepping stone is in the way
+            choice = next(((col, max(2, near - up)) for up in (4, 5, 6) for col in (mid, mid + 1)
+                           if ok(col, max(2, near - up))), (mid, max(2, near - 4)))
+            L.hooks.append(choice)
+        c += 1
 
 
 def gate_wall(L: Level) -> List[Tuple[int, int]]:
@@ -1993,6 +2046,13 @@ namespace Level {{
 {enemies}
     }};
 
+    // grapple points (Batch C): tile whose centre the rope hangs from
+    struct HookDef {{ int col, row; }};
+    inline constexpr int N_HOOKS = {nk};
+    inline constexpr HookDef HOOKS[{nk}] = {{
+{hooks}
+    }};
+
     // coin anchors
     struct CoinDef {{ int col, row; }};
     inline constexpr int N_COINS = {nc};
@@ -2062,6 +2122,8 @@ def _stage_args(L: Level, zones) -> Dict[str, object]:
         ne=len(L.enemies),
         enemies=",\n".join(
             f'        {{ "{e.kind}", {e.col}, {e.row} }}' for e in L.enemies),
+        nk=len(L.hooks),
+        hooks=",\n".join(f"        {{ {c}, {r} }}" for (c, r) in L.hooks),
         nc=len(L.coins),
         coins=",\n".join(f"        {{ {c}, {r} }}" for (c, r) in L.coins),
         ns=len(L.scenery),
@@ -2103,6 +2165,10 @@ STAGE_TEMPLATE = '''
         inline constexpr EnemyDef ENEMIES[{ne}] = {{
 {enemies}
         }};
+        inline constexpr int N_HOOKS = {nk};
+        inline constexpr HookDef HOOKS[{nk}] = {{
+{hooks}
+        }};
         inline constexpr int N_COINS = {nc};
         inline constexpr int N_SCENERY = {ns};
         inline constexpr SceneryDef SCENERY[{ns}] = {{
@@ -2125,11 +2191,12 @@ STAGE_TABLE = '''
         const EnemyDef* enemies;        int nEnemies;
         const SceneryDef* scenery;      int nScenery;
         int nCoins;
+        const HookDef* hooks;           int nHooks;
     }};
 #define DR_STAGE(NS, DIR, THEME) {{ NS NAME, DIR, THEME, NS PLAYER_X, NS PLAYER_Y, NS GROUND_TOP, \\
         NS ZONE_RUINS_COL, NS ZONE_SUNKEN_COL, NS ZONE_ARENA_COL, NS PLATFORMS, NS N_PLATFORMS, \\
         NS HAZARDS, NS N_HAZARDS, NS FACILITIES, NS N_FACILITIES, NS POWERUPS, NS N_POWERUPS, \\
-        NS ENEMIES, NS N_ENEMIES, NS SCENERY, NS N_SCENERY, NS N_COINS }}
+        NS ENEMIES, NS N_ENEMIES, NS SCENERY, NS N_SCENERY, NS N_COINS, NS HOOKS, NS N_HOOKS }}
     inline constexpr int N_STAGES = {n_stages};
     inline constexpr StageData STAGES[N_STAGES] = {{
         DR_STAGE(, "tileset/", 0),

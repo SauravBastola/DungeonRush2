@@ -78,6 +78,11 @@ public:
     float parryT = 0.f, parryCooldown = 0.f;
     bool  parryHit = false;           // the current window already landed
     int   parriesLanded = 0;          // run stat (and what the harness reads)
+    // Batch C: grappling hook
+    bool  hooked = false;
+    float hookX = 0.f, hookY = 0.f, ropeLen = 0.f;
+    float noJumpCutT = 0.f;           // after a fling, keep its height
+    int   grapplesUsed = 0;
     float dashTrailTimer = 0.f;     // paces the dash afterimages
     float speedBoostTimer = 0.f;
     float invincibleTimer = 0.f;
@@ -165,6 +170,11 @@ private:
     void stepParry();                  // stagger enemies in the zone
     bool tryReflect(Entity& shot);     // true: the shot was parried
     void drawParryShield();
+    bool nearestHook(float& hx, float& hy) const;
+    void startGrapple();
+    void releaseGrapple(bool fling);
+    void applyRope();
+    void drawGrapple();
 public:
     // Batch B: stages (public: the harness and a future level select use it)
     void loadStage(int n);

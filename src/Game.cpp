@@ -714,7 +714,9 @@ void Game::handlePlayerInput() {
     }
     const bool jumpHeld = keys[SDL_SCANCODE_W] || keys[SDL_SCANCODE_SPACE]
                        || keys[SDL_SCANCODE_UP];
-    if (!jumpHeld && pTr.velocity.y < Config::PLAYER_JUMP_VEL * 0.55f) {
+    if (noJumpCutT > 0.f) noJumpCutT -= lastFrameTime;
+    if (!jumpHeld && !hooked && noJumpCutT <= 0.f &&
+        pTr.velocity.y < Config::PLAYER_JUMP_VEL * 0.55f) {
         pTr.velocity.y = Config::PLAYER_JUMP_VEL * 0.55f;
     }
 
@@ -1083,6 +1085,104 @@ void Game::drawParryShield() {
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 }
 
+// ---- Batch C: grappling hook ---------------------------------------------
+// Hook points are tile centres from the generator (Level::stage().hooks).
+bool Game::nearestHook(float& hx, float& hy) const {
+    auto& tr = manager.getGroup(groupPlayers)[0]->getComponent<TransformComponent>();
+    const float cx = tr.position.x + Config::PLAYER_W * 0.5f;
+    const float cy = tr.position.y + Config::PLAYER_H * 0.5f;
+    float best = Config::GRAPPLE_RANGE + 1.f;
+    const auto& S = Level::stage();
+    for (int i = 0; i < S.nHooks; ++i) {
+        const float x = S.hooks[i].col * (float)Level::TILE + Level::TILE * 0.5f;
+        const float y = S.hooks[i].row * (float)Level::TILE + Level::TILE * 0.5f;
+        if (y >= cy - 16.f) continue;                       // only hooks above you
+        const float d = std::sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
+        if (d < best) { best = d; hx = x; hy = y; }
+    }
+    return best <= Config::GRAPPLE_RANGE;
+}
+
+void Game::startGrapple() {
+    if (state != State::Playing || slideT > 0.f) return;
+    if (hooked) { releaseGrapple(false); return; }
+    float hx, hy;
+    if (!nearestHook(hx, hy)) return;
+    auto& tr = manager.getGroup(groupPlayers)[0]->getComponent<TransformComponent>();
+    const float cx = tr.position.x + Config::PLAYER_W * 0.5f, cy = tr.position.y + Config::PLAYER_H * 0.5f;
+    hooked = true; hookX = hx; hookY = hy;
+    ropeLen = std::sqrt((hx - cx) * (hx - cx) + (hy - cy) * (hy - cy));
+    dashActive = false;
+    grapplesUsed++;
+    if (auto* s = assets->GetSound("jump")) Mix_PlayChannel(-1, s, 0);
+}
+
+void Game::releaseGrapple(bool fling) {
+    if (!hooked) return;
+    hooked = false;
+    if (fling) {
+        auto& tr = manager.getGroup(groupPlayers)[0]->getComponent<TransformComponent>();
+        tr.velocity.y = std::min(tr.velocity.y, Config::GRAPPLE_RELEASE_VY);
+        noJumpCutT = 0.35f;
+        jumpsRemaining = std::max(jumpsRemaining, 1);       // a jump still in hand
+        if (auto* s = assets->GetSound("jump")) Mix_PlayChannel(-1, s, 0);
+    }
+}
+
+// A rope is a maximum length: past it, pull the hero back onto the circle and
+// drop the outward part of the velocity.  Gravity does the swinging; left /
+// right air control pumps it.  The rope also reels in to GRAPPLE_MIN_LEN.
+void Game::applyRope() {
+    auto& p = *manager.getGroup(groupPlayers)[0];
+    auto& tr = p.getComponent<TransformComponent>();
+    ropeLen = std::max(Config::GRAPPLE_MIN_LEN, ropeLen - Config::GRAPPLE_REEL * lastFrameTime);
+    const float cx = tr.position.x + Config::PLAYER_W * 0.5f, cy = tr.position.y + Config::PLAYER_H * 0.5f;
+    float dx = cx - hookX, dy = cy - hookY;
+    const float d = std::sqrt(dx * dx + dy * dy);
+    if (d <= ropeLen || d < 1.f) return;
+    dx /= d; dy /= d;
+    tr.position.x += (hookX + dx * ropeLen) - cx;
+    tr.position.y += (hookY + dy * ropeLen) - cy;
+    const float vr = tr.velocity.x * dx + tr.velocity.y * dy;
+    if (vr > 0.f) { tr.velocity.x -= vr * dx; tr.velocity.y -= vr * dy; }
+    p.getComponent<ColliderComponent>().update();          // INV-2
+}
+
+// Rings at every hook point (brighter when one is in reach), and the rope.
+void Game::drawGrapple() {
+    const auto& S = Level::stage();
+    float inX = -1e9f, inY = 0.f;
+    if (!hooked) nearestHook(inX, inY);
+    auto box = [&](int x, int y, int w, int h, Uint8 r, Uint8 g, Uint8 b) {
+        SDL_SetRenderDrawColor(renderer, r, g, b, 255);
+        SDL_Rect q{ x, y, w, h };
+        SDL_RenderFillRect(renderer, &q);
+    };
+    for (int i = 0; i < S.nHooks; ++i) {
+        const int x = S.hooks[i].col * Level::TILE + Level::TILE / 2 - camera.x;
+        const int y = S.hooks[i].row * Level::TILE + Level::TILE / 2 - camera.y;
+        if (x < -20 || x > camera.w + 20 || y < -20 || y > camera.h + 20) continue;
+        const bool lit = std::fabs(x + camera.x - inX) < 1.f && std::fabs(y + camera.y - inY) < 1.f;
+        // a 12 px ring: INK outline, SLATE body, PLATE highlight, GOLD glint in reach
+        box(x - 4, y - 7, 8, 14, 0x1c, 0x12, 0x1c); box(x - 7, y - 4, 14, 8, 0x1c, 0x12, 0x1c);
+        box(x - 3, y - 6, 6, 12, 0x42, 0x4c, 0x6e); box(x - 6, y - 3, 12, 6, 0x42, 0x4c, 0x6e);
+        box(x - 2, y - 2, 4, 4, 0x1c, 0x12, 0x1c);
+        box(x - 5, y - 2, 1, 3, 0x92, 0xa1, 0xb9); box(x - 2, y - 5, 3, 1, 0x92, 0xa1, 0xb9);
+        if (lit || (hooked && std::fabs(x + camera.x - hookX) < 1.f))
+            box(x + 3, y - 5, 2, 2, 0xff, 0xc8, 0x25);
+    }
+    if (!hooked) return;
+    auto& tr = manager.getGroup(groupPlayers)[0]->getComponent<TransformComponent>();
+    const int hx = (int)(tr.position.x + Config::PLAYER_W * 0.5f + (facingRight ? 6 : -6)) - camera.x;
+    const int hy = (int)(tr.position.y + 14) - camera.y;
+    const int kx = (int)hookX - camera.x, ky = (int)hookY - camera.y;
+    SDL_SetRenderDrawColor(renderer, 0x5d, 0x2c, 0x28, 255);      // BROWN_DK rope
+    SDL_RenderDrawLine(renderer, hx, hy, kx, ky);
+    SDL_RenderDrawLine(renderer, hx + 1, hy, kx + 1, ky);
+    SDL_SetRenderDrawColor(renderer, 0xbf, 0x6f, 0x4a, 255);      // TAN highlight
+    SDL_RenderDrawLine(renderer, hx, hy - 1, kx, ky - 1);
+}
+
 void Game::startJump() {
     if (state != State::Playing) return;
     auto& p = *manager.getGroup(groupPlayers)[0];
@@ -1090,6 +1190,10 @@ void Game::startJump() {
     auto& col = p.getComponent<ColliderComponent>();
     // wall jump check
     (void)col;
+    if (hooked) {                              // Batch C: jump = let go, with a fling
+        releaseGrapple(true);
+        return;
+    }
     const int wallDir = wallContact();
     const bool touchingWall = wallDir != 0;
     if (slideT > 0.f) {                       // Batch C: jump out of a slide
@@ -1201,6 +1305,7 @@ void Game::respawn() {
     dashActive = false;
     slideT = 0.f; slideCooldown = 0.f; wallJumpLockT = 0.f; wallSliding = false;
     parryT = 0.f; parryCooldown = 0.f; parryHit = false;
+    hooked = false; noJumpCutT = 0.f;
     setSlideHitbox(false);                 // Batch C: never respawn crouched
     iframeTimer = Config::RESPAWN_INVULN;
     // A death should not leave the hero mid-swing or holding a stale combo.
@@ -1292,6 +1397,7 @@ void Game::stepPlayerPhysics() {
     }
     addLockedDoors(solids);
     auto r = Physics::moveAndCollide(player, solids);
+    if (hooked) applyRope();                   // Batch C
     wasGrounded = isGrounded;
     isGrounded = r.grounded;
     if (isGrounded) {
@@ -1871,6 +1977,7 @@ void Game::handleEvents() {
                 // is what makes the three-attack split reachable with one hand.
                 case SDLK_LSHIFT: case SDLK_RSHIFT: case SDLK_l: startDash(); break;
                 case SDLK_u: case SDLK_c: startParry(); break;          // Batch C
+                case SDLK_e: case SDLK_v: startGrapple(); break;        // Batch C
                 case SDLK_p:
                     if (state == State::Playing) { state = State::Paused; isPaused = true; }
                     else if (state == State::Paused) { state = State::Playing; isPaused = false; }
@@ -2137,6 +2244,7 @@ void Game::drawWorld() {
         g->getComponent<SpriteComponent>().draw();
     }
     // player
+    drawGrapple();                                          // Batch C
     for (auto* p : manager.getGroup(groupPlayers)) p->draw();
     drawParryShield();                                      // Batch C
     // projectiles
@@ -2758,6 +2866,7 @@ namespace {
         { "Into a wall",    "Wall Slide",       "Hold toward a wall while falling to slide down it slowly; jump to kick off." },
         { "S / Down",       "Slide",            "On the ground while moving: a fast low slide that dodges shots overhead." },
         { "U / C",          "Parry",            "Block just as a hit lands: shots fly back at the shooter, attackers stagger." },
+        { "E / V",          "Grapple",          "Near a ring over a gap: hook on and swing. Jump to let go with a fling." },
     };
 
     static const HelpItem ITEMS_COMBAT[] = {

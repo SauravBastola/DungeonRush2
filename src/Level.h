@@ -352,6 +352,15 @@ namespace Level {
         { "mage", 171, 25 }
     };
 
+    // grapple points (Batch C): tile whose centre the rope hangs from
+    struct HookDef { int col, row; };
+    inline constexpr int N_HOOKS = 3;
+    inline constexpr HookDef HOOKS[3] = {
+        { 40, 27 },
+        { 78, 24 },
+        { 118, 25 }
+    };
+
     // coin anchors
     struct CoinDef { int col, row; };
     inline constexpr int N_COINS = 128;
@@ -824,6 +833,14 @@ namespace Level {
         { "skeleton", 169, 30 },
         { "boss", 192, 30 }
         };
+        inline constexpr int N_HOOKS = 5;
+        inline constexpr HookDef HOOKS[5] = {
+        { 34, 23 },
+        { 66, 24 },
+        { 100, 26 },
+        { 120, 24 },
+        { 146, 25 }
+        };
         inline constexpr int N_COINS = 101;
         inline constexpr int N_SCENERY = 16;
         inline constexpr SceneryDef SCENERY[16] = {
@@ -1147,6 +1164,13 @@ namespace Level {
         { "skeleton", 170, 30 },
         { "boss", 192, 30 }
         };
+        inline constexpr int N_HOOKS = 4;
+        inline constexpr HookDef HOOKS[4] = {
+        { 45, 25 },
+        { 80, 23 },
+        { 112, 27 },
+        { 140, 25 }
+        };
         inline constexpr int N_COINS = 118;
         inline constexpr int N_SCENERY = 21;
         inline constexpr SceneryDef SCENERY[21] = {
@@ -1187,11 +1211,12 @@ namespace Level {
         const EnemyDef* enemies;        int nEnemies;
         const SceneryDef* scenery;      int nScenery;
         int nCoins;
+        const HookDef* hooks;           int nHooks;
     };
 #define DR_STAGE(NS, DIR, THEME) { NS NAME, DIR, THEME, NS PLAYER_X, NS PLAYER_Y, NS GROUND_TOP, \
         NS ZONE_RUINS_COL, NS ZONE_SUNKEN_COL, NS ZONE_ARENA_COL, NS PLATFORMS, NS N_PLATFORMS, \
         NS HAZARDS, NS N_HAZARDS, NS FACILITIES, NS N_FACILITIES, NS POWERUPS, NS N_POWERUPS, \
-        NS ENEMIES, NS N_ENEMIES, NS SCENERY, NS N_SCENERY, NS N_COINS }
+        NS ENEMIES, NS N_ENEMIES, NS SCENERY, NS N_SCENERY, NS N_COINS, NS HOOKS, NS N_HOOKS }
     inline constexpr int N_STAGES = 3;
     inline constexpr StageData STAGES[N_STAGES] = {
         DR_STAGE(, "tileset/", 0),
