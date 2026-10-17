@@ -429,6 +429,10 @@ void Game::spawnEnemy(const std::string& kind, int col, int row) {
             sp.addAnim("idle",   Animation(0, 4, 140).motion(0.f, 0.f));
             sp.addAnim("run",    Animation(1, 6, 100).motion(0.f, 0.f));
             sp.addAnim("attack", Animation(2, 4, 110).motion(0.f, 0.f));
+            // Batch C: the swing in its three phases (tell held, strike, guard)
+            sp.addAnim("windup", Animation(2, 2, 220).motion(0.f, 0.f));
+            sp.addAnim("strike", Animation(2, 1, 120, 2).motion(0.f, 0.f));
+            sp.addAnim("guard",  Animation(2, 1, 120, 3).motion(0.f, 0.f));
             sp.addAnim("hurt",   Animation(3, 2, 120).motion(0.f, 0.f));
             sp.addAnim("die",    Animation(4, 5, 160).motion(0.f, 0.f));
             sp.Play("idle");
@@ -1017,8 +1021,8 @@ SDL_Rect Game::parryZone() const {
 }
 
 static void parryLanded(Game& g, float x, float y) {
+    if (!g.parryHit) g.parriesLanded++;      // one window counts once
     g.parryHit = true;
-    g.parriesLanded++;
     g.parryCooldown = std::min(g.parryCooldown, 0.12f);     // reward: chain them
     g.hitStop = std::max(g.hitStop, 0.06f);
     Vfx::impactRing(x, y, 249, 230, 207, 44.f, 0.22f);
@@ -1436,8 +1440,13 @@ void Game::stepEnemies() {
     // One sink carries the hero's defensive state down into the AI, so enemy
     // contact damage, blasts and shockwaves all honour shields and i-frames
     // through exactly the same funnel (Damage::applyToPlayer).
-    EnemyAI::DamageSink sink{ shieldCharges, iframeTimer, invincibleTimer };
+    int parryEvents = 0;
+    EnemyAI::DamageSink sink{ shieldCharges, iframeTimer, invincibleTimer, parryT, parryEvents };
     EnemyAI::step(manager.getGroup(groupEnemies), player, sink, m_shakeMag);
+    if (parryEvents > 0) {             // Batch C: a skeleton's strike met a parry
+        auto& t = player.getComponent<TransformComponent>();
+        parryLanded(*this, t.position.x + (facingRight ? Config::PLAYER_W + 10.f : -10.f), t.position.y + 25.f);
+    }
 }
 
 void Game::stepEnemyPhysics() {
@@ -1605,6 +1614,14 @@ void Game::update() {
                 if (!en->isActive() || !en->hasComponent<ColliderComponent>()) continue;
                 if (pc.dead.count(reinterpret_cast<std::uintptr_t>(en))) continue;
                 if (Collision::AABB(col, en->getComponent<ColliderComponent>().collider)) {
+                    // Batch C: a guarding skeleton blocks a shot from the front
+                    auto& prt = pr->getComponent<TransformComponent>();
+                    if (EnemyAI::blocks(*en, prt.position.x - prt.velocity.x * 0.1f)) {
+                        Particles::emitHitSparks(prt.position.x, prt.position.y);
+                        if (auto* s = assets->GetSound("invincible")) Mix_PlayChannel(-1, s, 0);
+                        pr->destroy();
+                        break;
+                    }
                     auto& hp = en->getComponent<HealthComponent>();
                     float dmg = pc.damage * (dmgBoostTimer > 0 ? Config::POWERUP_DMG_MULT : 1.f);
                     // damage() means "the hit landed"; a kill needs hp.dead too.
@@ -2238,6 +2255,22 @@ void Game::drawWorld() {
     for (auto* p : manager.getGroup(groupPowerups)) p->draw();
     // enemies
     for (auto* e : manager.getGroup(groupEnemies)) e->draw();
+    // Batch C: a guarding skeleton shows a shield on the side that blocks
+    for (auto* e : manager.getGroup(groupEnemies)) {
+        if (!e->isActive() || !e->hasComponent<EnemyAIComponent>()) continue;
+        if (!e->getComponent<EnemyAIComponent>().guarding) continue;
+        auto& c = e->getComponent<ColliderComponent>().collider;
+        const bool r = e->getComponent<TransformComponent>().facingRight;
+        const int x = (r ? c.x + c.w - 2 : c.x - 6) - camera.x, y = c.y + 8 - camera.y;
+        SDL_SetRenderDrawColor(renderer, 0x1c, 0x12, 0x1c, 255);          // INK
+        SDL_Rect o{ x - 1, y - 1, 10, 26 };  SDL_RenderFillRect(renderer, &o);
+        SDL_SetRenderDrawColor(renderer, 0x42, 0x4c, 0x6e, 255);          // SLATE
+        SDL_Rect b{ x, y, 8, 24 };           SDL_RenderFillRect(renderer, &b);
+        SDL_SetRenderDrawColor(renderer, 0x92, 0xa1, 0xb9, 255);          // PLATE rim
+        SDL_Rect h{ x + (r ? 1 : 5), y + 2, 2, 20 };  SDL_RenderFillRect(renderer, &h);
+        SDL_SetRenderDrawColor(renderer, 0xff, 0xc8, 0x25, 255);          // GOLD boss
+        SDL_Rect k{ x + 3, y + 10, 2, 3 };   SDL_RenderFillRect(renderer, &k);
+    }
     // dash trail — behind the hero, over the world. These are real entities
     // (SpriteComponent + AfterimageComponent), so they cannot live in the
     // particle group: Particles::draw filters on ParticleComponent and would

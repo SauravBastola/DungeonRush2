@@ -85,7 +85,14 @@ struct DamageSink {
     int&   shieldCharges;
     float& iframeT;
     float  invincT;
+    // Batch C: a parry window open on the hero, and how many strikes it beat
+    float  parryT;
+    int&   parryEvents;
 };
+
+// Batch C: does this enemy block a hit arriving from world x `fromX`?
+// (a guarding skeleton blocks whatever comes from the side it faces)
+bool blocks(Entity& enemy, float fromX);
 
 void step(std::vector<Entity*>& enemies, Entity& player,
           const DamageSink& sink, float& screenShake);

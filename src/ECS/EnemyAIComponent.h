@@ -51,6 +51,15 @@ public:
     float    slamT      = 0.f;
     float    fanT       = 0.f;          // projectile-fan cadence (phase 2)
 
+    // Batch C - skeleton swing: 0 chase, 1 wind-up (tell), 2 strike, 3 guard
+    int      swingPhase = 0;
+    float    swingT     = 0.f;
+    bool     guarding   = false;        // frontal hits are blocked
+    // Batch C - bat dive: 0 roam, 1 tell (hover), 2 dive, 3 climb back
+    int      divePhase  = 0;
+    float    diveT      = 0.f, diveCd = 0.f;
+    float    diveVX     = 0.f, diveVY = 0.f, homeY = -1.f;
+
     // ---- helpers ----
     void transition(State s) { state = s; stateT = 0.f; }
     bool canSeeTarget(float range) const;

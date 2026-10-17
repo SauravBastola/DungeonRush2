@@ -1189,6 +1189,10 @@ def build_stage(spec: StageSpec) -> Level:
                 continue
             if any(abs(cc - k) <= 2 for k in cp_cols) or abs(cc - key_col) <= 1:
                 continue
+            # a skeleton's swing knocks you back 300 px/s: never at a chasm
+            # lip, where it throws you into the pit (fullrun found this)
+            if kind == "skeleton" and any(abs(cc - c) <= 3 for c in chasm_cols):
+                continue
             ground = kind not in ("bat", "mage")
             if ground and (cc in chasm_cols or cc in hazard_cols or g[cc] is None or g[cc] < 0):
                 continue
@@ -1365,6 +1369,11 @@ def validate_level(L: Level) -> List[str]:
             on = [p for p in L.platforms if p.col <= e.col < p.col + p.w and p.row == e.row + 1]
             if not on or on[0].moving:
                 bad.append(f"{e.kind} at col {e.col} is not on a static platform")
+    chasm_cols_v = [c for c in range(L.width) if g[c] is not None and g[c] < 0]
+    for e in L.enemies:
+        if e.kind == "skeleton" and any(abs(e.col - c) <= 3 for c in chasm_cols_v):
+            bad.append(f"skeleton at col {e.col} is within 3 columns of a chasm - its swing "
+                       f"knocks the hero into the pit")
     cols = sorted(e.col for e in L.enemies if e.kind != "boss")
     for i, c in enumerate(cols):
         window = [x for x in cols if c <= x < c + 12]

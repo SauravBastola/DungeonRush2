@@ -807,14 +807,14 @@ namespace Level {
         { "slime", 57, 26 },
         { "bat", 62, 21 },
         { "mage", 75, 25 },
-        { "skeleton", 69, 28 },
+        { "slime", 69, 28 },
         { "archer", 77, 29 },
         { "archer", 81, 29 },
         { "slime", 85, 25 },
         { "slime", 91, 25 },
         { "slime", 95, 25 },
         { "bat", 100, 23 },
-        { "skeleton", 102, 29 },
+        { "skeleton", 105, 29 },
         { "skeleton", 107, 28 },
         { "archer", 109, 28 },
         { "skeleton", 115, 28 },
@@ -1123,8 +1123,8 @@ namespace Level {
         { "Invincible", 148, 27 },
         { "Health", 164, 28 }
         };
-        inline constexpr int N_ENEMIES = 38;
-        inline constexpr EnemyDef ENEMIES[38] = {
+        inline constexpr int N_ENEMIES = 37;
+        inline constexpr EnemyDef ENEMIES[37] = {
         { "archer", 15, 28 },
         { "mage", 27, 25 },
         { "skeleton", 23, 28 },
@@ -1133,7 +1133,7 @@ namespace Level {
         { "bat", 37, 20 },
         { "slime", 39, 28 },
         { "bat", 44, 22 },
-        { "skeleton", 47, 28 },
+        { "skeleton", 49, 28 },
         { "bomber", 52, 27 },
         { "skeleton", 53, 27 },
         { "slime", 58, 25 },
@@ -1153,8 +1153,7 @@ namespace Level {
         { "archer", 126, 25 },
         { "bomber", 131, 25 },
         { "archer", 135, 28 },
-        { "skeleton", 139, 28 },
-        { "skeleton", 142, 28 },
+        { "skeleton", 136, 28 },
         { "bomber", 145, 28 },
         { "skeleton", 149, 28 },
         { "skeleton", 157, 24 },

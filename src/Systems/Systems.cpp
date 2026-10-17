@@ -430,6 +430,17 @@ int resolveMelee(std::vector<Entity*>& hitboxes,
             std::uintptr_t id = reinterpret_cast<std::uintptr_t>(t);
             if (hc.hit.count(id)) continue;
             hc.hit.insert(id);
+            // Batch C: a guarding skeleton blocks a blow from the side it faces
+            if (hc.owner->hasComponent<TransformComponent>()) {
+                auto& ot = hc.owner->getComponent<TransformComponent>();
+                if (EnemyAI::blocks(*t, ot.position.x + ot.width * 0.5f)) {
+                    auto& tt = t->getComponent<TransformComponent>();
+                    Particles::emitHitSparks(tt.position.x + tt.width * 0.5f, tt.position.y + 20.f);
+                    if (auto* s = Game::assets->GetSound("invincible")) Mix_PlayChannel(-1, s, 0);
+                    ot.velocity.x += (ot.position.x < tt.position.x ? -1.f : 1.f) * 180.f;
+                    continue;
+                }
+            }
             hc.hitCount++;
             landed++;
             auto& hp = t->getComponent<HealthComponent>();
@@ -583,7 +594,10 @@ void step(std::vector<Entity*>& enemies, Entity& player,
         float dy  = tr.position.y - pt.position.y;
         float dist = std::sqrt(dx*dx + dy*dy);
 
-        ai.update();
+        // Batch C: no ai.update() here - Entity::update() already runs every
+        // component's update() each frame, so calling it again ticked attackCd,
+        // fireTimer and stateT twice: archers and mages fired at double their
+        // configured rate.
 
         // Staggered: the knockback owns the body for a moment.  Without this
         // the switch below reassigns tr.velocity.x every single frame and the
@@ -603,6 +617,53 @@ void step(std::vector<Entity*>& enemies, Entity& player,
 
         switch (ai.kind) {
             case EnemyAIComponent::Kind::Skeleton: {
+                // Batch C: tell -> strike -> guard, then back to the chase
+                auto* sp = e->hasComponent<SpriteComponent>() ? &e->getComponent<SpriteComponent>() : nullptr;
+                auto& ec = e->getComponent<ColliderComponent>().collider;
+                auto& pc = player.getComponent<ColliderComponent>().collider;
+                const float gap = (dx > 0) ? (float)(ec.x - (pc.x + pc.w)) : (float)(pc.x - (ec.x + ec.w));
+                if (ai.swingPhase == 0 && gap < Config::SKEL_SWING_RANGE && std::fabs(dy) < 40.f &&
+                    ai.attackCd <= 0.f) {
+                    ai.swingPhase = 1; ai.swingT = 0.f;
+                    tr.facingRight = dx < 0;
+                }
+                if (ai.swingPhase > 0) {
+                    ai.swingT += lastFrameTime;
+                    tr.velocity.x *= 0.6f;
+                    if (ai.swingPhase == 1) {                                  // the tell
+                        if (sp) sp->Play("windup");
+                        if (ai.swingT >= Config::SKEL_WINDUP) { ai.swingPhase = 2; ai.swingT = 0.f; }
+                    } else if (ai.swingPhase == 2) {                           // the strike
+                        if (sp) sp->Play("strike");
+                        const int dir = tr.facingRight ? 1 : -1;
+                        SDL_Rect blade{ dir > 0 ? ec.x + ec.w : ec.x - (int)Config::SKEL_REACH,
+                                        ec.y + 4, (int)Config::SKEL_REACH, ec.h - 8 };
+                        if (Collision::AABB(blade, pc)) {
+                            if (sink.parryT > 0.f) {                         // parried
+                                ai.hurtT = Config::PARRY_STUN;
+                                tr.velocity.x = -dir * 260.f;
+                                ai.swingPhase = 0; ai.attackCd = Config::SKEL_SWING_CD;
+                                sink.parryEvents++;
+                                break;
+                            }
+                            auto& ptr = player.getComponent<TransformComponent>();
+                            if (Damage::applyToPlayer(player, Config::SKEL_SWING_DAMAGE, sink.shieldCharges,
+                                                      sink.invincT, sink.iframeT, screenShake)) {
+                                ptr.velocity.x = dir * 300.f;
+                                ptr.velocity.y = -280.f;
+                            }
+                        }
+                        if (ai.swingT >= Config::SKEL_STRIKE) { ai.swingPhase = 3; ai.swingT = 0.f; }
+                    } else {                                                   // guard
+                        ai.guarding = true;
+                        if (sp) sp->Play("guard");
+                        if (ai.swingT >= Config::SKEL_GUARD) {
+                            ai.swingPhase = 0; ai.guarding = false; ai.attackCd = Config::SKEL_SWING_CD;
+                        }
+                    }
+                    break;
+                }
+                ai.guarding = false;
                 if (adx < Config::ENEMY_CHASE_RANGE) {
                     ai.transition(EnemyAIComponent::State::Chase);
                     float dir = (dx > 0) ? -1.f : 1.f;
@@ -638,6 +699,61 @@ void step(std::vector<Entity*>& enemies, Entity& player,
             }
             case EnemyAIComponent::Kind::Bat: {
                 ai.sinT += lastFrameTime;
+                // Batch C: hover (tell) -> dive at where you were -> climb back
+                if (ai.homeY < 0.f) ai.homeY = tr.position.y;
+                ai.diveCd -= lastFrameTime;
+                if (ai.divePhase == 0 && ai.diveCd <= 0.f && adx < Config::BAT_DIVE_RANGE_X &&
+                    pt.position.y > tr.position.y + 40.f) {
+                    ai.divePhase = 1; ai.diveT = 0.f;
+                }
+                if (ai.divePhase == 1) {                                       // the tell
+                    ai.diveT += lastFrameTime;
+                    tr.velocity.x = 0.f;
+                    tr.velocity.y = std::sin(ai.sinT * 40.f) * 40.f;          // a hard flutter
+                    tr.facingRight = dx < 0;
+                    if (ai.diveT >= Config::BAT_DIVE_TELL) {
+                        const float tx = pt.position.x + 16.f - (tr.position.x + 16.f);
+                        const float ty = pt.position.y + 25.f - (tr.position.y + 16.f);
+                        const float l = std::max(1.f, std::sqrt(tx * tx + ty * ty));
+                        ai.diveVX = tx / l * Config::BAT_DIVE_SPEED;
+                        ai.diveVY = ty / l * Config::BAT_DIVE_SPEED;
+                        ai.divePhase = 2; ai.diveT = 0.f;
+                    }
+                    if (e->hasComponent<SpriteComponent>()) e->getComponent<SpriteComponent>().Play("fly");
+                    break;
+                }
+                if (ai.divePhase == 2) {                                       // the dive
+                    ai.diveT += lastFrameTime;
+                    tr.velocity.x = ai.diveVX; tr.velocity.y = ai.diveVY;
+                    tr.facingRight = ai.diveVX >= 0;
+                    // bats ignore terrain collision, so stop at the ground
+                    const int col = std::max(0, std::min(Level::WIDTH_TILES - 1,
+                                     (int)((tr.position.x + 16.f) / Level::TILE)));
+                    const int top = Level::stage().groundTop[col];
+                    const bool atGround = top >= 0 && tr.position.y + tr.height * tr.scale >= (top + 1) * Level::TILE;
+                    auto& ec = e->getComponent<ColliderComponent>().collider;
+                    auto& pc = player.getComponent<ColliderComponent>().collider;
+                    if (Collision::AABB(ec, pc)) {
+                        if (Damage::applyToPlayer(player, Config::BAT_DIVE_DAMAGE, sink.shieldCharges,
+                                                  sink.invincT, sink.iframeT, screenShake)) {
+                            auto& ptr = player.getComponent<TransformComponent>();
+                            ptr.velocity.x += (ai.diveVX >= 0 ? 1.f : -1.f) * 200.f;
+                        }
+                        ai.divePhase = 3;
+                    }
+                    if (atGround || ai.diveT >= Config::BAT_DIVE_TIME) ai.divePhase = 3;
+                    if (e->hasComponent<SpriteComponent>()) e->getComponent<SpriteComponent>().Play("fly");
+                    break;
+                }
+                if (ai.divePhase == 3) {                                       // climb back
+                    tr.velocity.x *= 0.9f;
+                    tr.velocity.y = -180.f;
+                    if (tr.position.y <= ai.homeY) {
+                        ai.divePhase = 0; ai.diveCd = Config::BAT_DIVE_CD;
+                    }
+                    if (e->hasComponent<SpriteComponent>()) e->getComponent<SpriteComponent>().Play("fly");
+                    break;
+                }
                 if (dist < Config::ENEMY_CHASE_RANGE) {
                     float dirX = (pt.position.x > tr.position.x) ? 1.f : -1.f;
                     float dirY = (pt.position.y > tr.position.y) ? 1.f : -1.f;
@@ -871,6 +987,15 @@ void step(std::vector<Entity*>& enemies, Entity& player,
             }
         }
     }
+}
+
+bool blocks(Entity& enemy, float fromX) {
+    if (!enemy.hasComponent<EnemyAIComponent>()) return false;
+    auto& ai = enemy.getComponent<EnemyAIComponent>();
+    if (!ai.guarding || ai.hurtT > 0.f) return false;
+    auto& tr = enemy.getComponent<TransformComponent>();
+    const float cx = tr.position.x + tr.width * tr.scale * 0.5f;
+    return tr.facingRight ? fromX >= cx : fromX <= cx;
 }
 
 } // namespace EnemyAI

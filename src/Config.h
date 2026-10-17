@@ -85,6 +85,21 @@ namespace Config {
     constexpr float GRAPPLE_MIN_LEN    = 110.f;    // the rope reels in to this
     constexpr float GRAPPLE_REEL       = 120.f;    // px/s
     constexpr float GRAPPLE_RELEASE_VY = -560.f;   // the fling when you jump off
+    // Batch C: skeleton swing (tell -> strike -> guard)
+    constexpr float SKEL_SWING_RANGE   = 36.f;     // px gap that starts a swing (< SKEL_REACH)
+    constexpr float SKEL_WINDUP        = 0.45f;    // the tell: sword raised, eye flare
+    constexpr float SKEL_STRIKE        = 0.12f;
+    constexpr float SKEL_REACH         = 46.f;     // px the blade reaches past the body
+    constexpr float SKEL_SWING_DAMAGE  = 15.f;
+    constexpr float SKEL_GUARD         = 0.70f;    // frontal hits blocked
+    constexpr float SKEL_SWING_CD      = 1.00f;
+    // Batch C: bat dive-bomb (tell -> dive -> climb back)
+    constexpr float BAT_DIVE_RANGE_X   = 240.f;
+    constexpr float BAT_DIVE_TELL      = 0.40f;
+    constexpr float BAT_DIVE_SPEED     = 520.f;
+    constexpr float BAT_DIVE_TIME      = 0.70f;
+    constexpr float BAT_DIVE_CD        = 2.20f;
+    constexpr float BAT_DIVE_DAMAGE    = 12.f;
 
     // ---- dash ----
     constexpr float DASH_SPEED         = 720.f;
