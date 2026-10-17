@@ -58,7 +58,8 @@ N = 1, E = 2, S = 4, W = 8.  A clear bit is an exposed side.
      24,25 1101  E                  right wall           (variants 1, 2)
      26,27 1011  S                  underside            (variants 1, 2)
      28,29 0111  W                  left wall            (variants 1, 2)
-     30,31  -    -                  reserved (transparent)
+     30    1111  -                  interior             (variant 3)
+     31     -    -                  reserved (transparent)
 
 Pieces 0..15 are the 16-piece N/E/S/W set.  A 4-bit mask cannot see
 diagonals, so the concave corner where a step meets a wall (both cardinals
@@ -102,10 +103,10 @@ EDGE_KEEP = 8                     # px of border every variant shares
 
 # --- piece numbering (see the table in the docstring) -----------------------
 INNER = {"NE": 16, "SE": 17, "SW": 18, "NW": 19}
-INTERIOR_VARIANTS = (15, 20, 21)
+INTERIOR_VARIANTS = (15, 20, 21, 30)
 EDGE_VARIANTS = {14: (14, 22, 23), 13: (13, 24, 25),
                  11: (11, 26, 27), 7: (7, 28, 29)}
-N_PIECES = 30
+N_PIECES = 31
 
 
 def terrain_id(material: str, band: int, piece: int) -> int:
@@ -116,15 +117,16 @@ def piece_for(mask: int, diag_empty, variant: int) -> int:
     """Select the piece for a 4-bit connect mask.
 
     `diag_empty` is the set of empty diagonals among {"NE","SE","SW","NW"};
-    it only matters for a fully enclosed cell.  `variant` is 0..2.
+    it only matters for a fully enclosed cell.  `variant` is 0..11 (12 buckets keep both % 4 and % 3 uniform):
+    interiors use all four, straight edges use variant % 3.
     """
     if mask == 15:
         for k in ("NW", "NE", "SW", "SE"):       # lit corner wins a tie
             if k in diag_empty:
                 return INNER[k]
-        return INTERIOR_VARIANTS[variant]
+        return INTERIOR_VARIANTS[variant % 4]
     if mask in EDGE_VARIANTS:
-        return EDGE_VARIANTS[mask][variant]
+        return EDGE_VARIANTS[mask][variant % 3]
     return mask
 
 
@@ -362,17 +364,36 @@ def _inside(cx, cy, rx, ry):
             EDGE_KEEP + ry + 2 <= cy <= CELL - EDGE_KEEP - ry - 3)
 
 
+def _touches(cx, cy, rx, ry):
+    return not _inside(cx, cy, rx, ry)
+
+
 def _base(colour):
     return [[colour] * CELL for _ in range(CELL)]
 
 
-def _tex_teal(variant):
-    t = _base(PAL.TEAL)
-    # moss clumps: dark patches with a lit fleck on their upper-left
-    for k in range(9):
-        cx = int(_h(101 + k * 5) * CELL)
-        cy = int(_h(102 + k * 5) * CELL)
-        r = 3 + int(_h(103 + k * 5) * 4)
+def _layered(base, features, variant):
+    """Shared border, per-variant interior.
+
+    `features(tex, seed, keep)` draws a material's whole feature set.  Every
+    variant draws the seed-0 features that touch the border band, so the
+    outer EDGE_KEEP px are identical across variants and any variant abuts
+    any other; the interior is a different seed per variant, which is what
+    breaks the 64 px repeat (variant 0 is simply seed 0 throughout).
+    """
+    t = _base(base)
+    features(t, 0, _touches)
+    features(t, variant * 7919, _inside)
+    return t
+
+
+def _moss(t, seed, keep):
+    for k in range(14):
+        cx = int(_h(101 + seed + k * 5) * CELL)
+        cy = int(_h(102 + seed + k * 5) * CELL)
+        r = 3 + int(_h(103 + seed + k * 5) * 4)
+        if not keep(cx, cy, r, r):
+            continue
 
         def paint(x, y, u, v, d):
             if d > 0.55 or (u + v) > -0.3:
@@ -380,49 +401,40 @@ def _tex_teal(variant):
         _wrap_blob(t, cx, cy, r, max(2, r - 1), paint)
         t[(cy - r) % CELL][(cx - 1) % CELL] = PAL.GRASS_MID
         t[(cy - r) % CELL][cx % CELL] = PAL.GRASS_MID
-    _specks(t, 140, 10, PAL.NAVY)
-    _specks(t, 170, 6, PAL.GRASS_MID)
-    if variant:
-        seed = 900 + variant * 50
-        _pebbles(t, seed, 4, 2, 3, PAL.TEAL_DK, PAL.GRASS_MID, PAL.NAVY,
-                 PAL.NAVY, keep=_inside)
-        _specks(t, seed + 20, 6, PAL.GRASS_MID, keep=_inside)
-    return t
+    _pebbles(t, 900 + seed, 4, 2, 3, PAL.TEAL_DK, PAL.GRASS_MID, PAL.NAVY,
+             PAL.NAVY, keep=keep)
+    _specks(t, 140 + seed, 14, PAL.NAVY, keep=keep)
+    _specks(t, 170 + seed, 8, PAL.GRASS_MID, keep=keep)
+
+
+def _tex_teal(variant):
+    return _layered(PAL.TEAL, _moss, variant)
 
 
 def _tex_soil(variant):
-    t = _base(PAL.BROWN_XD)
-    _pebbles(t, 200, 14, 3, 6, PAL.BROWN, PAL.TAN, PAL.BROWN_DK, PAL.INK)
-    _specks(t, 260, 12, PAL.BROWN_DK)
-    if variant:
-        seed = 1200 + variant * 50
-        _pebbles(t, seed, 4, 2, 4, PAL.BROWN, PAL.TAN_LT, PAL.BROWN_DK,
-                 PAL.INK, keep=_inside)
-    return t
+    def f(t, seed, keep):
+        _pebbles(t, 200 + seed, 16, 3, 6, PAL.BROWN, PAL.TAN, PAL.BROWN_DK,
+                 PAL.INK, keep=keep)
+        _specks(t, 260 + seed, 14, PAL.BROWN_DK, keep=keep)
+    return _layered(PAL.BROWN_XD, f, variant)
 
 
 def _tex_stone(variant):
-    t = _base(PAL.NAVY_XD)
-    _pebbles(t, 300, 11, 4, 7, PAL.SLATE_XD, PAL.SLATE, PAL.NAVY_XD, PAL.INK)
-    _specks(t, 360, 14, PAL.INK)
-    if variant:
-        seed = 1500 + variant * 50
-        _pebbles(t, seed, 3, 2, 4, PAL.SLATE_XD, PAL.SLATE_LT, PAL.NAVY_XD,
-                 PAL.INK, keep=_inside)
-        _specks(t, seed + 30, 5, PAL.SLATE, keep=_inside)
-    return t
+    def f(t, seed, keep):
+        _pebbles(t, 300 + seed, 13, 4, 7, PAL.SLATE_XD, PAL.SLATE, PAL.NAVY_XD,
+                 PAL.INK, keep=keep)
+        _specks(t, 360 + seed, 16, PAL.INK, keep=keep)
+        _specks(t, 380 + seed, 4, PAL.SLATE, keep=keep)
+    return _layered(PAL.NAVY_XD, f, variant)
 
 
 def _tex_navy(variant):
-    t = _base(PAL.NAVY)
-    _pebbles(t, 400, 10, 3, 6, PAL.SLATE_XD, PAL.SLATE, PAL.NAVY_XD, PAL.NAVY_XD)
-    _specks(t, 460, 10, PAL.WATER_DK)
-    _specks(t, 480, 8, PAL.NAVY_XD)
-    if variant:
-        seed = 1800 + variant * 50
-        _pebbles(t, seed, 3, 2, 4, PAL.NAVY_DK, PAL.WATER_DK, PAL.NAVY_XD,
-                 PAL.NAVY_XD, keep=_inside)
-    return t
+    def f(t, seed, keep):
+        _pebbles(t, 400 + seed, 12, 3, 6, PAL.SLATE_XD, PAL.SLATE, PAL.NAVY_XD,
+                 PAL.NAVY_XD, keep=keep)
+        _specks(t, 460 + seed, 12, PAL.WATER_DK, keep=keep)
+        _specks(t, 480 + seed, 10, PAL.NAVY_XD, keep=keep)
+    return _layered(PAL.NAVY, f, variant)
 
 
 def _tex_water(variant):
@@ -640,7 +652,7 @@ def build():
     classes = [piece_classes(p) for p in range(N_PIECES)]
     report = []
     for m, material in enumerate(MATERIALS):
-        textures = [TEXTURE[material](v) for v in range(3)]
+        textures = [TEXTURE[material](v) for v in range(4)]
         cov = band_coverage(material, textures[0])
         l0 = _mean_lum(textures[0])
         achieved = [_mean_lum(darken(textures[0], f)) / l0 for f in cov]

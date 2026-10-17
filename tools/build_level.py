@@ -1107,8 +1107,8 @@ def _depth_band(row: int, top: int) -> int:
 
 
 def _variant(col: int, row: int) -> int:
-    """Interior/edge variant 0..2: a deterministic hash of (col, row)."""
-    return int(_h(col * 7919 + row * 104729 + 17) * 3)
+    """0..11 from a deterministic hash of (col, row); interiors take % 4, edges % 3."""
+    return int(_h(col * 7919 + row * 104729 + 17) * 12)
 
 
 def terrain_cells(L: Level) -> Dict[Tuple[int, int], Tuple[str, str, int]]:
