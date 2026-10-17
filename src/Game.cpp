@@ -1193,7 +1193,9 @@ void Game::update() {
                 if (Collision::AABB(col, en->getComponent<ColliderComponent>().collider)) {
                     auto& hp = en->getComponent<HealthComponent>();
                     float dmg = pc.damage * (dmgBoostTimer > 0 ? Config::POWERUP_DMG_MULT : 1.f);
-                    bool died = hp.damage(dmg);
+                    // damage() means "the hit landed"; a kill needs hp.dead too.
+                    const bool connected = hp.damage(dmg);
+                    const bool died      = connected && hp.dead;
                     if (en->hasComponent<EnemyAIComponent>()) {
                         auto& ai = en->getComponent<EnemyAIComponent>();
                         ai.hurtT = std::max(ai.hurtT,
