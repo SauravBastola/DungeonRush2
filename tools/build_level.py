@@ -1114,9 +1114,9 @@ def _variant(col: int, row: int) -> int:
 def terrain_cells(L: Level) -> Dict[Tuple[int, int], Tuple[str, str, int]]:
     """(col,row) -> (kind, material, band) for every foreground cell.
 
-    kind is "g" for solid ground (heightmap + platforms) and "w" for chasm
-    water.  Platforms - including the moving ones, whose spawn rect the old
-    writer also baked in - are teal slabs at band 0.
+    kind is "g" for solid ground (heightmap + static platforms) and "w" for
+    chasm water.  Static platforms are teal slabs at band 0; moving ones are
+    entities only (the old writer baked their spawn rect in as a ghost slab).
     """
     g = L.ground
     cells: Dict[Tuple[int, int], Tuple[str, str, int]] = {}
@@ -1133,6 +1133,8 @@ def terrain_cells(L: Level) -> Dict[Tuple[int, int], Tuple[str, str, int]]:
                 cells[(col, row)] = ("g", _ground_material(col, row, top),
                                      _depth_band(row, top))
     for p in L.platforms:
+        if p.moving:          # the game spawns it as an entity; a static copy
+            continue          # here would leave a solid ghost slab at its start
         for x in range(p.col, p.col + p.w):
             for y in range(p.row, p.row + p.h):
                 if 0 <= x < L.width and 0 <= y < L.height:
@@ -1445,7 +1447,8 @@ def write_colliders(path: str, L: Level) -> None:
                 x += 1
             rects.append((run_start, y, x - run_start, 1))
     for p in L.platforms:
-        rects.append((p.col, p.row, p.w, p.h))
+        if not p.moving:      # moving platforms carry their own collider
+            rects.append((p.col, p.row, p.w, p.h))
     with open(path, "w") as f:
         for (x, y, w, h) in rects:
             f.write(f"{x} {y} {w} {h}\n")
