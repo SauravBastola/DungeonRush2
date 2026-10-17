@@ -138,13 +138,13 @@ void Game::loadAssets() {
     assets->AddTexture("terrain2_mid", Depth::bake(renderer,
         assetPath("tileset/terrain_v2.png").c_str(), Depth::MID));
     tex("player",      "sprites/player_sprites.png");
-    tex("skeleton",    "sprites/skeleton_sprites.png");
+    tex("skeleton",    "sprites/enemy_skeleton.png");
     tex("slime",       "sprites/enemy_slime.png");
     tex("bat",         "sprites/enemy_bat.png");
-    tex("mage",        "sprites/mage.png");
-    tex("archer",      "sprites/archer.png");
-    tex("bomber",      "sprites/bomber.png");
-    tex("boss",        "sprites/villain_boss.png");
+    tex("mage",        "sprites/enemy_mage.png");
+    tex("archer",      "sprites/enemy_archer.png");
+    tex("bomber",      "sprites/enemy_bomber.png");
+    tex("boss",        "sprites/enemy_boss.png");
     tex("coin",        "tileset/coins.png");
     tex("projectile",  "sprites/proj.png");
     tex("fireball",    "sprites/fireball.png");
@@ -369,11 +369,13 @@ void Game::spawnEnemy(const std::string& kind, int col, int row) {
         // a few degrees of lean, driven off the same clock as the frame
         // advance, reads as continuous movement without new art.
         case EnemyAIComponent::Kind::Skeleton:
-            sp.addAnim("idle",   Animation(0, 4, 110).motion(1.0f, 1.2f, 1.f));
-            sp.addAnim("run",    Animation(1, 6, 100).motion(1.8f, 2.6f));
-            sp.addAnim("attack", Animation(2, 6, 80).motion(0.8f, 3.4f, 1.f));
-            sp.addAnim("hurt",   Animation(3, 4, 120).motion(0.6f, 4.0f, 2.f));
-            sp.addAnim("die",    Animation(4, 4, 200).motion(0.f, 0.f));
+            // ART-11 sheets carry their own motion, and a lean would
+            // resample the 1:1 pixels, so every enemy plays with motion 0.
+            sp.addAnim("idle",   Animation(0, 4, 140).motion(0.f, 0.f));
+            sp.addAnim("run",    Animation(1, 6, 100).motion(0.f, 0.f));
+            sp.addAnim("attack", Animation(2, 4, 110).motion(0.f, 0.f));
+            sp.addAnim("hurt",   Animation(3, 2, 120).motion(0.f, 0.f));
+            sp.addAnim("die",    Animation(4, 5, 160).motion(0.f, 0.f));
             sp.Play("idle");
             break;
         case EnemyAIComponent::Kind::Slime:
@@ -391,27 +393,30 @@ void Game::spawnEnemy(const std::string& kind, int col, int row) {
             // cells is the worst case for steppiness, so this one leans on
             // the cross-fade hardest: 45% of each step is a blend into the
             // other wing position, plus a strong vertical bob.
-            sp.addAnim("fly", Animation(0, 2, 100).motion(3.0f, 7.0f, 1.f, .45f));
-            sp.addAnim("die", Animation(0, 2, 150).motion(0.f, 0.f));
+            sp.addAnim("fly", Animation(0, 2, 110).motion(0.f, 0.f));
+            sp.addAnim("die", Animation(1, 3, 150).motion(0.f, 0.f));
             sp.Play("fly");
             break;
         case EnemyAIComponent::Kind::Mage:
             // mage.png is one row of 4 - the cast is a fast flicker on row 0
-            sp.addAnim("idle",   Animation(0, 4, 130).motion(1.4f, 1.0f, 1.f));
-            sp.addAnim("attack", Animation(0, 4, 55).motion(0.5f, 2.0f, 2.f));
-            sp.addAnim("die",    Animation(0, 2, 150).motion(0.f, 0.f));
+            sp.addAnim("idle",   Animation(0, 4, 160).motion(0.f, 0.f));
+            sp.addAnim("attack", Animation(1, 4, 120).motion(0.f, 0.f));
+            sp.addAnim("die",    Animation(2, 4, 150).motion(0.f, 0.f));
             sp.Play("idle");
             break;
         case EnemyAIComponent::Kind::Archer:
-            sp.addAnim("idle",  Animation(0, 4, 140).motion(0.9f, 1.0f, 1.f));
-            sp.addAnim("shoot", Animation(1, 4, 90).motion(0.4f, 1.6f, 1.f));
-            sp.addAnim("die",   Animation(2, 4, 150).motion(0.f, 0.f));
+            // "shoot" is played while the AI is AIMING, so it shows the
+            // aim row -- the bow-drawn tell; row 2 is the release.
+            sp.addAnim("idle",  Animation(0, 4, 160).motion(0.f, 0.f));
+            sp.addAnim("shoot", Animation(1, 3, 120).motion(0.f, 0.f));
+            sp.addAnim("loose", Animation(2, 3, 90).motion(0.f, 0.f));
+            sp.addAnim("die",   Animation(3, 4, 150).motion(0.f, 0.f));
             sp.Play("idle");
             break;
         case EnemyAIComponent::Kind::Bomber:
-            sp.addAnim("walk", Animation(0, 4, 110).motion(1.6f, 3.0f, 2.f));
-            sp.addAnim("fuse", Animation(1, 4, 70).motion(0.7f, 5.0f, 2.f));
-            sp.addAnim("die",  Animation(2, 4, 150).motion(0.f, 0.f));
+            sp.addAnim("walk", Animation(0, 4, 110).motion(0.f, 0.f));
+            sp.addAnim("fuse", Animation(1, 3, 110).motion(0.f, 0.f));
+            sp.addAnim("die",  Animation(2, 4, 110).motion(0.f, 0.f));
             sp.Play("walk");
             break;
         case EnemyAIComponent::Kind::Boss:
@@ -421,10 +426,11 @@ void Game::spawnEnemy(const std::string& kind, int col, int row) {
             // existing squash/stretch and hit flash.  `frames = 1` means the
             // loop position is just the phase, so cycles=1 gives one breath
             // per `speed` ms.
-            sp.addAnim("idle",   Animation(0, 1, 900).motion(1.5f, 2.0f, 1.f));
-            sp.addAnim("run",    Animation(0, 1, 260).motion(3.0f, 4.0f, 1.f));
-            sp.addAnim("attack", Animation(0, 1, 160).motion(1.0f, 6.0f, 1.f));
-            sp.addAnim("die",    Animation(0, 1, 150).motion(0.f, 0.f));
+            sp.addAnim("idle",   Animation(0, 4, 220).motion(0.f, 0.f));
+            sp.addAnim("run",    Animation(1, 6, 120).motion(0.f, 0.f));
+            sp.addAnim("attack", Animation(2, 5, 140).motion(0.f, 0.f));
+            sp.addAnim("hurt",   Animation(3, 2, 120).motion(0.f, 0.f));
+            sp.addAnim("die",    Animation(4, 6, 150).motion(0.f, 0.f));
             sp.Play("idle");
             break;
     }
