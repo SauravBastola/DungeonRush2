@@ -21,6 +21,11 @@ namespace Level {
     // terrain_v2.png (tools/build_terrain.py): sheet width in cells and the
     // silhouette cells the foreground-silhouette plane draws (ART-13).
     inline constexpr int  TERRAIN_V2_COLS     = 32;
+
+    // first column of each zone after the meadow (tools/build_level.py)
+    inline constexpr int  ZONE_RUINS_COL      = 50;
+    inline constexpr int  ZONE_SUNKEN_COL     = 120;
+    inline constexpr int  ZONE_ARENA_COL      = 175;
     inline constexpr int  SIL_CANOPY[3]       = { 480, 481, 482 };
     inline constexpr int  SIL_CANOPY_EDGE[3]  = { 483, 484, 485 };
     inline constexpr int  SIL_ROOTS[2]        = { 486, 487 };
@@ -263,27 +268,27 @@ namespace Level {
     struct HazardDef { const char* kind; int col, row, w, h; };
     inline constexpr int N_HAZARDS = 6;
     inline constexpr HazardDef HAZARDS[6] = {
-        { "spikes", 36, 30, 2, 1 },
-        { "spikes", 43, 30, 2, 1 },
-        { "spikes", 74, 27, 2, 1 },
-        { "spikes", 81, 27, 2, 1 },
-        { "spikes", 114, 28, 2, 1 },
-        { "spikes", 121, 28, 2, 1 }
+        { "spikes", 36, 31, 2, 1 },
+        { "spikes", 43, 31, 2, 1 },
+        { "spikes", 74, 28, 2, 1 },
+        { "spikes", 81, 28, 2, 1 },
+        { "spikes", 114, 29, 2, 1 },
+        { "spikes", 121, 29, 2, 1 }
     };
 
     // facilities (checkpoint / shrine / key / door)
     struct FacilityDef { const char* kind; int col, row; };
     inline constexpr int N_FACILITIES = 9;
     inline constexpr FacilityDef FACILITIES[9] = {
-        { "checkpoint", 30, 30 },
-        { "checkpoint", 70, 27 },
-        { "checkpoint", 110, 27 },
-        { "checkpoint", 150, 24 },
-        { "shrine", 55, 29 },
-        { "shrine", 100, 25 },
-        { "shrine", 145, 24 },
-        { "key", 143, 24 },
-        { "door", 175, 27 }
+        { "checkpoint", 30, 31 },
+        { "checkpoint", 70, 28 },
+        { "checkpoint", 110, 28 },
+        { "checkpoint", 150, 25 },
+        { "shrine", 55, 30 },
+        { "shrine", 100, 26 },
+        { "shrine", 145, 25 },
+        { "key", 143, 25 },
+        { "door", 175, 28 }
     };
 
     // powerups
@@ -305,15 +310,15 @@ namespace Level {
 
     // enemies
     struct EnemyDef { const char* kind; int col, row; };
-    inline constexpr int N_ENEMIES = 26;
-    inline constexpr EnemyDef ENEMIES[26] = {
+    inline constexpr int N_ENEMIES = 37;
+    inline constexpr EnemyDef ENEMIES[37] = {
         { "skeleton", 18, 30 },
-        { "skeleton", 28, 30 },
+        { "skeleton", 26, 30 },
         { "skeleton", 50, 29 },
         { "skeleton", 60, 26 },
         { "skeleton", 73, 27 },
-        { "skeleton", 90, 27 },
-        { "skeleton", 108, 27 },
+        { "skeleton", 93, 27 },
+        { "skeleton", 106, 25 },
         { "skeleton", 132, 29 },
         { "skeleton", 158, 28 },
         { "slime", 35, 30 },
@@ -323,16 +328,27 @@ namespace Level {
         { "bomber", 84, 27 },
         { "bomber", 126, 28 },
         { "archer", 66, 28 },
-        { "archer", 112, 27 },
+        { "archer", 116, 28 },
         { "archer", 160, 28 },
         { "bat", 48, 22 },
         { "bat", 80, 18 },
         { "bat", 115, 19 },
         { "bat", 138, 20 },
-        { "mage", 72, 24 },
+        { "mage", 61, 23 },
         { "mage", 90, 24 },
         { "mage", 132, 25 },
-        { "boss", 192, 30 }
+        { "boss", 192, 30 },
+        { "slime", 22, 30 },
+        { "bat", 24, 22 },
+        { "skeleton", 63, 26 },
+        { "bat", 75, 19 },
+        { "archer", 98, 25 },
+        { "slime", 101, 25 },
+        { "slime", 103, 25 },
+        { "archer", 140, 27 },
+        { "skeleton", 165, 28 },
+        { "bomber", 168, 27 },
+        { "mage", 171, 25 }
     };
 
     // coin anchors
@@ -476,39 +492,28 @@ namespace Level {
     // rises above it.  These are NOT tile ids: placing them by tile id used to
     // scatter severed tree halves around the level.
     struct SceneryDef { int id; int col, row; float scale; bool flip; };
-    inline constexpr int N_SCENERY = 35;
-    inline constexpr SceneryDef SCENERY[35] = {
-        { 3, 7, 28, 0.9500f, false },
+    inline constexpr int N_SCENERY = 24;
+    inline constexpr SceneryDef SCENERY[24] = {
         { 0, 14, 32, 1.0500f, false },
-        { 4, 15, 32, 0.8500f, false },
         { 0, 22, 32, 0.9800f, true },
-        { 4, 23, 32, 0.8000f, false },
-        { 3, 30, 32, 1.0000f, false },
         { 0, 34, 32, 1.1000f, false },
-        { 4, 35, 32, 0.9000f, false },
         { 1, 58, 28, 1.0500f, false },
-        { 4, 59, 28, 0.8500f, false },
         { 5, 72, 29, 1.0000f, false },
         { 6, 73, 29, 0.9500f, false },
         { 5, 86, 29, 1.1000f, false },
         { 7, 87, 29, 0.8500f, false },
         { 1, 92, 29, 1.0000f, true },
-        { 4, 93, 29, 0.8000f, false },
         { 1, 104, 27, 0.9500f, false },
         { 5, 105, 27, 1.0000f, false },
         { 7, 106, 27, 0.8500f, false },
-        { 2, 123, 30, 1.0500f, false },
         { 5, 124, 30, 1.1500f, false },
         { 7, 125, 30, 0.9000f, false },
-        { 2, 135, 31, 1.0000f, false },
         { 6, 136, 31, 0.9500f, false },
         { 5, 144, 26, 1.1000f, false },
         { 7, 145, 26, 0.8500f, false },
-        { 2, 156, 30, 1.0000f, false },
         { 6, 157, 30, 0.9000f, false },
         { 5, 164, 30, 1.0500f, false },
         { 7, 165, 30, 0.8500f, false },
-        { 2, 176, 29, 1.1000f, false },
         { 5, 177, 29, 1.2000f, false },
         { 7, 178, 29, 0.9000f, false },
         { 5, 197, 32, 1.2500f, false },

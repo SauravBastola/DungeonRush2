@@ -282,9 +282,14 @@ def resolve_rows(L: Level) -> None:
     for e in L.enemies:
         if e.row is None:
             e.row = _clamp_row(_solid_row(L, e.col) - 1)
+    # _solid_row() returns the last EMPTY row above the ground (its name says
+    # "topmost solid", which is one off).  Enemies tolerate the extra -1 -
+    # they fall onto the ground on the first frame - but facilities and
+    # hazards are static, so they used to float a tile up: spikes hung in the
+    # air and the door left a 64 px gap the 50 px hero walked under.
     for f in L.facilities:
         if f.row is None:
-            f.row = _clamp_row(_solid_row(L, f.col) - 1)
+            f.row = _clamp_row(_solid_row(L, f.col))
     for p in L.powerups:
         if p.row is None:
             p.row = _clamp_row(_solid_row(L, p.col) - 2)
@@ -292,7 +297,7 @@ def resolve_rows(L: Level) -> None:
         if h.row is None:
             cols = range(h.col, h.col + h.w)
             tops = [_solid_row(L, c) for c in cols]
-            h.row = _clamp_row(min(tops) - 1)
+            h.row = _clamp_row(min(tops))
 
 
 # ---------------------------------------------------------------------------
@@ -363,6 +368,7 @@ def get_zone(col: int) -> str:
 
 
 DECOR_KEEP = {21, 22, 23, 31, 32}   # rocks, crystal + branch, small trees
+SCENERY_DROP = {"bush", "boulder_teal", "boulder_deep"}
 
 
 def scatter_decor(L: Level) -> None:
@@ -670,12 +676,12 @@ def build_level() -> Level:
     # --- enemies -----------------------------------------------------------
     L.enemies += [
         EnemySpawn("skeleton", 18),
-        EnemySpawn("skeleton", 28),
+        EnemySpawn("skeleton", 26),         # was 28: on checkpoint 30's respawn
         EnemySpawn("skeleton", 50),
         EnemySpawn("skeleton", 60),
         EnemySpawn("skeleton", 73),
-        EnemySpawn("skeleton", 90),
-        EnemySpawn("skeleton", 108),
+        EnemySpawn("skeleton", 93),         # was 90: 5 enemies in cols 80..91
+        EnemySpawn("skeleton", 106),        # was 108: on checkpoint 110's respawn
         EnemySpawn("skeleton", 132),
         EnemySpawn("skeleton", 158),
         EnemySpawn("slime", 35),
@@ -685,16 +691,36 @@ def build_level() -> Level:
         EnemySpawn("bomber", 84),
         EnemySpawn("bomber", 126),
         EnemySpawn("archer", 66),
-        EnemySpawn("archer", 112),
+        EnemySpawn("archer", 116),          # was 112: on checkpoint 110's respawn (114-115 are spikes)
         EnemySpawn("archer", 160),
         EnemySpawn("bat", 48, 22, stands_on="air"),
         EnemySpawn("bat", 80, 18, stands_on="air"),
         EnemySpawn("bat", 115, 19, stands_on="air"),
         EnemySpawn("bat", 138, 20, stands_on="air"),
-        EnemySpawn("mage", 71, stands_on="platform"),
+        EnemySpawn("mage", 61, stands_on="platform"),   # was 71: ledge over checkpoint 70
         EnemySpawn("mage", 89, stands_on="platform"),
         EnemySpawn("mage", 131, stands_on="platform"),
         EnemySpawn("boss", 192, 30),
+        # --- Batch A: +11 (26 -> 37), placed as readable patterns ---------
+        # meadow: a slime joins the first skeleton pair; a bat meets you on
+        # the flat before the first spikes-and-chasm run (at col 37 its
+        # knockback threw you into the pit - unfair in the tutorial zone)
+        EnemySpawn("slime", 22),
+        EnemySpawn("bat", 24, 22, stands_on="air"),
+        # ruins: a skeleton pair; a second bat over the approach to chasm 2;
+        # an archer covering the far side of the ruins
+        EnemySpawn("skeleton", 63),
+        EnemySpawn("bat", 75, 19, stands_on="air"),
+        EnemySpawn("archer", 98),
+        # late ruins: a slime pack after the shrine; sunken: an archer
+        # guarding the key
+        EnemySpawn("slime", 101),
+        EnemySpawn("slime", 103),
+        EnemySpawn("archer", 140),
+        # arena approach: the gauntlet before the door, a mage on the ledge
+        EnemySpawn("skeleton", 165),
+        EnemySpawn("bomber", 168),
+        EnemySpawn("mage", 171, stands_on="platform"),
     ]
 
     # --- powerups ----------------------------------------------------------
@@ -829,7 +855,11 @@ def build_level() -> Level:
         SceneryItem("branch_red",   198, _surface_row(198), scale=1.05),
     ]
     # Filter so every scenery item is guaranteed to stand on a valid _flat_run
-    L.scenery = [s for s in scenery_specs if _flat_run(s.col)]
+    # Batch A: "bush" (a mushroom-planter block) and the two "boulder" blobs
+    # are platformer.png terrain cells, not props; next to terrain_v2 they
+    # read as stray chunks of ground.  Their columns go to the prop clusters.
+    L.scenery = [s for s in scenery_specs
+                 if _flat_run(s.col) and s.kind not in SCENERY_DROP]
 
     # --- decor layer: the detail that sits on the terrain ------------------
     # Runs last because it reads the finished heightmap, the platform rows and
@@ -1044,6 +1074,32 @@ def validate_level(L: Level) -> List[str]:
     pc, pr = L.player
     if g[pc] is None or g[pc] < 0:
         bad.append(f"player spawns over a chasm at col {pc}")
+
+    # 6. enemies (Batch A): fair placement, never a wall of them
+    checkpoints = [f.col for f in L.facilities if f.kind == "checkpoint"]
+    ground_kinds = [e for e in L.enemies if e.stands_on == "ground"]
+    for e in L.enemies:
+        if e.kind == "boss":
+            continue
+        if abs(e.col - pc) < 8:
+            bad.append(f"{e.kind} at col {e.col} is within 8 columns of spawn")
+        near = [c for c in checkpoints if abs(e.col - c) <= 2]
+        if near:
+            bad.append(f"{e.kind} at col {e.col} would hit a respawn at checkpoint {near[0]}")
+        if e.stands_on == "ground" and (g[e.col] is None or g[e.col] < 0):
+            bad.append(f"{e.kind} at col {e.col} stands over a chasm")
+        if e.stands_on == "ground" and any(h.col <= e.col < h.col + h.w for h in L.hazards):
+            bad.append(f"{e.kind} at col {e.col} stands on a hazard")
+        if e.stands_on == "platform":
+            on = [p for p in L.platforms if p.col <= e.col < p.col + p.w and p.row == e.row + 1]
+            if not on or on[0].moving:
+                bad.append(f"{e.kind} at col {e.col} is not on a static platform")
+    cols = sorted(e.col for e in L.enemies if e.kind != "boss")
+    for i, c in enumerate(cols):
+        window = [x for x in cols if c <= x < c + 12]
+        if len(window) > 4:
+            bad.append(f"{len(window)} enemies in cols {c}..{c + 11} (max 4 per 12)")
+            break
 
     return bad
 
@@ -1603,6 +1659,11 @@ namespace Level {{
     // terrain_v2.png (tools/build_terrain.py): sheet width in cells and the
     // silhouette cells the foreground-silhouette plane draws (ART-13).
     inline constexpr int  TERRAIN_V2_COLS     = {tv2_cols};
+
+    // first column of each zone after the meadow (tools/build_level.py)
+    inline constexpr int  ZONE_RUINS_COL      = {zone_ruins};
+    inline constexpr int  ZONE_SUNKEN_COL     = {zone_sunken};
+    inline constexpr int  ZONE_ARENA_COL      = {zone_arena};
     inline constexpr int  SIL_CANOPY[3]       = {{ {sil_canopy} }};
     inline constexpr int  SIL_CANOPY_EDGE[3]  = {{ {sil_edge} }};
     inline constexpr int  SIL_ROOTS[2]        = {{ {sil_roots} }};
@@ -1703,6 +1764,7 @@ def emit_header(out_path: str, L: Level) -> None:
     pc, pr = L.player
     txt = HEADER.format(
         tv2_cols=BT.COLS,
+        zone_ruins=ZONE_RUINS[0], zone_sunken=ZONE_SUNKEN[0], zone_arena=ZONE_ARENA[0],
         sil_canopy=", ".join(str(BT.BG["CANOPY_%d" % i]) for i in range(3)),
         sil_edge=", ".join(str(BT.BG["CANOPY_EDGE_%d" % i]) for i in range(3)),
         sil_roots=", ".join(str(BT.BG["ROOTS_%d" % i]) for i in range(2)),
@@ -1800,9 +1862,8 @@ def main() -> int:
                     if tok and tok != str(EMPTY):
                         used.add(int(tok))
     missing = [t for t in ALL_USABLE_TILES if t not in used]
-    print(f"tile usage : {len(used)}/{len(ALL_USABLE_TILES)} platformer.png cells "
-          f"drawn by decor"
-          + (f"  -- unused: {missing}" if missing else "  (every one used)"))
+    print(f"tile usage : {len(used)} platformer.png cells still drawn by decor "
+          f"(the rest is superseded by terrain_v2 / props_v2)")
     report_density(L)
     return report_v2(L)
 
