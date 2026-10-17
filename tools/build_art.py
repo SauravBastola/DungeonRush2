@@ -22,6 +22,7 @@ Sheet geometry MUST match src/SpriteSpec.h.  If a size changes here, change
 it there too.
 """
 import os
+import sys
 
 from artdraw import Canvas, Sheet
 from palette import PAL
@@ -348,6 +349,127 @@ def bomber(path, svg):
     s.save(path, svg, scale=4)
 
 
+
+# ===========================================================================
+# ART-11 -- 1:1 pixel sprites (ART_STYLE_V2).  No supersampling, no resize:
+# every pixel is placed, so the PNG holds only PAL colours and alpha 0/255.
+# The SVG twin is the same pixels as run-length <rect>s - exact and editable.
+# ===========================================================================
+def save_pixels(img, png_path, svg_path):
+    img.save(png_path)
+    W, H = img.size
+    px = img.load()
+    out = ['<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" '
+           'viewBox="0 0 %d %d" shape-rendering="crispEdges">' % (W, H, W, H)]
+    for y in range(H):
+        x = 0
+        while x < W:
+            c = px[x, y]
+            if c[3] == 0:
+                x += 1
+                continue
+            x0 = x
+            while x < W and px[x, y] == c:
+                x += 1
+            out.append('  <rect x="%d" y="%d" width="%d" height="1" fill="%s"/>'
+                       % (x0, y, x - x0, PAL.hex(c[:3])))
+    out.append("</svg>")
+    with open(svg_path, "w") as f:
+        f.write("\n".join(out) + "\n")
+
+
+def _blob_cell(w, h, mouth=False, eyes=True, fade=0):
+    """One slime pose in a 32x32 cell, feet on the last row, facing right.
+
+    A superellipse dome with a flat base: wide at the floor, rounded on top.
+    1 px INK outline, light from the upper left (GRASS lit, GRASS_MID body,
+    TEAL_DK shade), a CREAM glint, two INK eyes towards the facing side.
+    `mouth` is the hop tell: a RED_DK/RED gash of >= 4 px (ART_STYLE_V2 3).
+    `fade` 1..3 walks the colours down the ramp for the death frames.
+    """
+    CW = CH = 32
+    cell = [[None] * CW for _ in range(CH)]
+    a, cx, base = w / 2.0, CW / 2.0, CH - 1
+
+    def inside(x, y):
+        if y > base or y < base - h + 1:
+            return False
+        nx = abs((x + 0.5) - cx) / a
+        ny = (base - y + 0.5) / h
+        return nx ** 2.4 + ny ** 2.4 <= 1.0
+
+    ramp = [PAL.GRASS, PAL.GRASS_MID, PAL.TEAL, PAL.TEAL_DK, PAL.NAVY]
+    lit, body, shade = ramp[min(fade, 2)], ramp[min(fade + 1, 3)], ramp[min(fade + 3, 4)]
+    for y in range(CH):
+        for x in range(CW):
+            if not inside(x, y):
+                continue
+            edge = (y == base or not inside(x - 1, y) or not inside(x + 1, y)
+                    or not inside(x, y - 1) or not inside(x, y + 1))
+            if edge:
+                cell[y][x] = PAL.INK
+                continue
+            # distance from a light spot up and to the left: a round lit cap,
+            # a body ring, and shade on the lower right and along the base
+            lx = ((x + 0.5) - (cx - a * 0.30)) / a
+            ly = ((y + 0.5) - (base - h * 0.78)) / h
+            d = (lx * lx + ly * ly) ** 0.5
+            cell[y][x] = (lit if d < 0.52 else
+                          body if d < 0.92 and y < base - 2 else shade)
+    top = base - h + 1
+    if fade == 0:
+        gx, gy = int(cx - a * 0.45), top + max(2, h // 5)
+        for dx, dy in ((0, 0), (1, 0), (0, 1)):
+            if cell[gy + dy][gx + dx] not in (None, PAL.INK):
+                cell[gy + dy][gx + dx] = PAL.CREAM
+    if eyes:
+        ey = top + max(3, int(h * 0.38))
+        for ex in (int(cx + a * 0.18), int(cx + a * 0.52)):
+            for dy in (0, 1):
+                if cell[ey + dy][ex] not in (None,):
+                    cell[ey + dy][ex] = PAL.INK
+        if mouth:
+            my = ey + 3
+            for mx in range(int(cx + a * 0.10), int(cx + a * 0.10) + 5):
+                if cell[my][mx] not in (None, PAL.INK):
+                    cell[my][mx] = PAL.RED_DK
+            for mx in range(int(cx + a * 0.10) + 1, int(cx + a * 0.10) + 3):
+                if cell[my + 1][mx] not in (None, PAL.INK):
+                    cell[my + 1][mx] = PAL.RED
+    return cell
+
+
+def slime(path, svg):
+    """enemy_slime.png: 4 cols x 3 rows of 32x32 -- idle 4, hop 4, die 4.
+
+    Figure 26x20 on a 26x20 collider (ART_STYLE_V2 2.5).  Hop = tell, tell,
+    stretch, land: the flattened tell with the open mouth is held for two
+    frames, twice the active frame (section 3).  Death sinks into a puddle.
+    """
+    from PIL import Image
+    poses = [
+        [(26, 20, False), (27, 19, False), (26, 20, False), (25, 21, False)],   # idle
+        [(28, 18, True),  (28, 18, True),  (22, 24, False), (28, 18, False)],   # hop
+    ]
+    die = [(28, 14, 1), (30, 9, 2), (30, 5, 3), (24, 3, 3)]
+    img = Image.new("RGBA", (4 * 32, 3 * 32), (0, 0, 0, 0))
+    px = img.load()
+
+    def put(cell, col, row):
+        for y in range(32):
+            for x in range(32):
+                c = cell[y][x]
+                if c is not None:
+                    px[col * 32 + x, row * 32 + y] = (c[0], c[1], c[2], 255)
+
+    for row, line in enumerate(poses):
+        for col, (w, h, m) in enumerate(line):
+            put(_blob_cell(w, h, mouth=m), col, row)
+    for col, (w, h, f) in enumerate(die):
+        put(_blob_cell(w, h, eyes=(f < 3), fade=f), col, 2)
+    save_pixels(img, path, svg)
+
+
 # ===========================================================================
 def main():
     os.makedirs(SPRITES, exist_ok=True)
@@ -368,7 +490,11 @@ def main():
         (shockwave,      "shockwave.png"),
         (archer,         "archer.png"),
         (bomber,         "bomber.png"),
+        (slime,          "enemy_slime.png"),
     ]
+    only = set(sys.argv[1:])     # e.g. `build_art.py enemy_slime.png`
+    if only:
+        jobs = [j for j in jobs if j[1] in only]
     for fn, name in jobs:
         png = os.path.join(SPRITES, name)
         svg = os.path.join(SVG, name.replace(".png", ".svg"))

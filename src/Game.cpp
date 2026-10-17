@@ -139,7 +139,7 @@ void Game::loadAssets() {
         assetPath("tileset/terrain_v2.png").c_str(), Depth::MID));
     tex("player",      "sprites/player_sprites.png");
     tex("skeleton",    "sprites/skeleton_sprites.png");
-    tex("slime",       "sprites/slime.png");
+    tex("slime",       "sprites/enemy_slime.png");
     tex("bat",         "sprites/enemy_bat.png");
     tex("mage",        "sprites/mage.png");
     tex("archer",      "sprites/archer.png");
@@ -377,13 +377,13 @@ void Game::spawnEnemy(const std::string& kind, int col, int row) {
             sp.Play("idle");
             break;
         case EnemyAIComponent::Kind::Slime:
-            // slime.png is a single row of 4 - every state reuses row 0 at a
-            // different tempo, because row 1/2 simply do not exist.
-            // The slime is a blob, so it gets the biggest amplitude: it
-            // should visibly squall as it hops.
-            sp.addAnim("idle", Animation(0, 4, 120).motion(1.2f, 0.f, 2.f, .35f));
-            sp.addAnim("jump", Animation(0, 4, 55).motion(2.6f, 0.f, 2.f, .40f));
-            sp.addAnim("die",  Animation(0, 2, 150).motion(0.f, 0.f));
+            // ART-11: enemy_slime.png has real rows now -- idle, hop (tell,
+            // tell, stretch, land), die -- so the squash lives in the frames.
+            // No bob, lean or cross-fade: a blend superimposes two frames and
+            // a lean resamples the pixels, both of which break the 1:1 grid.
+            sp.addAnim("idle", Animation(0, 4, 160).motion(0.f, 0.f));
+            sp.addAnim("jump", Animation(1, 4, 70).motion(0.f, 0.f));
+            sp.addAnim("die",  Animation(2, 4, 120).motion(0.f, 0.f));
             sp.Play("idle");
             break;
         case EnemyAIComponent::Kind::Bat:

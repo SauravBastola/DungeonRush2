@@ -68,9 +68,10 @@ namespace Sprites {
     inline constexpr Spec SKELETON{
         "skeleton", 150, 150, 0.40f, 36, 50, Anchor::Feet, true };
 
-    // slime.png 128x32 -> 1 row x 4 cols of 32x32
+    // enemy_slime.png 128x96 -> 3 rows x 4 cols of 32x32 (tools/build_art.py
+    // slime(), ART-11): idle, hop, die.  1:1, figure 26x20 on the collider.
     inline constexpr Spec SLIME{
-        "slime", 32, 32, 1.00f, 28, 26, Anchor::Feet, true };
+        "slime", 32, 32, 1.00f, 26, 20, Anchor::Feet, true };
 
     // enemy_bat.png 64x48 -> 1 row x 2 cols of 32x48
     inline constexpr Spec BAT{
