@@ -278,8 +278,8 @@ namespace Level {
 
     // facilities (checkpoint / shrine / key / door)
     struct FacilityDef { const char* kind; int col, row; };
-    inline constexpr int N_FACILITIES = 9;
-    inline constexpr FacilityDef FACILITIES[9] = {
+    inline constexpr int N_FACILITIES = 10;
+    inline constexpr FacilityDef FACILITIES[10] = {
         { "checkpoint", 30, 31 },
         { "checkpoint", 70, 28 },
         { "checkpoint", 110, 28 },
@@ -288,7 +288,8 @@ namespace Level {
         { "shrine", 100, 26 },
         { "shrine", 145, 25 },
         { "key", 143, 25 },
-        { "door", 175, 28 }
+        { "door", 175, 28 },
+        { "checkpoint", 178, 28 }
     };
 
     // powerups

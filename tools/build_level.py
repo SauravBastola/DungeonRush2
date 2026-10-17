@@ -671,6 +671,9 @@ def build_level() -> Level:
         Facility("shrine",     145),
         Facility("key",        143),
         Facility("door",       175),
+        # Batch B: a checkpoint just inside the gate, so a boss retry does not
+        # start with a 2600 px walk back from checkpoint 150.
+        Facility("checkpoint", 178),
     ]
 
     # --- enemies -----------------------------------------------------------
