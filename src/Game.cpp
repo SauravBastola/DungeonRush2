@@ -1282,7 +1282,7 @@ void Game::drawText(const char* fontId, const char* text, int x, int y,
                     SDL_Color c, bool centered) {
     TTF_Font* f = assets->GetFont(fontId);
     if (!f || !text || !*text) return;
-    SDL_Surface* s = TTF_RenderText_Blended(f, text, c);
+    SDL_Surface* s = TTF_RenderUTF8_Blended(f, text, c);
     if (!s) return;
     SDL_Texture* tx = SDL_CreateTextureFromSurface(renderer, s);
     if (!tx) { SDL_FreeSurface(s); return; }
@@ -1859,7 +1859,7 @@ void Game::drawHUD() {
     // score
     if (auto* f = assets->GetFont("title")) {
         SDL_Color y{ 255, 230, 90, 255 };
-        SDL_Surface* s = TTF_RenderText_Blended(f, std::to_string(gameScore).c_str(), y);
+        SDL_Surface* s = TTF_RenderUTF8_Blended(f, std::to_string(gameScore).c_str(), y);
         if (s) {
             SDL_Texture* t = SDL_CreateTextureFromSurface(renderer, s);
             SDL_Rect r{ Config::WINDOW_WIDTH/2 - s->w/2, 14, s->w, s->h };
@@ -1872,7 +1872,7 @@ void Game::drawHUD() {
         std::string cs = "Coins " + std::to_string(coinsCollected)
                        + "/" + std::to_string(totalCoins);
         SDL_Color y{ 255, 230, 90, 255 };
-        SDL_Surface* s = TTF_RenderText_Blended(f, cs.c_str(), y);
+        SDL_Surface* s = TTF_RenderUTF8_Blended(f, cs.c_str(), y);
         if (s) {
             SDL_Texture* t = SDL_CreateTextureFromSurface(renderer, s);
             SDL_Rect r{ Config::WINDOW_WIDTH/2 - s->w/2, 50, s->w, s->h };
@@ -1885,7 +1885,7 @@ void Game::drawHUD() {
         if (auto* f = assets->GetFont("body")) {
             std::string ks = "Keys: " + std::to_string(keys);
             SDL_Color c{ 80, 220, 255, 255 };
-            SDL_Surface* s = TTF_RenderText_Blended(f, ks.c_str(), c);
+            SDL_Surface* s = TTF_RenderUTF8_Blended(f, ks.c_str(), c);
             if (s) {
                 SDL_Texture* t = SDL_CreateTextureFromSurface(renderer, s);
                 SDL_Rect r{ Config::WINDOW_WIDTH/2 - 80, 70, s->w, s->h };
@@ -1906,7 +1906,7 @@ void Game::drawHUD() {
                            "[J/Z] melee  [K/X] bolt  "
                            "[P/ESC] pause  [O] settings  [I] stats  [H] help  [M] mute";
         SDL_Color w{ 200, 200, 200, 200 };
-        SDL_Surface* s = TTF_RenderText_Blended(f, hint.c_str(), w);
+        SDL_Surface* s = TTF_RenderUTF8_Blended(f, hint.c_str(), w);
         if (s) {
             SDL_Texture* t = SDL_CreateTextureFromSurface(renderer, s);
             SDL_Rect r{ 12, Config::WINDOW_HEIGHT - 28, s->w, s->h };
@@ -1919,7 +1919,7 @@ void Game::drawHUD() {
     if (auto* f = assets->GetFont("body")) {
         int y = 124;
         auto drawBuff = [&](const std::string& txt, SDL_Color c) {
-            SDL_Surface* s = TTF_RenderText_Blended(f, txt.c_str(), c);
+            SDL_Surface* s = TTF_RenderUTF8_Blended(f, txt.c_str(), c);
             if (s) {
                 SDL_Texture* t = SDL_CreateTextureFromSurface(renderer, s);
                 SDL_Rect r{ Config::WINDOW_WIDTH - 200, y, s->w, s->h };
@@ -1946,6 +1946,15 @@ void Game::drawHUD() {
         if (e->tag != "boss" || !e->isActive()) continue;
         auto& hp = e->getComponent<HealthComponent>();
         if (hp.dead) continue;
+        // D6: gate the bar on engagement.  It used to be drawn from the first
+        // frame of the level, which spoils the boss and clutters the screen.
+        {
+            auto& btr = e->getComponent<TransformComponent>();
+            auto& htr = p.getComponent<TransformComponent>();
+            float bdx = std::fabs((btr.position.x + btr.width  * 0.5f) -
+                                  (htr.position.x + htr.width  * 0.5f));
+            if (bdx >= Config::BOSS_BAR_RANGE && hp.hp >= hp.hpMax) continue;
+        }
         int bw2 = 600, bh2 = 16;
         int bx2 = Config::WINDOW_WIDTH/2 - bw2/2;
         int by2 = Config::WINDOW_HEIGHT - 80;
@@ -1961,7 +1970,7 @@ void Game::drawHUD() {
         SDL_RenderFillRect(renderer, &bbf);
         if (auto* f = assets->GetFont("body")) {
             SDL_Color c{ 255, 230, 90, 255 };
-            SDL_Surface* s = TTF_RenderText_Blended(f, "THE OVERLORD", c);
+            SDL_Surface* s = TTF_RenderUTF8_Blended(f, "THE OVERLORD", c);
             if (s) {
                 SDL_Texture* t = SDL_CreateTextureFromSurface(renderer, s);
                 SDL_Rect r{ bx2, by2 - 22, s->w, s->h };
@@ -2092,7 +2101,7 @@ void Game::drawMenu() {
     // ---- Title with drop-shadow + glow pulse ----
     if (auto* fBig = assets->GetFont("big")) {
         SDL_Color cWhite{ 255, 255, 255, 255 };
-        SDL_Surface* sTitle = TTF_RenderText_Blended(fBig, "DUNGEON  RUSH  2", cWhite);
+        SDL_Surface* sTitle = TTF_RenderUTF8_Blended(fBig, "DUNGEON  RUSH  2", cWhite);
         if (sTitle) {
             SDL_Texture* txTitle = SDL_CreateTextureFromSurface(renderer, sTitle);
             if (txTitle) {
@@ -2230,18 +2239,20 @@ void Game::drawMenu() {
     {
         const int footY = 570;
         struct Hint { const char* key; const char* desc; };
+        // Only keys the menu actually handles.  "O Settings" and "I Stats"
+        // were advertised here but handleMenuInput ignores both, so the bar
+        // was teaching dead keys (R-14).
         const Hint hints[] = {
             { "W / S", "Select" },
             { "ENTER", "Confirm" },
-            { "O", "Settings" },
-            { "I", "Stats" },
             { "ESC", "Quit" },
         };
+        const int nHints = (int)(sizeof(hints) / sizeof(hints[0]));
 
         TTF_Font* fSmall = assets->GetFont("small");
         int totalW = 0;
-        int kw[5]{}, dw[5]{};
-        for (int i = 0; i < 5; i++) {
+        int kw[3]{}, dw[3]{};
+        for (int i = 0; i < nHints; i++) {
             int th = 0;
             if (fSmall) {
                 TTF_SizeText(fSmall, hints[i].key, &kw[i], &th);
@@ -2253,7 +2264,7 @@ void Game::drawMenu() {
         totalW -= 24;
 
         int curX = W / 2 - totalW / 2;
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < nHints; i++) {
             int outKw = 0;
             drawKeycap(hints[i].key, curX, footY, outKw);
             curX += outKw + 6;
@@ -2375,7 +2386,15 @@ void Game::drawInstructionsPanel(bool overWorld) {
     const int W = Config::WINDOW_WIDTH, H = Config::WINDOW_HEIGHT;
     const int panelX = 60, panelY = 30;
     const int panelW = W - 120, panelH = H - 60;
-    const int headH = 62;
+    // Header height is derived from the two fonts' line skips instead of a
+    // hard-coded 62: the 32 px title alone needs ~42 px, so the old value put
+    // the subtitle on top of it (R-13).
+    TTF_Font* fTitle = assets->GetFont("title");
+    TTF_Font* fSmallH = assets->GetFont("small");
+    const int titleSkip = fTitle  ? TTF_FontLineSkip(fTitle)  : 42;
+    const int smallSkip = fSmallH ? TTF_FontLineSkip(fSmallH) : 17;
+    const int headPad   = 10;
+    const int headH = headPad + titleSkip + smallSkip + 10;
     const int footH = 34;
 
     SDL_Rect panel{ panelX, panelY, panelW, panelH };
@@ -2530,8 +2549,10 @@ void Game::drawInstructionsPanel(bool overWorld) {
     SDL_RenderDrawLine(renderer, panelX, panelY + headH, panelX + panelW, panelY + headH);
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 
-    drawText("title", "HOW TO PLAY", panelX + 24, panelY + 22, SDL_Color{ 255, 255, 255, 255 }, false);
-    drawText("small", "Field Guide & Combat Manual  ·  DungeonRush 2", panelX + 26, panelY + 44,
+    drawText("title", "HOW TO PLAY", panelX + 24, panelY + headPad,
+             SDL_Color{ 255, 255, 255, 255 }, false);
+    drawText("small", "Field Guide & Combat Manual  ·  DungeonRush 2",
+             panelX + 26, panelY + headPad + titleSkip,
              SDL_Color{ 130, 180, 220, 220 }, false);
 
     int kw1 = 0, kw2 = 0;
@@ -2591,14 +2612,22 @@ void Game::drawPauseOverlay() {
     SDL_SetRenderDrawColor(renderer, 120, 200, 255, 220);
     SDL_RenderDrawRect(renderer, &panel);
 
-    drawText("big",   "PAUSED", W / 2, py + 46, SDL_Color{255,255,255,255}, true);
+    // Title and hint are positioned from the fonts' line skips.  The old
+    // py+46 / py+84 pair overlapped by a few pixels on the "PAUSED" descender.
+    TTF_Font* fBigP   = assets->GetFont("big");
+    TTF_Font* fSmallP = assets->GetFont("small");
+    const int bigSkip   = fBigP   ? TTF_FontLineSkip(fBigP)   : 73;
+    const int smallSkip = fSmallP ? TTF_FontLineSkip(fSmallP) : 17;
+    const int titleCy = py + 20 + bigSkip / 2;
+    const int subCy   = py + 20 + bigSkip + 6 + smallSkip / 2;
+    drawText("big",   "PAUSED", W / 2, titleCy, SDL_Color{255,255,255,255}, true);
     drawText("small", "W / S to choose     ENTER to confirm     P or ESC to resume",
-             W / 2, py + 84, SDL_Color{150,160,185,255}, true);
+             W / 2, subCy, SDL_Color{150,160,185,255}, true);
 
     const char* labels[5] = { "Resume", "Restart run", "Settings",
                               "Run stats", "Quit to menu" };
     const int rowH = 52;
-    const int top  = py + 120;
+    const int top  = py + 130;
     for (int i = 0; i < 5; i++) {
         const int y = top + i * rowH;
         const bool sel = (pauseSelection == i);

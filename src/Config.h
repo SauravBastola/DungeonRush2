@@ -237,6 +237,10 @@ namespace Config {
     constexpr float BOSS_HP            = 260.f;
     constexpr float BOSS_SPEED         = 110.f;
     constexpr float BOSS_DAMAGE        = 16.f;
+    // Rule D6: the boss health bar appears only when the fight is engaged.
+    // Matches the `adx < 600.f` chase threshold in the boss case of
+    // EnemyAI::step, so the bar and the aggro arrive together.
+    constexpr float BOSS_BAR_RANGE     = 600.f;
     constexpr float BOSS_CHARGE_TIME   = 3.0f;
     constexpr float BOSS_ENRAGE_RATIO  = 0.5f;     // below 50% HP enrages
     constexpr float BOSS_CHARGE_SPEED  = 320.f;

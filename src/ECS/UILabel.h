@@ -29,7 +29,7 @@ public:
         if (!Game::renderer || !Game::assets) return;
         TTF_Font* f = Game::assets->GetFont(font);
         if (!f) return;
-        SDL_Surface* s = TTF_RenderText_Blended(f, t.c_str(), color);
+        SDL_Surface* s = TTF_RenderUTF8_Blended(f, t.c_str(), color);
         if (!s) return;
         tex = SDL_CreateTextureFromSurface(Game::renderer, s);
         SDL_QueryTexture(tex, nullptr, nullptr, &pos.w, &pos.h);
@@ -43,7 +43,7 @@ public:
         if (!Game::renderer || !Game::assets) return;
         TTF_Font* f = Game::assets->GetFont(fontId);
         if (!f) return;
-        SDL_Surface* s = TTF_RenderText_Blended(f, t.c_str(), color);
+        SDL_Surface* s = TTF_RenderUTF8_Blended(f, t.c_str(), color);
         if (!s) return;
         tex = SDL_CreateTextureFromSurface(Game::renderer, s);
         SDL_QueryTexture(tex, nullptr, nullptr, &pos.w, &pos.h);
