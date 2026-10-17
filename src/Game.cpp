@@ -127,6 +127,7 @@ void Game::loadAssets() {
         assets->AddTexture(id, assetPath(rel).c_str());
     };
     tex("terrain",     "tileset/platformer.png");
+    tex("terrain2",    "tileset/terrain_v2.png");
     tex("player",      "sprites/player_sprites.png");
     tex("skeleton",    "sprites/skeleton_sprites.png");
     tex("slime",       "sprites/slime.png");
@@ -198,12 +199,18 @@ void Game::loadLevel() {
     // haze reads as distance instead of as a second, brighter copy of the
     // foreground.  This tint never applied before — TileComponent used to
     // gate it on `parallax < 0.3f` while this layer's factor is exactly 0.3f.
-    g_map->LoadLayer(assetPath("tileset/BackgroundLayer.map"),
-                     Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES,
-                     9, 0.30f, 96, 132, 176);
-    g_map->LoadLayer(assetPath("tileset/ForegroundLayer.map"),
-                     Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES,
-                     9, 1.0f);
+    //
+    // ART-10: the background and the terrain come from the generated
+    // terrain_v2.png (32 columns of 64px cells; ids are owned by
+    // tools/build_terrain.py).  Map is only a loader -- every tile keeps its
+    // own texture -- so a second one for the v2 sheet leaves draw order as is.
+    Map terrainV2("terrain2", 64);
+    terrainV2.LoadLayer(assetPath("tileset/BackgroundLayer.map"),
+                        Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES,
+                        32, 0.30f, 96, 132, 176);
+    terrainV2.LoadLayer(assetPath("tileset/ForegroundLayer.map"),
+                        Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES,
+                        32, 1.0f);
     // Decor is props sitting ON the surface (rocks, crystals, lamps).  It was
     // loaded at 0.55f parallax, which made every prop drift sideways relative
     // to the ground it stands on as the camera moved — rocks visibly sliding

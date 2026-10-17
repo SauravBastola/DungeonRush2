@@ -49,6 +49,8 @@ OBJ_IDS: Dict[str, int] = {}
 # ---------------------------------------------------------------------------
 import re
 
+import build_terrain as BT   # terrain_v2.png ids live there (ART-10)
+
 CONFIG_H = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                         "src", "Config.h")
 
@@ -1075,101 +1077,107 @@ def _edge_index(col: int, inside) -> int:
     return 1
 
 
-def tile_for(col: int, row: int, g: List[Optional[int]]) -> int:
-    """Pick a tile for (col,row) given the ground heightmap.
+def _ground_material(col: int, row: int, top: int) -> str:
+    """Material of a solid ground cell: the zoning the old tile_for() used.
 
-    g[col] is the last EMPTY row above the surface, so the surface tile is
-    row top+1.  -1 marks a chasm: open water all the way down.
-
-    Tile choice has two independent inputs -- depth, which picks the
-    material, and horizontal neighbourhood, which picks the slice.  Mixing
-    them (the old `(col + row) & 2`) is what put ragged cap tiles in the
-    middle of solid runs: `& 2` only ever yields 0 or 2, so it alternated
-    between one cap and whatever sat at index 2 -- for the teal body that is
-    tile 17, a decorative round rock, which is why the underground was full
-    of floating blobs with transparent margins.
+    Surface row is always teal; below it each zone keeps its own strata.  The
+    old code put a fringe cell on the map's last row only because it had no
+    way to close a mass; with real autotiling the bottom is interior stone.
     """
-    if not (0 <= col < len(g)):
-        return EMPTY
-    top = g[col]
-    if top is None:
-        return EMPTY
-
-    if top < 0:
-        # Chasm: a bright surface line, then the deep blue body.  Both are in
-        # the reference palette - #0098dc reads as the lit top of the water.
-        if row <= WATER_LINE:
-            return EMPTY
-        def water(c: int) -> bool:
-            return _is_water_col(c, g)
-        i = _edge_index(col, water)
-        if row == WATER_LINE + 1:
-            return WATER_SET[i]
-        # A second bright band just under the surface.  The chasms are only
-        # MAX_GAP wide, which is narrow enough that _edge_index() hands both
-        # columns an end cap and the middle tile (28, the lit water) never
-        # gets used at all -- this row is where it lands instead, and it reads
-        # as sunlight reaching down into the top of the water.
-        if row == WATER_LINE + 2:
-            return WATER_BRIGHT
-        # The water runs to the bottom of the map, so close it with the navy
-        # pair whose fringe hangs along its BOTTOM edge (12/13) instead of
-        # ending the sheet on a hard horizontal cut.
-        if row == HEIGHT - 1:
-            return NAVY_BOTTOM[i]
-        return NAVY_SET[i]
-
-    if row <= top:
-        return EMPTY
-
-    def solid(c: int) -> bool:
-        return _solid_at(c, row, g)
-    i = _edge_index(col, solid)
-
-    # Ground profile, top-down, zoned by biome:
-    # Surface is always TEAL_TOP[i] so all terrain has a consistent walkable grass/moss fringe
     if row == top + 1:
-        return TEAL_TOP[i]
-
+        return "teal"
+    d = row - top
     zone = get_zone(col)
     if zone == "meadow":
-        if row in (top + 2, top + 3):
-            return TEAL_BODY[i]
-        if row == top + 4:
-            return SOIL_SET[i]
-        if row == top + 5:
-            return SOIL_ALT[i]
-        if row == HEIGHT - 1:
-            return TEAL_BOTTOM[i]
-        return STONE_SET[i]
-    elif zone == "ruins":
-        if row == top + 2:
-            return SOIL_SET[i]
-        if row == top + 3:
-            return SOIL_ALT[i]
-        if row == top + 4:
-            return STONE_SET[i]
-        if row == HEIGHT - 1:
-            return TEAL_BOTTOM[i]
-        return STONE_SET[i]
-    elif zone == "sunken":
-        if row == top + 2:
-            return NAVY_SET[i]
-        if row == top + 3:
-            return FILL_NAVY
-        if row == top + 4:
-            return SOIL_ALT[i]
-        if row == HEIGHT - 1:
-            return NAVY_BOTTOM[i]
-        return STONE_SET[i]
-    else:  # arena
-        if row == top + 2:
-            return STONE_SET[i]
-        if row == top + 3:
-            return SOIL_ALT[i]
-        if row == HEIGHT - 1:
-            return TEAL_BOTTOM[i]
-        return STONE_SET[i]
+        return "teal" if d <= 3 else ("soil" if d <= 5 else "stone")
+    if zone == "ruins":
+        return "soil" if d <= 3 else "stone"
+    if zone == "sunken":
+        return "navy" if d <= 3 else ("soil" if d == 4 else "stone")
+    return "soil" if d == 3 else "stone"           # arena
+
+
+def _depth_band(row: int, top: int) -> int:
+    """ART_STYLE_V2 4.3: x0.85 below top+3, x0.72 below top+6."""
+    if row > top + 6:
+        return 2
+    if row > top + 3:
+        return 1
+    return 0
+
+
+def _variant(col: int, row: int) -> int:
+    """Interior/edge variant 0..2: a deterministic hash of (col, row)."""
+    return int(_h(col * 7919 + row * 104729 + 17) * 3)
+
+
+def terrain_cells(L: Level) -> Dict[Tuple[int, int], Tuple[str, str, int]]:
+    """(col,row) -> (kind, material, band) for every foreground cell.
+
+    kind is "g" for solid ground (heightmap + platforms) and "w" for chasm
+    water.  Platforms - including the moving ones, whose spawn rect the old
+    writer also baked in - are teal slabs at band 0.
+    """
+    g = L.ground
+    cells: Dict[Tuple[int, int], Tuple[str, str, int]] = {}
+    for col in range(L.width):
+        top = g[col]
+        if top is None:
+            continue
+        for row in range(L.height):
+            if top < 0:
+                if row > WATER_LINE:
+                    cells[(col, row)] = ("w", "water",
+                                         _depth_band(row, WATER_LINE))
+            elif row > top:
+                cells[(col, row)] = ("g", _ground_material(col, row, top),
+                                     _depth_band(row, top))
+    for p in L.platforms:
+        for x in range(p.col, p.col + p.w):
+            for y in range(p.row, p.row + p.h):
+                if 0 <= x < L.width and 0 <= y < L.height:
+                    cells[(x, y)] = ("g", "teal", 0)
+    return cells
+
+
+def tile_for(col: int, row: int, cells, width: int, height: int) -> int:
+    """terrain_v2 id for (col,row): 4-neighbour bitmask autotiling.
+
+    A ground cell connects to ground; a water cell connects to water and to
+    ground (the chasm wall draws the edge, the water runs up to it).  Below
+    the map counts as more of the same mass, and the left/right map edges
+    repeat the edge column, so nothing is outlined at the border of the world.
+    """
+    me = cells.get((col, row))
+    if me is None:
+        return EMPTY
+    kind, material, band = me
+
+    def k(c: int, r: int) -> Optional[str]:
+        if r >= height:
+            return "g"
+        if r < 0:
+            return None
+        c = min(max(c, 0), width - 1)
+        v = cells.get((c, r))
+        return v[0] if v else None
+
+    def joins(c: int, r: int) -> bool:
+        n = k(c, r)
+        return n == "g" or (kind == "w" and n == "w")
+
+    mask = ((BT.N if joins(col, row - 1) else 0) |
+            (BT.E if joins(col + 1, row) else 0) |
+            (BT.S if joins(col, row + 1) else 0) |
+            (BT.W if joins(col - 1, row) else 0))
+    diag = set()
+    if mask == 15:
+        for name, dc, dr in (("NE", 1, -1), ("SE", 1, 1),
+                             ("SW", -1, 1), ("NW", -1, -1)):
+            if not joins(col + dc, row + dr):
+                diag.add(name)
+    piece = BT.piece_for(mask, diag, _variant(col, row))
+    return BT.terrain_id(material, band, piece)
 
 
 # The water surface row used by the chasms.  tile_for() puts the bright water
@@ -1190,36 +1198,13 @@ def write_layer(path: str, L: Level, fn) -> None:
 
 
 def write_foreground(path: str, L: Level) -> None:
-    # Index platforms by column so the slice is chosen in O(1) per tile
-    # instead of scanning every platform for every one of 7200 cells.
-    plat_at = {}
-    for p in L.platforms:
-        for x in range(p.col, p.col + p.w):
-            plat_at[x] = p
+    # Floating platforms are folded into terrain_cells(), so a slab is
+    # autotiled exactly like the ground: end caps, top, underside, and the
+    # inner corner where a slab rests on a step.
+    cells = terrain_cells(L)
 
     def fn(x: int, y: int) -> int:
-        t = tile_for(x, y, L.ground)
-        p = plat_at.get(x)
-        if p is not None and p.row <= y < p.row + p.h:
-            # A floating platform is ONE slab, not w copies of one tile.
-            # Emitting the left cap for every column repeated a ragged left
-            # edge right across the span, so a 4-wide platform read as four
-            # separate blocks with seams between them.  Slice it instead:
-            # left cap, seamless fills, right cap.
-            if p.w == 1:                 i = 1
-            elif x == p.col:             i = 0
-            elif x == p.col + p.w - 1:   i = 2
-            else:                        i = 1
-            # Grass-fringed cap on top, seamless fill through the middle, and
-            # -- for the two-tile platforms -- the pair whose fringe hangs
-            # down (15/16) along the underside, so a slab has a finished
-            # bottom instead of a raw cut.
-            if y == p.row:
-                return TEAL_TOP[i]
-            if y == p.row + p.h - 1:
-                return TEAL_BOTTOM[i]
-            return FILL_TEAL
-        return t
+        return tile_for(x, y, cells, L.width, L.height)
     write_layer(path, L, fn)
 
 
@@ -1338,12 +1323,73 @@ def _ridge_layer(L: Level, prof: List[int], props: Dict[Tuple[int, int], int],
     return fn
 
 
+BG_PARALLAX = 0.30   # must match the BackgroundLayer.map line in Game::loadLevel
+
+
+def _read_config_int(name: str, default: int) -> int:
+    try:
+        with open(CONFIG_H) as f:
+            m = re.search(rf"constexpr\s+int\s+{name}\s*=\s*([0-9]+)\s*;", f.read())
+        return int(m.group(1)) if m else default
+    except OSError:
+        return default
+
+
+def background_cells(L: Level) -> Dict[Tuple[int, int], int]:
+    """Silhouette backdrop for the 0.30 parallax plane (ART_STYLE_V2 4.4).
+
+    Designed in the layer's OWN space: a tile at world (x, y) appears on
+    screen at (x - cam.x * 0.3, y - cam.y * 0.3).  The camera is clamped to
+    the map, so only cols 0..last_col and rows 0..last_row can ever be seen;
+    the old layer put its ridge at row ~24, which lands below the bottom of
+    the frame at every camera height the hero reaches.  Two silhouette bands:
+
+      canopy  hanging from the top: CANOPY mass, a scalloped CANOPY_EDGE, and
+              ROOTS / ROOT_END strands under some of it
+      ridge   rising from below: TEETH (spires) or RIDGE_TOP on the skyline,
+              then MASS, then the darker DEEP body down to the last row
+    """
+    win_w = _read_config_int("WINDOW_WIDTH", 1350)
+    win_h = _read_config_int("WINDOW_HEIGHT", 850)
+    max_cam_x = L.width * TILE - win_w
+    max_cam_y = L.height * TILE - win_h
+    last_col = min(L.width - 1, int(math.ceil((max_cam_x * BG_PARALLAX + win_w) / TILE)))
+    last_row = min(L.height - 1, int(math.ceil((max_cam_y * BG_PARALLAX + win_h) / TILE)) - 1)
+
+    cells: Dict[Tuple[int, int], int] = {}
+    for x in range(last_col + 1):
+        v = int(_h(x * 131 + 7) * 3)
+        # canopy: its lower edge wanders between rows 6 and 9
+        edge = 7 + int(round(1.3 * math.sin(x * 0.23 + 0.4)
+                             + 0.9 * math.sin(x * 0.61 + 1.3)))
+        edge = max(6, min(9, edge))
+        for y in range(2, edge):
+            cells[(x, y)] = BT.BG["CANOPY_%d" % int(_h(x * 17 + y * 29) * 3)]
+        cells[(x, edge)] = BT.BG["CANOPY_EDGE_%d" % v]
+        if _h(x * 53 + 11) < 0.30:
+            drop = 1 + int(_h(x * 59 + 3) * 2)
+            for y in range(edge + 1, edge + drop):
+                cells[(x, y)] = BT.BG["ROOTS_%d" % (v & 1)]
+            cells[(x, edge + drop)] = BT.BG["ROOT_END_%d" % (v & 1)]
+        # ridge: skyline between rows 11 and 14
+        top = 12 + int(round(1.6 * math.sin(x * 0.11 + 0.7)
+                             + 1.0 * math.sin(x * 0.29 + 2.0)))
+        top = max(11, min(14, top))
+        cells[(x, top)] = (BT.BG["TEETH_%d" % v] if _h(x * 71 + 5) < 0.6
+                           else BT.BG["RIDGE_TOP"])
+        for y in range(top + 1, last_row + 1):
+            band = "MASS" if y <= top + 3 else "DEEP"
+            cells[(x, y)] = BT.BG["%s_%d" % (band, int(_h(x * 37 + y * 41) * 3))]
+    return cells
+
+
 def write_background(path: str, L: Level) -> None:
-    """Far panorama: navy ridge, trees and spires, parallax 0.30."""
-    prof = [_far_profile(x) for x in range(L.width)]
-    props = _ridge_props(L.width, prof, 0.34)
-    write_layer(path, L, _ridge_layer(L, prof, props, FILL_NAVY,
-                                      NAVY_SET, NAVY_BOTTOM))
+    """Far plane: canopy + ridge silhouettes from terrain_v2, parallax 0.30."""
+    cells = background_cells(L)
+
+    def fn(x: int, y: int) -> int:
+        return cells.get((x, y), EMPTY)
+    write_layer(path, L, fn)
 
 
 def write_mid(path: str, L: Level) -> None:
@@ -1590,8 +1636,7 @@ def main() -> int:
     # draws.  The point of the exercise is to use the art that exists, so an
     # unused tile is a bug report rather than a curiosity.
     used: set = set()
-    for rel in ("ForegroundLayer.map", "BackgroundLayer.map",
-                "MidLayer.map", "DecorLayer.map"):
+    for rel in ("MidLayer.map", "DecorLayer.map"):
         p = os.path.join(tileset, rel)
         if not os.path.exists(p):
             continue
@@ -1602,8 +1647,40 @@ def main() -> int:
                     if tok and tok != str(EMPTY):
                         used.add(int(tok))
     missing = [t for t in ALL_USABLE_TILES if t not in used]
-    print(f"tile usage : {len(used)}/{len(ALL_USABLE_TILES)} usable cells drawn"
+    print(f"tile usage : {len(used)}/{len(ALL_USABLE_TILES)} platformer.png cells "
+          f"drawn by mid+decor"
           + (f"  -- unused: {missing}" if missing else "  (every one used)"))
+    return report_v2(L)
+
+
+def report_v2(L: Level) -> int:
+    """ART_STYLE_V2 6.5/6.6 measured on what was just written.
+
+    Returns 1 (and the generator fails) if the background breaks its rule;
+    the per-material foreground numbers are reported, not enforced, because
+    a material's share depends on the layout as much as on the tile set.
+    """
+    from collections import Counter
+    cells = terrain_cells(L)
+    by_mat: Dict[str, Counter] = {}
+    for (x, y), (_, material, _) in cells.items():
+        by_mat.setdefault(material, Counter())[tile_for(x, y, cells, L.width, L.height)] += 1
+    for material in BT.MATERIALS:
+        c = by_mat.get(material, Counter())
+        n = sum(c.values())
+        if not n:
+            continue
+        tid, top = c.most_common(1)[0]
+        print(f"fg {material:<6}  : {n:4d} cells, {len(c):2d} ids, "
+              f"max share {100.0 * top / n:4.1f} % (id {tid})")
+    bg = Counter(background_cells(L).values())
+    n = sum(bg.values())
+    tid, top = bg.most_common(1)[0]
+    share = 100.0 * top / n
+    print(f"background : {n:4d} cells, {len(bg):2d} ids, max share {share:4.1f} % (id {tid})")
+    if len(bg) < 8 or share > 40.0:
+        print("*** background layer breaks ART_STYLE_V2 6.6 (>= 8 ids, <= 40 %) ***")
+        return 1
     return 0
 
 
