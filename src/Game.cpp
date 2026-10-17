@@ -60,6 +60,17 @@ bool          Game::isRunning = false;
 
 static inline std::vector<Entity*>& G(std::size_t idx) { return manager.getGroup(idx); }
 
+// INV-2: ColliderComponent::init() copies w/h and the transform pointer but not
+// the collider itself, so a freshly spawned entity's collider sits at (0,0)
+// until the first manager.update(). Physics::moveAndCollide starts from the
+// collider and writes the result back into the transform, so any entity that
+// reaches physics before that pass is teleported to the world origin. Every
+// spawn path therefore syncs here, at the point the position is known.
+static inline void syncCollider(Entity& e) {
+    if (e.hasComponent<ColliderComponent>())
+        e.getComponent<ColliderComponent>().update();
+}
+
 float Game::clamp(float v, float lo, float hi) { return std::max(lo, std::min(v, hi)); }
 
 // ===========================================================================
@@ -293,6 +304,7 @@ void Game::spawnPlayer() {
         Config::PLAYER_W, Config::PLAYER_H);
     p.addComponent<HealthComponent>(Config::MAX_HP);
     p.addGroup(groupPlayers);
+    syncCollider(p);
 }
 
 void Game::spawnEnemy(const std::string& kind, int col, int row) {
@@ -399,6 +411,7 @@ void Game::spawnEnemy(const std::string& kind, int col, int row) {
     ai.kind = k;
     ai.target = nullptr;
     e.addGroup(groupEnemies);
+    syncCollider(e);
 }
 
 void Game::spawnPowerup(const std::string& kind, int col, int row) {
@@ -432,6 +445,7 @@ void Game::spawnPowerup(const std::string& kind, int col, int row) {
     p.addComponent<ColliderComponent>("powerup", w, h);
     p.addComponent<PowerUpComponent>(t);
     p.addGroup(groupPowerups);
+    syncCollider(p);
 }
 
 void Game::spawnFacility(const std::string& kind, int col, int row) {
@@ -460,6 +474,7 @@ void Game::spawnFacility(const std::string& kind, int col, int row) {
         bob.speed     = 2.0f;
     }
     f.addGroup(groupFacilities);
+    syncCollider(f);
 }
 
 // One entity per tile, so a wide strip tiles its art instead of stretching it.
@@ -486,6 +501,7 @@ void Game::spawnHazard(const std::string& kind, int col, int row, int w, int h) 
             z.getComponent<ColliderComponent>().solid  = false;
             z.getComponent<ColliderComponent>().sensor = true;
             z.addGroup(groupHazards);
+            syncCollider(z);
         }
     }
 }
@@ -512,6 +528,7 @@ void Game::spawnPlatform(int col, int row, int w, int h,
     }
     p.addGroup(groupPlatforms);
     p.addGroup(groupColliders);
+    syncCollider(p);
 }
 
 // ===========================================================================
@@ -891,6 +908,9 @@ void Game::respawn() {
     auto& hp = p.getComponent<HealthComponent>();
     tr.position = Vector2D(Config::PLAYER_X, Config::PLAYER_Y);
     tr.velocity.Zero();
+    // INV-2: moveAndCollide reads the collider; keep it in sync with any
+    // position write.
+    p.getComponent<ColliderComponent>().update();
     hp.hp = hp.hpMax;
     hp.dead = false;
     hp.iframes = Config::RESPAWN_INVULN;
@@ -951,6 +971,9 @@ void Game::restartLevel() {
     runTime = 0.f; enemiesDefeated = 0; deaths = 0;
     bestCombo = 0; coinsBanked = 0;
     shieldCharges = 0; m_shakeMag = 0.f; m_shake = 0.f;
+    speedBoostTimer = invincibleTimer = dmgBoostTimer = magnetTimer = coinMultTimer = 0.f;
+    m_deathTimer = 0.f;
+    checkpointIndex = -1;
     respawn();
     state = State::Playing;
     isPaused = false;
@@ -1059,7 +1082,12 @@ void Game::update() {
     if (state == State::Menu || state == State::Instructions) {
         handlePlayerInput();
         manager.refresh();
-        manager.update();
+        // The menu draws no world, so simulating it there only lets gravity
+        // drop the hero out of the level before the run has started.  How To
+        // Play opened mid-run still draws the world behind the panel, so that
+        // case keeps updating.
+        if (state == State::Instructions && m_returnState != State::Menu)
+            manager.update();
         return;
     }
     if (state == State::Paused || state == State::Settings ||
@@ -1406,7 +1434,7 @@ void Game::handleMenuInput(SDL_Keycode key) {
         if (key == SDLK_UP || key == SDLK_w) menuSelection = (menuSelection + 3) % 4;
         else if (key == SDLK_DOWN || key == SDLK_s) menuSelection = (menuSelection + 1) % 4;
         else if (key == SDLK_RETURN || key == SDLK_SPACE || key == SDLK_KP_ENTER) {
-            if (menuSelection == 0) { state = State::Playing; respawn(); }
+            if (menuSelection == 0) { restartLevel(); }
             else if (menuSelection == 1) {
                 m_returnState = State::Menu;
                 instructionsScroll = 0;
