@@ -433,7 +433,11 @@ int resolveMelee(std::vector<Entity*>& hitboxes,
             hc.hitCount++;
             landed++;
             auto& hp = t->getComponent<HealthComponent>();
-            bool died = hp.damage(hc.damage);
+            // damage() reports "the hit landed", not "the victim died" — a
+            // landed hit on a live enemy returns true too.  Only a landed hit
+            // that leaves hp.dead is a kill.
+            const bool connected = hp.damage(hc.damage);
+            const bool died      = connected && hp.dead;
             auto& tr  = t->getComponent<TransformComponent>();
             tr.velocity.x += hc.knockX;
             tr.velocity.y += hc.knockY;

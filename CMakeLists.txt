@@ -54,6 +54,7 @@ endif()
 add_executable(${PROJECT_NAME}
         src/main.cpp
         src/AssetManager.cpp
+        src/Depth.cpp
         src/Collision.cpp
         src/Game.cpp
         src/Map.cpp

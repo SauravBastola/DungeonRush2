@@ -32,6 +32,7 @@
 #include "Systems/Atmosphere.h"
 #include "Systems/Scenery.h"
 #include "Systems/Vfx.h"
+#include "Depth.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -59,6 +60,17 @@ AssetManager* Game::assets = nullptr;
 bool          Game::isRunning = false;
 
 static inline std::vector<Entity*>& G(std::size_t idx) { return manager.getGroup(idx); }
+
+// INV-2: ColliderComponent::init() copies w/h and the transform pointer but not
+// the collider itself, so a freshly spawned entity's collider sits at (0,0)
+// until the first manager.update(). Physics::moveAndCollide starts from the
+// collider and writes the result back into the transform, so any entity that
+// reaches physics before that pass is teleported to the world origin. Every
+// spawn path therefore syncs here, at the point the position is known.
+static inline void syncCollider(Entity& e) {
+    if (e.hasComponent<ColliderComponent>())
+        e.getComponent<ColliderComponent>().update();
+}
 
 float Game::clamp(float v, float lo, float hi) { return std::max(lo, std::min(v, hi)); }
 
@@ -116,14 +128,23 @@ void Game::loadAssets() {
         assets->AddTexture(id, assetPath(rel).c_str());
     };
     tex("terrain",     "tileset/platformer.png");
+    tex("terrain2",    "tileset/terrain_v2.png");
+    // ART-13: each depth plane is the same palette art seen through one
+    // entry of Depth's table, baked once here rather than tinted per call.
+    assets->AddTexture("terrain2_bg",  Depth::bake(renderer,
+        assetPath("tileset/terrain_v2.png").c_str(), Depth::BG_TILES));
+    assets->AddTexture("terrain2_sil", Depth::bake(renderer,
+        assetPath("tileset/terrain_v2.png").c_str(), Depth::FG_SIL));
+    assets->AddTexture("terrain2_mid", Depth::bake(renderer,
+        assetPath("tileset/terrain_v2.png").c_str(), Depth::MID));
     tex("player",      "sprites/player_sprites.png");
-    tex("skeleton",    "sprites/skeleton_sprites.png");
-    tex("slime",       "sprites/slime.png");
+    tex("skeleton",    "sprites/enemy_skeleton.png");
+    tex("slime",       "sprites/enemy_slime.png");
     tex("bat",         "sprites/enemy_bat.png");
-    tex("mage",        "sprites/mage.png");
-    tex("archer",      "sprites/archer.png");
-    tex("bomber",      "sprites/bomber.png");
-    tex("boss",        "sprites/villain_boss.png");
+    tex("mage",        "sprites/enemy_mage.png");
+    tex("archer",      "sprites/enemy_archer.png");
+    tex("bomber",      "sprites/enemy_bomber.png");
+    tex("boss",        "sprites/enemy_boss.png");
     tex("coin",        "tileset/coins.png");
     tex("projectile",  "sprites/proj.png");
     tex("fireball",    "sprites/fireball.png");
@@ -187,12 +208,25 @@ void Game::loadLevel() {
     // haze reads as distance instead of as a second, brighter copy of the
     // foreground.  This tint never applied before — TileComponent used to
     // gate it on `parallax < 0.3f` while this layer's factor is exactly 0.3f.
-    g_map->LoadLayer(assetPath("tileset/BackgroundLayer.map"),
-                     Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES,
-                     9, 0.30f, 96, 132, 176);
-    g_map->LoadLayer(assetPath("tileset/ForegroundLayer.map"),
-                     Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES,
-                     9, 1.0f);
+    //
+    // ART-10: the background and the terrain come from the generated
+    // terrain_v2.png (32 columns of 64px cells; ids are owned by
+    // tools/build_terrain.py).  Map is only a loader -- every tile keeps its
+    // own texture -- so a second one for the v2 sheet leaves draw order as is.
+    Map terrainV2("terrain2", 64);
+    // ART-13: the background reads the Depth::BG_TILES bake, which replaces
+    // the old (96,132,176) tint, and the mid layer (Q19: load it) reads the
+    // Depth::MID bake of the same sheet.  Both parallax factors come from the
+    // same table the generator was told about (BG_PARALLAX / MID_PARALLAX).
+    Map("terrain2_bg", 64).LoadLayer(assetPath("tileset/BackgroundLayer.map"),
+                        Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES,
+                        Level::TERRAIN_V2_COLS, Depth::BG_TILES.parallax);
+    Map("terrain2_mid", 64).LoadLayer(assetPath("tileset/MidLayer.map"),
+                        Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES,
+                        Level::TERRAIN_V2_COLS, Depth::MID.parallax);
+    terrainV2.LoadLayer(assetPath("tileset/ForegroundLayer.map"),
+                        Config::MAP_WIDTH_TILES, Config::MAP_HEIGHT_TILES,
+                        32, 1.0f);
     // Decor is props sitting ON the surface (rocks, crystals, lamps).  It was
     // loaded at 0.55f parallax, which made every prop drift sideways relative
     // to the ground it stands on as the camera moved — rocks visibly sliding
@@ -293,6 +327,7 @@ void Game::spawnPlayer() {
         Config::PLAYER_W, Config::PLAYER_H);
     p.addComponent<HealthComponent>(Config::MAX_HP);
     p.addGroup(groupPlayers);
+    syncCollider(p);
 }
 
 void Game::spawnEnemy(const std::string& kind, int col, int row) {
@@ -334,21 +369,23 @@ void Game::spawnEnemy(const std::string& kind, int col, int row) {
         // a few degrees of lean, driven off the same clock as the frame
         // advance, reads as continuous movement without new art.
         case EnemyAIComponent::Kind::Skeleton:
-            sp.addAnim("idle",   Animation(0, 4, 110).motion(1.0f, 1.2f, 1.f));
-            sp.addAnim("run",    Animation(1, 6, 100).motion(1.8f, 2.6f));
-            sp.addAnim("attack", Animation(2, 6, 80).motion(0.8f, 3.4f, 1.f));
-            sp.addAnim("hurt",   Animation(3, 4, 120).motion(0.6f, 4.0f, 2.f));
-            sp.addAnim("die",    Animation(4, 4, 200).motion(0.f, 0.f));
+            // ART-11 sheets carry their own motion, and a lean would
+            // resample the 1:1 pixels, so every enemy plays with motion 0.
+            sp.addAnim("idle",   Animation(0, 4, 140).motion(0.f, 0.f));
+            sp.addAnim("run",    Animation(1, 6, 100).motion(0.f, 0.f));
+            sp.addAnim("attack", Animation(2, 4, 110).motion(0.f, 0.f));
+            sp.addAnim("hurt",   Animation(3, 2, 120).motion(0.f, 0.f));
+            sp.addAnim("die",    Animation(4, 5, 160).motion(0.f, 0.f));
             sp.Play("idle");
             break;
         case EnemyAIComponent::Kind::Slime:
-            // slime.png is a single row of 4 - every state reuses row 0 at a
-            // different tempo, because row 1/2 simply do not exist.
-            // The slime is a blob, so it gets the biggest amplitude: it
-            // should visibly squall as it hops.
-            sp.addAnim("idle", Animation(0, 4, 120).motion(1.2f, 0.f, 2.f, .35f));
-            sp.addAnim("jump", Animation(0, 4, 55).motion(2.6f, 0.f, 2.f, .40f));
-            sp.addAnim("die",  Animation(0, 2, 150).motion(0.f, 0.f));
+            // ART-11: enemy_slime.png has real rows now -- idle, hop (tell,
+            // tell, stretch, land), die -- so the squash lives in the frames.
+            // No bob, lean or cross-fade: a blend superimposes two frames and
+            // a lean resamples the pixels, both of which break the 1:1 grid.
+            sp.addAnim("idle", Animation(0, 4, 160).motion(0.f, 0.f));
+            sp.addAnim("jump", Animation(1, 4, 70).motion(0.f, 0.f));
+            sp.addAnim("die",  Animation(2, 4, 120).motion(0.f, 0.f));
             sp.Play("idle");
             break;
         case EnemyAIComponent::Kind::Bat:
@@ -356,27 +393,30 @@ void Game::spawnEnemy(const std::string& kind, int col, int row) {
             // cells is the worst case for steppiness, so this one leans on
             // the cross-fade hardest: 45% of each step is a blend into the
             // other wing position, plus a strong vertical bob.
-            sp.addAnim("fly", Animation(0, 2, 100).motion(3.0f, 7.0f, 1.f, .45f));
-            sp.addAnim("die", Animation(0, 2, 150).motion(0.f, 0.f));
+            sp.addAnim("fly", Animation(0, 2, 110).motion(0.f, 0.f));
+            sp.addAnim("die", Animation(1, 3, 150).motion(0.f, 0.f));
             sp.Play("fly");
             break;
         case EnemyAIComponent::Kind::Mage:
             // mage.png is one row of 4 - the cast is a fast flicker on row 0
-            sp.addAnim("idle",   Animation(0, 4, 130).motion(1.4f, 1.0f, 1.f));
-            sp.addAnim("attack", Animation(0, 4, 55).motion(0.5f, 2.0f, 2.f));
-            sp.addAnim("die",    Animation(0, 2, 150).motion(0.f, 0.f));
+            sp.addAnim("idle",   Animation(0, 4, 160).motion(0.f, 0.f));
+            sp.addAnim("attack", Animation(1, 4, 120).motion(0.f, 0.f));
+            sp.addAnim("die",    Animation(2, 4, 150).motion(0.f, 0.f));
             sp.Play("idle");
             break;
         case EnemyAIComponent::Kind::Archer:
-            sp.addAnim("idle",  Animation(0, 4, 140).motion(0.9f, 1.0f, 1.f));
-            sp.addAnim("shoot", Animation(1, 4, 90).motion(0.4f, 1.6f, 1.f));
-            sp.addAnim("die",   Animation(2, 4, 150).motion(0.f, 0.f));
+            // "shoot" is played while the AI is AIMING, so it shows the
+            // aim row -- the bow-drawn tell; row 2 is the release.
+            sp.addAnim("idle",  Animation(0, 4, 160).motion(0.f, 0.f));
+            sp.addAnim("shoot", Animation(1, 3, 120).motion(0.f, 0.f));
+            sp.addAnim("loose", Animation(2, 3, 90).motion(0.f, 0.f));
+            sp.addAnim("die",   Animation(3, 4, 150).motion(0.f, 0.f));
             sp.Play("idle");
             break;
         case EnemyAIComponent::Kind::Bomber:
-            sp.addAnim("walk", Animation(0, 4, 110).motion(1.6f, 3.0f, 2.f));
-            sp.addAnim("fuse", Animation(1, 4, 70).motion(0.7f, 5.0f, 2.f));
-            sp.addAnim("die",  Animation(2, 4, 150).motion(0.f, 0.f));
+            sp.addAnim("walk", Animation(0, 4, 110).motion(0.f, 0.f));
+            sp.addAnim("fuse", Animation(1, 3, 110).motion(0.f, 0.f));
+            sp.addAnim("die",  Animation(2, 4, 110).motion(0.f, 0.f));
             sp.Play("walk");
             break;
         case EnemyAIComponent::Kind::Boss:
@@ -386,10 +426,11 @@ void Game::spawnEnemy(const std::string& kind, int col, int row) {
             // existing squash/stretch and hit flash.  `frames = 1` means the
             // loop position is just the phase, so cycles=1 gives one breath
             // per `speed` ms.
-            sp.addAnim("idle",   Animation(0, 1, 900).motion(1.5f, 2.0f, 1.f));
-            sp.addAnim("run",    Animation(0, 1, 260).motion(3.0f, 4.0f, 1.f));
-            sp.addAnim("attack", Animation(0, 1, 160).motion(1.0f, 6.0f, 1.f));
-            sp.addAnim("die",    Animation(0, 1, 150).motion(0.f, 0.f));
+            sp.addAnim("idle",   Animation(0, 4, 220).motion(0.f, 0.f));
+            sp.addAnim("run",    Animation(1, 6, 120).motion(0.f, 0.f));
+            sp.addAnim("attack", Animation(2, 5, 140).motion(0.f, 0.f));
+            sp.addAnim("hurt",   Animation(3, 2, 120).motion(0.f, 0.f));
+            sp.addAnim("die",    Animation(4, 6, 150).motion(0.f, 0.f));
             sp.Play("idle");
             break;
     }
@@ -399,6 +440,7 @@ void Game::spawnEnemy(const std::string& kind, int col, int row) {
     ai.kind = k;
     ai.target = nullptr;
     e.addGroup(groupEnemies);
+    syncCollider(e);
 }
 
 void Game::spawnPowerup(const std::string& kind, int col, int row) {
@@ -432,6 +474,7 @@ void Game::spawnPowerup(const std::string& kind, int col, int row) {
     p.addComponent<ColliderComponent>("powerup", w, h);
     p.addComponent<PowerUpComponent>(t);
     p.addGroup(groupPowerups);
+    syncCollider(p);
 }
 
 void Game::spawnFacility(const std::string& kind, int col, int row) {
@@ -460,6 +503,7 @@ void Game::spawnFacility(const std::string& kind, int col, int row) {
         bob.speed     = 2.0f;
     }
     f.addGroup(groupFacilities);
+    syncCollider(f);
 }
 
 // One entity per tile, so a wide strip tiles its art instead of stretching it.
@@ -486,6 +530,7 @@ void Game::spawnHazard(const std::string& kind, int col, int row, int w, int h) 
             z.getComponent<ColliderComponent>().solid  = false;
             z.getComponent<ColliderComponent>().sensor = true;
             z.addGroup(groupHazards);
+            syncCollider(z);
         }
     }
 }
@@ -512,6 +557,7 @@ void Game::spawnPlatform(int col, int row, int w, int h,
     }
     p.addGroup(groupPlatforms);
     p.addGroup(groupColliders);
+    syncCollider(p);
 }
 
 // ===========================================================================
@@ -891,6 +937,9 @@ void Game::respawn() {
     auto& hp = p.getComponent<HealthComponent>();
     tr.position = Vector2D(Config::PLAYER_X, Config::PLAYER_Y);
     tr.velocity.Zero();
+    // INV-2: moveAndCollide reads the collider; keep it in sync with any
+    // position write.
+    p.getComponent<ColliderComponent>().update();
     hp.hp = hp.hpMax;
     hp.dead = false;
     hp.iframes = Config::RESPAWN_INVULN;
@@ -951,6 +1000,9 @@ void Game::restartLevel() {
     runTime = 0.f; enemiesDefeated = 0; deaths = 0;
     bestCombo = 0; coinsBanked = 0;
     shieldCharges = 0; m_shakeMag = 0.f; m_shake = 0.f;
+    speedBoostTimer = invincibleTimer = dmgBoostTimer = magnetTimer = coinMultTimer = 0.f;
+    m_deathTimer = 0.f;
+    checkpointIndex = -1;
     respawn();
     state = State::Playing;
     isPaused = false;
@@ -1059,7 +1111,12 @@ void Game::update() {
     if (state == State::Menu || state == State::Instructions) {
         handlePlayerInput();
         manager.refresh();
-        manager.update();
+        // The menu draws no world, so simulating it there only lets gravity
+        // drop the hero out of the level before the run has started.  How To
+        // Play opened mid-run still draws the world behind the panel, so that
+        // case keeps updating.
+        if (state == State::Instructions && m_returnState != State::Menu)
+            manager.update();
         return;
     }
     if (state == State::Paused || state == State::Settings ||
@@ -1165,7 +1222,9 @@ void Game::update() {
                 if (Collision::AABB(col, en->getComponent<ColliderComponent>().collider)) {
                     auto& hp = en->getComponent<HealthComponent>();
                     float dmg = pc.damage * (dmgBoostTimer > 0 ? Config::POWERUP_DMG_MULT : 1.f);
-                    bool died = hp.damage(dmg);
+                    // damage() means "the hit landed"; a kill needs hp.dead too.
+                    const bool connected = hp.damage(dmg);
+                    const bool died      = connected && hp.dead;
                     if (en->hasComponent<EnemyAIComponent>()) {
                         auto& ai = en->getComponent<EnemyAIComponent>();
                         ai.hurtT = std::max(ai.hurtT,
@@ -1252,7 +1311,7 @@ void Game::drawText(const char* fontId, const char* text, int x, int y,
                     SDL_Color c, bool centered) {
     TTF_Font* f = assets->GetFont(fontId);
     if (!f || !text || !*text) return;
-    SDL_Surface* s = TTF_RenderText_Blended(f, text, c);
+    SDL_Surface* s = TTF_RenderUTF8_Blended(f, text, c);
     if (!s) return;
     SDL_Texture* tx = SDL_CreateTextureFromSurface(renderer, s);
     if (!tx) { SDL_FreeSurface(s); return; }
@@ -1406,7 +1465,7 @@ void Game::handleMenuInput(SDL_Keycode key) {
         if (key == SDLK_UP || key == SDLK_w) menuSelection = (menuSelection + 3) % 4;
         else if (key == SDLK_DOWN || key == SDLK_s) menuSelection = (menuSelection + 1) % 4;
         else if (key == SDLK_RETURN || key == SDLK_SPACE || key == SDLK_KP_ENTER) {
-            if (menuSelection == 0) { state = State::Playing; respawn(); }
+            if (menuSelection == 0) { restartLevel(); }
             else if (menuSelection == 1) {
                 m_returnState = State::Menu;
                 instructionsScroll = 0;
@@ -1610,6 +1669,106 @@ void Game::handlePauseInput(SDL_Keycode key) {
 // ===========================================================================
 // render
 // ===========================================================================
+// ---------------------------------------------------------------------------
+// ART-13 depth helpers
+// ---------------------------------------------------------------------------
+namespace {
+float hash01(int i) {
+    Uint32 x = (Uint32)i * 0x9E3779B1u;
+    x ^= x >> 15; x *= 0x85EBCA6Bu; x ^= x >> 13; x *= 0xC2B2AE35u; x ^= x >> 16;
+    return (float)(x & 0xFFFFFF) / (float)0x1000000;
+}
+
+// 2-3 stepped light shafts per screen, anchored in the background plane.
+// TEAL (#1e6f50) at 15 % alpha, added rather than blended: a shaft is light
+// falling through the haze, so it may only ever brighten what is behind it.
+void drawLightShafts(SDL_Renderer* r, const SDL_Rect& cam) {
+    const float par = Depth::BG_TILES.parallax;
+    const int spacing = 480, step = 8, slant = 4;
+    const float origin = cam.x * par;
+    const int first = (int)std::floor(origin / spacing) - 1;
+    const int H = Config::WINDOW_HEIGHT;
+    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_ADD);
+    SDL_SetRenderDrawColor(r, 0x1e, 0x6f, 0x50, 38);
+    for (int k = first; k <= first + 5; ++k) {
+        if (hash01(k * 31 + 7) < 0.25f) continue;          // leave some gaps
+        const float x0 = k * spacing + hash01(k * 17 + 3) * 200.f - origin;
+        const int w = 56 + (int)(hash01(k * 13 + 1) * 40.f);
+        const int len = (int)(H * (0.55f + 0.2f * hash01(k * 11 + 5)));
+        for (int y = 0; y < len; y += step) {
+            SDL_Rect q{ (int)x0 + (y / step) * slant, y, w, step };
+            SDL_RenderFillRect(r, &q);
+        }
+    }
+    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_NONE);
+}
+
+// Foreground silhouette plane (Depth::FG_SIL): leaf clusters hanging into the
+// top of the frame and mounds rising from the bottom, 1.10 parallax sideways.
+// Pinned to the screen vertically so a jump can never pull them over the play
+// line: the top clusters end above y = 160, the mounds start below y = 750.
+void drawForegroundSilhouettes(SDL_Renderer* r, const SDL_Rect& cam) {
+    SDL_Texture* tex = Game::assets->GetTexture("terrain2_sil");
+    if (!tex) return;
+    const int T = Config::TILE_SIZE, C = Level::TERRAIN_V2_COLS;
+    const float origin = cam.x * Depth::FG_SIL.parallax;
+    const int spacing = 560;
+    auto cell = [&](int id, int x, int y, SDL_RendererFlip flip) {
+        SDL_Rect src{ (id % C) * T, (id / C) * T, T, T };
+        SDL_Rect dst{ x, y, T, T };
+        SDL_RenderCopyEx(r, tex, &src, &dst, 0.0, nullptr, flip);
+    };
+    const int first = (int)std::floor(origin / spacing) - 1;
+    for (int k = first; k <= first + 4; ++k) {
+        const int x0 = (int)(k * spacing + hash01(k * 7 + 1) * 240.f - origin);
+        const int n = 2 + (int)(hash01(k * 5 + 2) * 2.f);       // 2-3 cells
+        if (hash01(k * 3 + 9) < 0.6f) {                         // hanging cluster
+            for (int i = 0; i < n; ++i) {
+                const int x = x0 + i * T;
+                const int drop = (i == 0 || i == n - 1) ? 0 : 22;   // fuller middle
+                cell(Level::SIL_CANOPY[(k + i) % 3], x, -40 + drop, SDL_FLIP_NONE);
+                cell(Level::SIL_CANOPY_EDGE[(k + i) % 3], x, 24 + drop, SDL_FLIP_NONE);
+                if (hash01(k * 19 + i) < 0.5f)
+                    cell(Level::SIL_ROOT_END[(k + i) & 1], x, 70 + drop, SDL_FLIP_NONE);
+            }
+        } else {                                                // ground mound
+            for (int i = 0; i < n; ++i)
+            {
+                const int lift = (i == 0 || i == n - 1) ? 0 : 20;
+                cell(Level::SIL_CANOPY_EDGE[(k + i) % 3], x0 + i * T,
+                     Config::WINDOW_HEIGHT - 84 - lift, SDL_FLIP_VERTICAL);
+                cell(Level::SIL_CANOPY[(k + i) % 3], x0 + i * T,
+                     Config::WINDOW_HEIGHT - 20 - lift, SDL_FLIP_NONE);
+            }
+        }
+    }
+}
+// ART-14: 16x2 px RED fill in a 1 px INK frame, 2 px above the head (the
+// collider top -- INV-8 makes that the visual top).  Only once damaged, never
+// at full HP, and never for the boss, which keeps its own gated bar (FIX-04).
+void drawEnemyHpBars(SDL_Renderer* r, const SDL_Rect& cam,
+                     const std::vector<Entity*>& enemies) {
+    const int W = 16, H = 2;
+    for (auto* e : enemies) {
+        if (!e->isActive() || !e->hasComponent<HealthComponent>() ||
+            !e->hasComponent<ColliderComponent>()) continue;
+        const auto& hp = e->getComponent<HealthComponent>();
+        if (hp.boss || hp.dead || hp.hpMax <= 0.f || hp.hp >= hp.hpMax) continue;
+        const SDL_Rect& c = e->getComponent<ColliderComponent>().collider;
+        const int x = c.x + c.w / 2 - W / 2 - 1 - cam.x;
+        const int y = c.y - 2 - (H + 2) - cam.y;
+        SDL_SetRenderDrawColor(r, 0x1c, 0x12, 0x1c, 255);          // INK
+        SDL_Rect frame{ x, y, W + 2, H + 2 };
+        SDL_RenderFillRect(r, &frame);
+        int fill = (int)std::lround(W * hp.hp / hp.hpMax);
+        fill = std::max(1, std::min(W, fill));
+        SDL_SetRenderDrawColor(r, 0xc4, 0x24, 0x30, 255);          // RED
+        SDL_Rect bar{ x + 1, y + 1, fill, H };
+        SDL_RenderFillRect(r, &bar);
+    }
+}
+} // namespace
+
 void Game::drawWorld() {
     // Backdrop — cached sky gradient, parallax ridges and drifting clouds.
     // Replaces the old per-pixel loop (850 draw calls a frame) and actually
@@ -1627,21 +1786,38 @@ void Game::drawWorld() {
     // nothing but the parallax backdrop. The per-tile culling below already
     // does the job the clip rect was meant to do.
     int margin = Config::TILE_SIZE;
+    // ART-13: tiles draw in depth passes -- background (< 0.5), then the light
+    // shafts, then mid (0.5 .. 1), then terrain and decor -- so the shafts can
+    // sit inside the background plane only.
+    auto drawTiles = [&](float minPar, float maxPar) {
     for (auto* t : manager.getGroup(groupMap)) {
         if (!t->isActive()) continue;
         auto& tc = t->getComponent<TileComponent>();
+        if (tc.parallax < minPar || tc.parallax >= maxPar) continue;
         // Cull in WORLD space.  TileComponent::update() rewrites destRect into
         // SCREEN space every frame (position - camera), so culling on destRect
         // compared screen pixels against world pixels and culled the entire
         // world the moment the camera drifted more than one screen from the
         // origin — the map vanished and only the backdrop was left.
-        const float wx = tc.position.x, wy = tc.position.y;
+        //
+        // R-16: a parallax layer is DRAWN at position - camera * parallax, so
+        // it has to be culled there too.  Culling the 0.30 background by its
+        // world position kept only tiles that draw off screen and dropped
+        // every one that should have been visible.  For parallax 1 this is
+        // exactly the old world-space test.
+        const float wx = tc.position.x - camera.x * (tc.parallax - 1.f);
+        const float wy = tc.position.y - camera.y * (tc.parallax - 1.f);
         if (wx + tc.destRect.w < camera.x - margin) continue;
         if (wx                 > camera.x + camera.w + margin) continue;
         if (wy + tc.destRect.h < camera.y - margin) continue;
         if (wy                 > camera.y + camera.h + margin) continue;
         t->draw();
     }
+    };
+    drawTiles(0.f, 0.5f);
+    drawLightShafts(renderer, camera);
+    drawTiles(0.5f, 1.f);
+    drawTiles(1.f, 99.f);
     // animated water sits over the water tiles, under everything else
     Parallax::drawWater(renderer, Config::WINDOW_WIDTH,
                         Config::WINDOW_HEIGHT, camera, gameTime);
@@ -1685,6 +1861,11 @@ void Game::drawWorld() {
     // it veils the terrain, or the foreground pops out of the weather.
     Atmosphere::drawFog(renderer, Config::WINDOW_WIDTH,
                         Config::WINDOW_HEIGHT, camera, gameTime);
+    // ART-14: a small bar over any hurt enemy.  After the fog on purpose: it
+    // is a readability device (reference 2), so the weather must not veil it.
+    drawEnemyHpBars(renderer, camera, manager.getGroup(groupEnemies));
+    // Nearest plane, in front of the weather: dark out-of-focus leaves.
+    drawForegroundSilhouettes(renderer, camera);
 }
 
 // Floating damage numbers.  Drawn in world space so they stay pinned to the
@@ -1829,7 +2010,7 @@ void Game::drawHUD() {
     // score
     if (auto* f = assets->GetFont("title")) {
         SDL_Color y{ 255, 230, 90, 255 };
-        SDL_Surface* s = TTF_RenderText_Blended(f, std::to_string(gameScore).c_str(), y);
+        SDL_Surface* s = TTF_RenderUTF8_Blended(f, std::to_string(gameScore).c_str(), y);
         if (s) {
             SDL_Texture* t = SDL_CreateTextureFromSurface(renderer, s);
             SDL_Rect r{ Config::WINDOW_WIDTH/2 - s->w/2, 14, s->w, s->h };
@@ -1842,7 +2023,7 @@ void Game::drawHUD() {
         std::string cs = "Coins " + std::to_string(coinsCollected)
                        + "/" + std::to_string(totalCoins);
         SDL_Color y{ 255, 230, 90, 255 };
-        SDL_Surface* s = TTF_RenderText_Blended(f, cs.c_str(), y);
+        SDL_Surface* s = TTF_RenderUTF8_Blended(f, cs.c_str(), y);
         if (s) {
             SDL_Texture* t = SDL_CreateTextureFromSurface(renderer, s);
             SDL_Rect r{ Config::WINDOW_WIDTH/2 - s->w/2, 50, s->w, s->h };
@@ -1855,7 +2036,7 @@ void Game::drawHUD() {
         if (auto* f = assets->GetFont("body")) {
             std::string ks = "Keys: " + std::to_string(keys);
             SDL_Color c{ 80, 220, 255, 255 };
-            SDL_Surface* s = TTF_RenderText_Blended(f, ks.c_str(), c);
+            SDL_Surface* s = TTF_RenderUTF8_Blended(f, ks.c_str(), c);
             if (s) {
                 SDL_Texture* t = SDL_CreateTextureFromSurface(renderer, s);
                 SDL_Rect r{ Config::WINDOW_WIDTH/2 - 80, 70, s->w, s->h };
@@ -1876,7 +2057,7 @@ void Game::drawHUD() {
                            "[J/Z] melee  [K/X] bolt  "
                            "[P/ESC] pause  [O] settings  [I] stats  [H] help  [M] mute";
         SDL_Color w{ 200, 200, 200, 200 };
-        SDL_Surface* s = TTF_RenderText_Blended(f, hint.c_str(), w);
+        SDL_Surface* s = TTF_RenderUTF8_Blended(f, hint.c_str(), w);
         if (s) {
             SDL_Texture* t = SDL_CreateTextureFromSurface(renderer, s);
             SDL_Rect r{ 12, Config::WINDOW_HEIGHT - 28, s->w, s->h };
@@ -1889,7 +2070,7 @@ void Game::drawHUD() {
     if (auto* f = assets->GetFont("body")) {
         int y = 124;
         auto drawBuff = [&](const std::string& txt, SDL_Color c) {
-            SDL_Surface* s = TTF_RenderText_Blended(f, txt.c_str(), c);
+            SDL_Surface* s = TTF_RenderUTF8_Blended(f, txt.c_str(), c);
             if (s) {
                 SDL_Texture* t = SDL_CreateTextureFromSurface(renderer, s);
                 SDL_Rect r{ Config::WINDOW_WIDTH - 200, y, s->w, s->h };
@@ -1916,6 +2097,15 @@ void Game::drawHUD() {
         if (e->tag != "boss" || !e->isActive()) continue;
         auto& hp = e->getComponent<HealthComponent>();
         if (hp.dead) continue;
+        // D6: gate the bar on engagement.  It used to be drawn from the first
+        // frame of the level, which spoils the boss and clutters the screen.
+        {
+            auto& btr = e->getComponent<TransformComponent>();
+            auto& htr = p.getComponent<TransformComponent>();
+            float bdx = std::fabs((btr.position.x + btr.width  * 0.5f) -
+                                  (htr.position.x + htr.width  * 0.5f));
+            if (bdx >= Config::BOSS_BAR_RANGE && hp.hp >= hp.hpMax) continue;
+        }
         int bw2 = 600, bh2 = 16;
         int bx2 = Config::WINDOW_WIDTH/2 - bw2/2;
         int by2 = Config::WINDOW_HEIGHT - 80;
@@ -1931,7 +2121,7 @@ void Game::drawHUD() {
         SDL_RenderFillRect(renderer, &bbf);
         if (auto* f = assets->GetFont("body")) {
             SDL_Color c{ 255, 230, 90, 255 };
-            SDL_Surface* s = TTF_RenderText_Blended(f, "THE OVERLORD", c);
+            SDL_Surface* s = TTF_RenderUTF8_Blended(f, "THE OVERLORD", c);
             if (s) {
                 SDL_Texture* t = SDL_CreateTextureFromSurface(renderer, s);
                 SDL_Rect r{ bx2, by2 - 22, s->w, s->h };
@@ -2062,7 +2252,7 @@ void Game::drawMenu() {
     // ---- Title with drop-shadow + glow pulse ----
     if (auto* fBig = assets->GetFont("big")) {
         SDL_Color cWhite{ 255, 255, 255, 255 };
-        SDL_Surface* sTitle = TTF_RenderText_Blended(fBig, "DUNGEON  RUSH  2", cWhite);
+        SDL_Surface* sTitle = TTF_RenderUTF8_Blended(fBig, "DUNGEON  RUSH  2", cWhite);
         if (sTitle) {
             SDL_Texture* txTitle = SDL_CreateTextureFromSurface(renderer, sTitle);
             if (txTitle) {
@@ -2200,18 +2390,20 @@ void Game::drawMenu() {
     {
         const int footY = 570;
         struct Hint { const char* key; const char* desc; };
+        // Only keys the menu actually handles.  "O Settings" and "I Stats"
+        // were advertised here but handleMenuInput ignores both, so the bar
+        // was teaching dead keys (R-14).
         const Hint hints[] = {
             { "W / S", "Select" },
             { "ENTER", "Confirm" },
-            { "O", "Settings" },
-            { "I", "Stats" },
             { "ESC", "Quit" },
         };
+        const int nHints = (int)(sizeof(hints) / sizeof(hints[0]));
 
         TTF_Font* fSmall = assets->GetFont("small");
         int totalW = 0;
-        int kw[5]{}, dw[5]{};
-        for (int i = 0; i < 5; i++) {
+        int kw[3]{}, dw[3]{};
+        for (int i = 0; i < nHints; i++) {
             int th = 0;
             if (fSmall) {
                 TTF_SizeText(fSmall, hints[i].key, &kw[i], &th);
@@ -2223,7 +2415,7 @@ void Game::drawMenu() {
         totalW -= 24;
 
         int curX = W / 2 - totalW / 2;
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < nHints; i++) {
             int outKw = 0;
             drawKeycap(hints[i].key, curX, footY, outKw);
             curX += outKw + 6;
@@ -2345,7 +2537,15 @@ void Game::drawInstructionsPanel(bool overWorld) {
     const int W = Config::WINDOW_WIDTH, H = Config::WINDOW_HEIGHT;
     const int panelX = 60, panelY = 30;
     const int panelW = W - 120, panelH = H - 60;
-    const int headH = 62;
+    // Header height is derived from the two fonts' line skips instead of a
+    // hard-coded 62: the 32 px title alone needs ~42 px, so the old value put
+    // the subtitle on top of it (R-13).
+    TTF_Font* fTitle = assets->GetFont("title");
+    TTF_Font* fSmallH = assets->GetFont("small");
+    const int titleSkip = fTitle  ? TTF_FontLineSkip(fTitle)  : 42;
+    const int smallSkip = fSmallH ? TTF_FontLineSkip(fSmallH) : 17;
+    const int headPad   = 10;
+    const int headH = headPad + titleSkip + smallSkip + 10;
     const int footH = 34;
 
     SDL_Rect panel{ panelX, panelY, panelW, panelH };
@@ -2500,8 +2700,10 @@ void Game::drawInstructionsPanel(bool overWorld) {
     SDL_RenderDrawLine(renderer, panelX, panelY + headH, panelX + panelW, panelY + headH);
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 
-    drawText("title", "HOW TO PLAY", panelX + 24, panelY + 22, SDL_Color{ 255, 255, 255, 255 }, false);
-    drawText("small", "Field Guide & Combat Manual  ·  DungeonRush 2", panelX + 26, panelY + 44,
+    drawText("title", "HOW TO PLAY", panelX + 24, panelY + headPad,
+             SDL_Color{ 255, 255, 255, 255 }, false);
+    drawText("small", "Field Guide & Combat Manual  ·  DungeonRush 2",
+             panelX + 26, panelY + headPad + titleSkip,
              SDL_Color{ 130, 180, 220, 220 }, false);
 
     int kw1 = 0, kw2 = 0;
@@ -2561,14 +2763,22 @@ void Game::drawPauseOverlay() {
     SDL_SetRenderDrawColor(renderer, 120, 200, 255, 220);
     SDL_RenderDrawRect(renderer, &panel);
 
-    drawText("big",   "PAUSED", W / 2, py + 46, SDL_Color{255,255,255,255}, true);
+    // Title and hint are positioned from the fonts' line skips.  The old
+    // py+46 / py+84 pair overlapped by a few pixels on the "PAUSED" descender.
+    TTF_Font* fBigP   = assets->GetFont("big");
+    TTF_Font* fSmallP = assets->GetFont("small");
+    const int bigSkip   = fBigP   ? TTF_FontLineSkip(fBigP)   : 73;
+    const int smallSkip = fSmallP ? TTF_FontLineSkip(fSmallP) : 17;
+    const int titleCy = py + 20 + bigSkip / 2;
+    const int subCy   = py + 20 + bigSkip + 6 + smallSkip / 2;
+    drawText("big",   "PAUSED", W / 2, titleCy, SDL_Color{255,255,255,255}, true);
     drawText("small", "W / S to choose     ENTER to confirm     P or ESC to resume",
-             W / 2, py + 84, SDL_Color{150,160,185,255}, true);
+             W / 2, subCy, SDL_Color{150,160,185,255}, true);
 
     const char* labels[5] = { "Resume", "Restart run", "Settings",
                               "Run stats", "Quit to menu" };
     const int rowH = 52;
-    const int top  = py + 120;
+    const int top  = py + 130;
     for (int i = 0; i < 5; i++) {
         const int y = top + i * rowH;
         const bool sel = (pauseSelection == i);

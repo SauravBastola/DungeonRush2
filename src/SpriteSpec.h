@@ -60,37 +60,44 @@ namespace Sprites {
     // figure, so the body overhangs the 32px collider by a few pixels — which
     // is what lets the sword-swing frames read at all.
     inline constexpr Spec PLAYER{
-        "player", 50, 37, 50.f / 37.f, 32, 50, Anchor::Feet, true };
+        "player", 48, 56, 1.00f, 32, 50, Anchor::Feet, true };
+    // ART-12: the sheet is now generated at 1:1 by tools/build_art.py hero()
+    // -- 7 x 8 cells of 48x56, same row meaning as above -- so the 50/37
+    // (1.35) exception is retired.  Collider unchanged: no physics change.
 
     // ---- enemies ----------------------------------------------------------
+    // ART-11: every enemy sheet is generated at 1:1 by tools/build_art.py
+    // (enemy_<kind>.png), so every scale is 1.0.  The comments below that
+    // still describe the old sheets are superseded by the generator docs.
     // skeleton_sprites.png 1200x900 -> 6 rows x 8 cols of 150x150
     //   rows: idle, walk, attack, hit, die, shoot
     inline constexpr Spec SKELETON{
-        "skeleton", 150, 150, 0.40f, 36, 50, Anchor::Feet, true };
+        "skeleton", 40, 56, 1.00f, 36, 50, Anchor::Feet, true };
 
-    // slime.png 128x32 -> 1 row x 4 cols of 32x32
+    // enemy_slime.png 128x96 -> 3 rows x 4 cols of 32x32 (tools/build_art.py
+    // slime(), ART-11): idle, hop, die.  1:1, figure 26x20 on the collider.
     inline constexpr Spec SLIME{
-        "slime", 32, 32, 1.00f, 28, 26, Anchor::Feet, true };
+        "slime", 32, 32, 1.00f, 26, 20, Anchor::Feet, true };
 
     // enemy_bat.png 64x48 -> 1 row x 2 cols of 32x48
     inline constexpr Spec BAT{
-        "bat", 32, 48, 1.00f, 28, 30, Anchor::Centre, true };
+        "bat", 32, 32, 1.00f, 28, 30, Anchor::Feet, true };
 
     // mage.png 128x40 -> 1 row x 4 cols of 32x40
     inline constexpr Spec MAGE{
-        "mage", 32, 40, 1.50f, 34, 50, Anchor::Feet, true };
+        "mage", 40, 56, 1.00f, 34, 50, Anchor::Feet, true };
 
     // archer.png -> rows: idle, shoot, die (generated art)
     inline constexpr Spec ARCHER{
-        "archer", 48, 48, 1.15f, 34, 52, Anchor::Feet, true };
+        "archer", 40, 56, 1.00f, 34, 52, Anchor::Feet, true };
 
     // bomber.png -> rows: walk, fuse, explode (generated art)
     inline constexpr Spec BOMBER{
-        "bomber", 32, 32, 1.10f, 26, 30, Anchor::Feet, true };
+        "bomber", 32, 32, 1.00f, 26, 30, Anchor::Feet, true };
 
     // villain_boss.png 150x150 -> single cell
     inline constexpr Spec BOSS{
-        "boss", 150, 150, 0.55f, 64, 74, Anchor::Feet, true };
+        "boss", 96, 104, 1.00f, 88, 100, Anchor::Feet, true };
 
     // ---- pickups ----------------------------------------------------------
     // coins.png 488x62 -> 1 row x 8 cols of 61x62
