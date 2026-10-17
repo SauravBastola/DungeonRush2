@@ -1737,6 +1737,30 @@ void drawForegroundSilhouettes(SDL_Renderer* r, const SDL_Rect& cam) {
         }
     }
 }
+// ART-14: 16x2 px RED fill in a 1 px INK frame, 2 px above the head (the
+// collider top -- INV-8 makes that the visual top).  Only once damaged, never
+// at full HP, and never for the boss, which keeps its own gated bar (FIX-04).
+void drawEnemyHpBars(SDL_Renderer* r, const SDL_Rect& cam,
+                     const std::vector<Entity*>& enemies) {
+    const int W = 16, H = 2;
+    for (auto* e : enemies) {
+        if (!e->isActive() || !e->hasComponent<HealthComponent>() ||
+            !e->hasComponent<ColliderComponent>()) continue;
+        const auto& hp = e->getComponent<HealthComponent>();
+        if (hp.boss || hp.dead || hp.hpMax <= 0.f || hp.hp >= hp.hpMax) continue;
+        const SDL_Rect& c = e->getComponent<ColliderComponent>().collider;
+        const int x = c.x + c.w / 2 - W / 2 - 1 - cam.x;
+        const int y = c.y - 2 - (H + 2) - cam.y;
+        SDL_SetRenderDrawColor(r, 0x1c, 0x12, 0x1c, 255);          // INK
+        SDL_Rect frame{ x, y, W + 2, H + 2 };
+        SDL_RenderFillRect(r, &frame);
+        int fill = (int)std::lround(W * hp.hp / hp.hpMax);
+        fill = std::max(1, std::min(W, fill));
+        SDL_SetRenderDrawColor(r, 0xc4, 0x24, 0x30, 255);          // RED
+        SDL_Rect bar{ x + 1, y + 1, fill, H };
+        SDL_RenderFillRect(r, &bar);
+    }
+}
 } // namespace
 
 void Game::drawWorld() {
@@ -1831,6 +1855,9 @@ void Game::drawWorld() {
     // it veils the terrain, or the foreground pops out of the weather.
     Atmosphere::drawFog(renderer, Config::WINDOW_WIDTH,
                         Config::WINDOW_HEIGHT, camera, gameTime);
+    // ART-14: a small bar over any hurt enemy.  After the fog on purpose: it
+    // is a readability device (reference 2), so the weather must not veil it.
+    drawEnemyHpBars(renderer, camera, manager.getGroup(groupEnemies));
     // Nearest plane, in front of the weather: dark out-of-focus leaves.
     drawForegroundSilhouettes(renderer, camera);
 }
