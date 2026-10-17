@@ -67,6 +67,13 @@ public:
     bool  dashActive = false;
     float dashTimer = 0.f;
     float dashCooldown = 0.f;
+    // Batch C: slide and wall movement
+    float slideT = 0.f, slideCooldown = 0.f;
+    int   slideDir = 1;
+    bool  prevDownKey = false;
+    float wallJumpLockT = 0.f;
+    bool  wallSliding = false;
+    float wallDustT = 0.f;
     float dashTrailTimer = 0.f;     // paces the dash afterimages
     float speedBoostTimer = 0.f;
     float invincibleTimer = 0.f;
@@ -146,6 +153,9 @@ private:
     void updateHeroState();
     void checkLevelState();
     void respawn();
+    int  wallContact() const;          // -1 wall on the left, +1 right, 0 none
+    void setSlideHitbox(bool low);
+    bool fullHeightFits() const;
 public:
     // Batch B: stages (public: the harness and a future level select use it)
     void loadStage(int n);

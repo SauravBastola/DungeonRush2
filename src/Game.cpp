@@ -370,6 +370,7 @@ void Game::spawnPlayer() {
     sp.addAnim("apex",   Animation(5, 1, 100, 3));     // col 3: top of the arc
     sp.addAnim("fall",   Animation(5, 2, 110, 2));     // cols 2-3: descent
     sp.addAnim("leap",   Animation(5, 1, 100, 1));     // dash pose: stretched
+    sp.addAnim("slide",  Animation(4, 1, 100, 1));     // Batch C: thrust crouch, low
     // The three distinct sword attacks the sheet provides.
     sp.addAnim("attackPower", Animation(2, 5, 62));    // row 2, the big arc
     sp.addAnim("attackSlash", Animation(3, 6, 52));    // row 3, horizontal
@@ -627,7 +628,42 @@ void Game::handlePlayerInput() {
     if (left)  target = -Config::PLAYER_SPEED * (speedBoostTimer > 0 ? Config::POWERUP_SPEED_MULT : 1.f);
     if (right) target =  Config::PLAYER_SPEED * (speedBoostTimer > 0 ? Config::POWERUP_SPEED_MULT : 1.f);
 
-    if (dashActive) {
+    // ---- Batch C: slide ----
+    const bool downKey = keys[SDL_SCANCODE_S] || keys[SDL_SCANCODE_DOWN];
+    if (slideCooldown > 0) slideCooldown -= lastFrameTime;
+    if (downKey && !prevDownKey && isGrounded && !dashActive && slideT <= 0.f &&
+        slideCooldown <= 0.f && (left || right || std::fabs(pTr.velocity.x) > 60.f)) {
+        slideDir = left ? -1 : right ? 1 : (pTr.velocity.x < 0 ? -1 : 1);
+        slideT = Config::SLIDE_TIME;
+        setSlideHitbox(true);
+        // Damage::applyToPlayer gates on HealthComponent::iframes, not on
+        // Game::iframeTimer - set the one that actually protects (both kept
+        // in step, as respawn() does).
+        auto& hpc = manager.getGroup(groupPlayers)[0]->getComponent<HealthComponent>();
+        hpc.iframes = std::max(hpc.iframes, Config::SLIDE_TIME);
+        iframeTimer = std::max(iframeTimer, Config::SLIDE_TIME);
+        if (auto* s = assets->GetSound("dash")) Mix_PlayChannel(-1, s, 0);
+    }
+    prevDownKey = downKey;
+    if (slideT > 0.f) {
+        slideT -= lastFrameTime;
+        pTr.velocity.x = slideDir * Config::SLIDE_SPEED;
+        facingRight = slideDir > 0; pTr.facingRight = facingRight;
+        {
+            auto& hpc = manager.getGroup(groupPlayers)[0]->getComponent<HealthComponent>();
+            hpc.iframes = std::max(hpc.iframes, 0.05f);   // covers a ceiling-extended slide
+        }
+        iframeTimer = std::max(iframeTimer, 0.05f);
+        if (slideT <= 0.f) {
+            if (fullHeightFits()) { setSlideHitbox(false); slideCooldown = Config::SLIDE_COOLDOWN; }
+            else slideT = 0.05f;           // under a ceiling: keep sliding until there is room
+        }
+    }
+    if (wallJumpLockT > 0) wallJumpLockT -= lastFrameTime;
+
+    if (slideT > 0.f || wallJumpLockT > 0.f) {
+        // slide owns the horizontal speed; a fresh wall-jump keeps its kick
+    } else if (dashActive) {
         // velocity already set by startDash
     } else if (target != 0) {
         float accel = Config::PLAYER_ACCEL * lastFrameTime;
@@ -658,6 +694,21 @@ void Game::handlePlayerInput() {
     // W, SPACE *and* UP as jump keys, so jumping with the arrow key was
     // never cut — the hero jumped ~45% higher on arrows than on WASD.  All
     // three keys are checked now, so both layouts jump identically.
+    // ---- Batch C: wall-slide - airborne, falling, pushing into a wall ----
+    wallSliding = false;
+    if (!isGrounded && pTr.velocity.y > 0.f && slideT <= 0.f) {
+        const int w = wallContact();
+        if (w != 0 && ((w > 0 && right) || (w < 0 && left))) {
+            wallSliding = true;
+            pTr.velocity.y = std::min(pTr.velocity.y, Config::WALL_SLIDE_SPEED);
+            jumpsRemaining = std::max(jumpsRemaining, 1);   // a wall gives the jump back
+            if ((wallDustT -= lastFrameTime) <= 0.f) {
+                wallDustT = 0.08f;
+                Particles::emitDust(pTr.position.x + (w > 0 ? Config::PLAYER_W : 0),
+                                    pTr.position.y + 20, 190, 190, 200);
+            }
+        }
+    }
     const bool jumpHeld = keys[SDL_SCANCODE_W] || keys[SDL_SCANCODE_SPACE]
                        || keys[SDL_SCANCODE_UP];
     if (!jumpHeld && pTr.velocity.y < Config::PLAYER_JUMP_VEL * 0.55f) {
@@ -863,6 +914,7 @@ void Game::updatePlayerAnimation() {
     const auto& hp = p.getComponent<HealthComponent>();
     if (hp.dead)            { sp.Play("die");  return; }
     if (dashActive)         { sp.Play("leap"); return; }
+    if (slideT > 0.f)       { sp.Play("slide"); return; }      // Batch C
     if (diving)             { sp.Play("attackThrust"); return; }
 
     if (!isGrounded) {
@@ -883,26 +935,75 @@ void Game::updatePlayerAnimation() {
     else                                sp.Play("idle");
 }
 
+// Batch C helpers -------------------------------------------------------
+// Which side the hero's collider touches a solid on (within 3 px), with real
+// vertical overlap; locked doors count, since they are solid too.
+int Game::wallContact() const {
+    // A wall is solid beside the hero from mid-body up to at least 20 px ABOVE
+    // the head, so a one-tile step (64 px, the hero is 50) is not one.
+    // Colliders are one-tile strips, so probe points rather than one rect.
+    auto& p = *manager.getGroup(groupPlayers)[0];
+    const SDL_Rect& h = p.getComponent<ColliderComponent>().collider;
+    auto solidAt = [&](int x, int y) {
+        SDL_Point pt{ x, y };
+        for (auto* c : manager.getGroup(groupColliders))
+            if (c->hasComponent<ColliderComponent>() &&
+                SDL_PointInRect(&pt, &c->getComponent<ColliderComponent>().collider)) return true;
+        for (auto* f : manager.getGroup(groupFacilities))
+            if (f->isActive() && f->tag == "door" &&
+                SDL_PointInRect(&pt, &f->getComponent<ColliderComponent>().collider)) return true;
+        return false;
+    };
+    const int top = h.y + h.h - Config::PLAYER_H;     // full-height top, even mid-slide
+    auto wallAt = [&](int x) {
+        return solidAt(x, top + Config::PLAYER_H / 2) && solidAt(x, top + 4) && solidAt(x, top - 20);
+    };
+    if (wallAt(h.x + h.w + 2)) return 1;
+    if (wallAt(h.x - 3))       return -1;
+    return 0;
+}
+
+// Slide hitbox: the lower SLIDE_H px of the normal one (feet stay put).
+void Game::setSlideHitbox(bool low) {
+    auto& p = *manager.getGroup(groupPlayers)[0];
+    auto& c = p.getComponent<ColliderComponent>();
+    c.h = low ? Config::SLIDE_H : Config::PLAYER_H;
+    c.yOffset = low ? Config::PLAYER_H - Config::SLIDE_H : 0;
+    c.update();
+}
+
+// Would the full-height hitbox fit where the hero is now?
+bool Game::fullHeightFits() const {
+    auto& p = *manager.getGroup(groupPlayers)[0];
+    auto& tr = p.getComponent<TransformComponent>();
+    SDL_Rect full{ (int)tr.position.x, (int)tr.position.y, Config::PLAYER_W, Config::PLAYER_H - 1 };
+    for (auto* c : manager.getGroup(groupColliders))
+        if (c->hasComponent<ColliderComponent>() &&
+            SDL_HasIntersection(&full, &c->getComponent<ColliderComponent>().collider)) return false;
+    return true;
+}
+
 void Game::startJump() {
     if (state != State::Playing) return;
     auto& p = *manager.getGroup(groupPlayers)[0];
     auto& tr = p.getComponent<TransformComponent>();
     auto& col = p.getComponent<ColliderComponent>();
     // wall jump check
-    bool touchingWall = false;
-    int  wallDir = 0;
-    for (auto* c : manager.getGroup(groupColliders)) {
-        if (c == &p) continue;
-        if (!c->hasComponent<ColliderComponent>()) continue;
-        auto& b = c->getComponent<ColliderComponent>().collider;
-        bool vo = col.collider.y + col.collider.h > b.y && col.collider.y < b.y + b.h;
-        if (!vo) continue;
-        if (std::abs((col.collider.x + col.collider.w) - b.x) < 4) { touchingWall = true; wallDir =  1; break; }
-        if (std::abs((b.x + b.w) - col.collider.x) < 4)             { touchingWall = true; wallDir = -1; break; }
+    (void)col;
+    const int wallDir = wallContact();
+    const bool touchingWall = wallDir != 0;
+    if (slideT > 0.f) {                       // Batch C: jump out of a slide
+        if (!fullHeightFits()) return;        // no room to stand: keep sliding
+        slideT = 0.f; setSlideHitbox(false); slideCooldown = Config::SLIDE_COOLDOWN;
     }
-    if (touchingWall && !isGrounded) {
+    // Batch C: a wall-jump belongs to clinging - while wall-sliding, or on the
+    // way down.  Rising against a wall (e.g. hopping up a one-tile step) keeps
+    // the normal double jump instead of kicking the hero backwards.
+    if (touchingWall && !isGrounded && (wallSliding || tr.velocity.y >= 0.f)) {
         tr.velocity.y = Config::WALL_JUMP_VY;
         tr.velocity.x = -wallDir * Config::WALL_JUMP_VX;
+        wallJumpLockT = Config::WALL_JUMP_LOCK;
+        facingRight = wallDir < 0; tr.facingRight = facingRight;
         jumpsRemaining = Config::MAX_JUMPS - 1;
         isGrounded = false;
         if (auto* s = assets->GetSound("jump")) Mix_PlayChannel(-1, s, 0);
@@ -998,6 +1099,8 @@ void Game::respawn() {
     hp.dead = false;
     hp.iframes = Config::RESPAWN_INVULN;
     dashActive = false;
+    slideT = 0.f; slideCooldown = 0.f; wallJumpLockT = 0.f; wallSliding = false;
+    setSlideHitbox(false);                 // Batch C: never respawn crouched
     iframeTimer = Config::RESPAWN_INVULN;
     // A death should not leave the hero mid-swing or holding a stale combo.
     attackTimer = 0.f; attackCooldown = 0.f;
@@ -2548,6 +2651,8 @@ namespace {
         { "S / Down",       "Look Down / Dive", "Hold Down in air while pressing J to trigger a devastating Dive Slash." },
         { "Shift / L",      "Invincible Dash",  "Pass through enemies safely! 0.7s ground cooldown; 1 air dash per jump." },
         { "Wall Jump",      "Wall Rebound",     "Touch any wall while airborne and press Jump to rebound upward." },
+        { "Into a wall",    "Wall Slide",       "Hold toward a wall while falling to slide down it slowly; jump to kick off." },
+        { "S / Down",       "Slide",            "On the ground while moving: a fast low slide that dodges shots overhead." },
     };
 
     static const HelpItem ITEMS_COMBAT[] = {

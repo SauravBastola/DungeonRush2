@@ -64,6 +64,14 @@ namespace Config {
     constexpr float WALL_SLIDE_SPEED   = 90.f;
     constexpr float WALL_JUMP_VY       = -820.f;    // slightly short of a full jump
     constexpr float WALL_JUMP_VX       = 360.f;
+    // Batch C: horizontal input is ignored this long after a wall-jump, so
+    // holding toward the wall cannot pull the hero straight back onto it.
+    constexpr float WALL_JUMP_LOCK     = 0.16f;
+    // Batch C: slide (S / Down on the ground while moving)
+    constexpr float SLIDE_SPEED        = 560.f;
+    constexpr float SLIDE_TIME         = 0.32f;
+    constexpr float SLIDE_COOLDOWN     = 0.45f;
+    constexpr int   SLIDE_H            = 26;       // hitbox height while sliding
 
     // ---- dash ----
     constexpr float DASH_SPEED         = 720.f;
