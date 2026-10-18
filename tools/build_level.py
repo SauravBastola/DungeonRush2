@@ -375,7 +375,11 @@ def get_zone(col: int) -> str:
     return ZONES[-1][0]
 
 
-DECOR_KEEP = {21, 22, 23, 31, 32}   # rocks, crystal + branch, small trees
+# Batch I: none.  Old cells 21-23 are little atlases of 32 px items and 31-32
+# are only the crowns of two-cell trees; placed as whole tiles they left
+# stones floating above boulders and trunkless tree tops.  Their items are
+# props now (tools/build_props.py cuts them out), so no old decor is kept.
+DECOR_KEEP: set = set()
 SCENERY_DROP = {"bush", "boulder_teal", "boulder_deep"}
 
 
@@ -1876,6 +1880,7 @@ def place_props(L: Level):
         return g[c]
 
     props: Dict[Tuple[int, int], int] = {}
+    cells_solid = set(terrain_cells(L).keys())      # Batch I: for two-cell trees
     col, last_zone = 1, None
     while col < L.width - 1:
         zone = get_zone(col)
@@ -1890,7 +1895,8 @@ def place_props(L: Level):
                     break
         last_zone = zone
         if _h(col * 97 + 13) < 0.85:                       # start a cluster
-            length = 3 + int(_h(col * 89 + 5) * 3)        # 3..5 columns
+            length = 3 + int(_h(col * 89 + 5) * 4)        # 3..6 columns (Batch I: the
+                                                           # old decor no longer fills in)
             for c in range(col, min(col + length, L.width - 1)):
                 r = surface(c)
                 if r is None or c in blocked_cols or (c, r) in busy or (c, r) in props:
@@ -1906,12 +1912,21 @@ def place_props(L: Level):
                     if pick < 0:
                         break
                 step = surface(c - 1) != r or surface(c + 1) != r
-                if step and name in BP.SOLID_LOOKING:
+                if step and (name in BP.SOLID_LOOKING or name in BP.TALL):
                     name = "ROCKS"
+                if name in BP.TALL:
+                    # Batch I: a two-cell tree needs the cell above free air too
+                    up = (c, r - 1)
+                    if r - 1 >= 0 and up not in cells_solid and up not in coins and up not in props \
+                            and up not in busy and (c, r) not in coins:
+                        props[(c, r)] = BP.PROP[name + "_BOT"]
+                        props[up] = BP.PROP[name + "_TOP"]
+                        continue
+                    name = "BUSH"
                 if (c, r) in coins and BP.PROP[name] not in low:
                     name = "GRASS_TALL" if zone != "sunken" else "FERN"
                 props[(c, r)] = BP.PROP[name]
-            col += length + 1 + int(_h(col * 71 + 3) * 2)  # gap 1..2
+            col += length + 1                              # gap 1 (Batch I: was 1..2)
         else:
             col += 1
     # side props beside the existing decor: same cell, one quarter of it
@@ -2412,7 +2427,43 @@ def report_v2(L: Level) -> int:
     if len(bg) < 8 or share > 40.0:
         print("*** background layer breaks ART_STYLE_V2 6.6 (>= 8 ids, <= 40 %) ***")
         return 1
+    # Batch I: nothing may float - read back what was written for every stage
+    if not check_props_grounded(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                             "assets", "tileset")):
+        return 1
     return 0
+
+
+def check_props_grounded(tileset: str) -> bool:
+    """Every standing prop has terrain under it and every tree crown sits on
+    its own trunk, in every stage's written maps.  (Old decor cells once put
+    stones a tile above the ground; this keeps that from coming back.)"""
+    def load(path):
+        with open(path) as f:
+            return [[int(v) for v in line.strip().split(",") if v.strip() != ""] for line in f if line.strip()]
+    P = BP.PROP
+    hang = {P["HANG_VINES"], P["HANG_ROOTS"]}
+    tops = {P[n + "_TOP"]: P[n + "_BOT"] for n in BP.TALL}
+    ok, total = True, 0
+    for d in ("", "stage2", "stage3"):
+        base = os.path.join(tileset, d)
+        props = load(os.path.join(base, "PropsLayer.map"))
+        fg = load(os.path.join(base, "ForegroundLayer.map"))
+        for r, row in enumerate(props):
+            for c, t in enumerate(row):
+                if t < 0 or t in hang:
+                    continue
+                total += 1
+                if t in tops:
+                    if r + 1 >= len(props) or props[r + 1][c] != tops[t]:
+                        print(f"*** {d or 'stage1'}: tree crown at col {c} row {r} has no trunk under it ***")
+                        ok = False
+                elif r + 1 >= len(fg) or fg[r + 1][c] < 0:
+                    print(f"*** {d or 'stage1'}: prop {BP.NAMES[t]} at col {c} row {r} is floating ***")
+                    ok = False
+    if ok:
+        print(f"props      : {total} standing props in 3 stages - all grounded, every tree whole")
+    return ok
 
 
 if __name__ == "__main__":
