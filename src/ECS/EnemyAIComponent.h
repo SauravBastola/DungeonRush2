@@ -13,7 +13,8 @@ extern float gameTime;
 class EnemyAIComponent : public Component {
 public:
     enum class State { Idle, Patrol, Chase, Attack, Hurt, Dead };
-    enum class Kind  { Skeleton, Slime, Bat, Mage, Archer, Bomber, Boss };
+    enum class Kind  { Skeleton, Slime, Bat, Mage, Archer, Bomber, Boss,
+                       Spitter, Wisp };                 // Batch C4
 
     Kind   kind = Kind::Skeleton;
     State  state = State::Idle;

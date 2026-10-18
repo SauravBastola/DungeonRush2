@@ -141,6 +141,8 @@ void Game::loadAssets() {
         assetPath("tileset/terrain_v2.png").c_str(), Depth::MID));
     tex("player",      "sprites/player_sprites.png");
     tex("skeleton",    "sprites/enemy_skeleton.png");
+    tex("spitter",     "sprites/enemy_spitter.png");    // Batch C4
+    tex("wisp",        "sprites/enemy_wisp.png");       // Batch C4
     tex("slime",       "sprites/enemy_slime.png");
     tex("bat",         "sprites/enemy_bat.png");
     tex("mage",        "sprites/enemy_mage.png");
@@ -400,6 +402,8 @@ void Game::spawnEnemy(const std::string& kind, int col, int row) {
     else if (kind == "archer")   { spec = &Sprites::ARCHER;   k = EnemyAIComponent::Kind::Archer;   hp = Config::ENEMY_HP_ARCHER; }
     else if (kind == "bomber")   { spec = &Sprites::BOMBER;   k = EnemyAIComponent::Kind::Bomber;   hp = Config::ENEMY_HP_BOMBER; }
     else if (kind == "boss")     { spec = &Sprites::BOSS;     k = EnemyAIComponent::Kind::Boss;     hp = Config::BOSS_HP; }
+    else if (kind == "spitter")  { spec = &Sprites::SPITTER;  k = EnemyAIComponent::Kind::Spitter;  hp = Config::ENEMY_HP_SPITTER; }
+    else if (kind == "wisp")     { spec = &Sprites::WISP;     k = EnemyAIComponent::Kind::Wisp;     hp = Config::ENEMY_HP_WISP; }
     else return;
 
     const int w = spec->cw, h = spec->ch;
@@ -410,13 +414,27 @@ void Game::spawnEnemy(const std::string& kind, int col, int row) {
 
     auto& e = manager.addEntity(kind);
     e.addComponent<TransformComponent>(px, py, w, h, 1.f);
-    if (k != EnemyAIComponent::Kind::Bat)
+    if (k != EnemyAIComponent::Kind::Bat && k != EnemyAIComponent::Kind::Wisp)   // flyers
         e.addComponent<RigidBodyComponent>();
 
     auto& sp = e.addComponent<SpriteComponent>(
         spec->tex, spec->fw, spec->fh, spec->scale, true);
     Sprites::apply(sp, *spec);
     switch (k) {
+        case EnemyAIComponent::Kind::Spitter:          // Batch C4
+            sp.addAnim("idle",  Animation(0, 4, 180).motion(0.f, 0.f));
+            sp.addAnim("tell",  Animation(1, 3, 200).motion(0.f, 0.f));
+            sp.addAnim("spit",  Animation(2, 2, 120).motion(0.f, 0.f));
+            sp.addAnim("die",   Animation(3, 4, 150).motion(0.f, 0.f));
+            sp.Play("idle");
+            break;
+        case EnemyAIComponent::Kind::Wisp:             // Batch C4
+            sp.addAnim("float", Animation(0, 4, 110).motion(0.f, 0.f));
+            sp.addAnim("tell",  Animation(1, 2, 90).motion(0.f, 0.f));
+            sp.addAnim("lunge", Animation(2, 2, 90).motion(0.f, 0.f));
+            sp.addAnim("die",   Animation(3, 3, 120).motion(0.f, 0.f));
+            sp.Play("float");
+            break;
         // Every enemy animation below carries secondary motion (see
         // Animation::motion).  These sheets are tiny -- the bat has two
         // cells and the boss has one -- and stepping between two pictures at

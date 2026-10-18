@@ -350,7 +350,7 @@ void spawnPlayerBolt(Entity& owner, int dir, bool heavy) {
     Vfx::sparkle(px + w / 2.f, py + h / 2.f, heavy ? 10 : 5);
 }
 
-void spawnProjectile(Entity& owner, Vector2D vel, float damage, const std::string& tag,
+Entity& spawnProjectile(Entity& owner, Vector2D vel, float damage, const std::string& tag,
                      const std::string& tex, float life) {
     auto& pr = manager.addEntity("projectile");
     auto& tr = owner.getComponent<TransformComponent>();
@@ -372,6 +372,7 @@ void spawnProjectile(Entity& owner, Vector2D vel, float damage, const std::strin
     col.sensor = true; col.solid = false;
     pr.addComponent<ProjectileComponent>(vel, damage, tag, &owner, life);
     pr.addGroup(Game::groupProjectiles);
+    return pr;                              // Batch C4: callers can adjust it (gravity)
 }
 
 void spawnShockwave(Entity& owner, int dir, float damage) {
@@ -697,6 +698,89 @@ void step(std::vector<Entity*>& enemies, Entity& player,
                         tr.velocity.y < 0 ? "jump" : "idle");
                 break;
             }
+            case EnemyAIComponent::Kind::Spitter: {
+                // Batch C4: rooted.  tell (pod swells, mouth glows) -> spit a seed
+                // on a real arc at where the hero stands -> cooldown.
+                auto* sp = e->hasComponent<SpriteComponent>() ? &e->getComponent<SpriteComponent>() : nullptr;
+                tr.velocity.x = 0.f;
+                if (ai.swingPhase == 0) {
+                    tr.facingRight = dx < 0;
+                    if (adx < Config::SPITTER_RANGE && std::fabs(dy) < 320.f && ai.attackCd <= 0.f) {
+                        ai.swingPhase = 1; ai.swingT = 0.f;
+                    }
+                    if (sp) sp->Play("idle");
+                } else if (ai.swingPhase == 1) {
+                    ai.swingT += lastFrameTime;
+                    if (sp) sp->Play("tell");
+                    if (ai.swingT >= Config::SPITTER_TELL) {
+                        const int dir = tr.facingRight ? 1 : -1;
+                        const float sx = tr.position.x + (dir > 0 ? tr.width : 0.f);
+                        const float sy = tr.position.y + 10.f;
+                        const float tx = pt.position.x + 16.f, ty = pt.position.y + 25.f;
+                        const float t = std::max(0.35f, std::min(1.6f, std::fabs(tx - sx) / Config::SPITTER_SEED_VX));
+                        const float vx = (tx - sx) / t;
+                        const float vy = (ty - sy - 0.5f * Config::PLAYER_GRAVITY * t * t) / t;
+                        auto& seed = Combat::spawnProjectile(*e, Vector2D(vx, vy), Config::SPITTER_DAMAGE,
+                                                             "enemy", "fireball", 3.0f);
+                        seed.getComponent<ProjectileComponent>().gravity = true;
+                        ai.swingPhase = 2; ai.swingT = 0.f;
+                    }
+                } else {
+                    ai.swingT += lastFrameTime;
+                    if (sp) sp->Play("spit");
+                    if (ai.swingT >= 0.25f) { ai.swingPhase = 0; ai.attackCd = Config::SPITTER_COOLDOWN; }
+                }
+                break;
+            }
+            case EnemyAIComponent::Kind::Wisp: {
+                // Batch C4: drifts through walls toward the hero; flares (tell),
+                // lunges at where the hero was, hurts only during the lunge.
+                auto* sp = e->hasComponent<SpriteComponent>() ? &e->getComponent<SpriteComponent>() : nullptr;
+                ai.sinT += lastFrameTime;
+                ai.diveCd -= lastFrameTime;
+                const float hx = pt.position.x + 16.f - (tr.position.x + tr.width * 0.5f);
+                const float hy = pt.position.y + 25.f - (tr.position.y + tr.height * 0.5f);
+                const float hd = std::max(1.f, std::sqrt(hx * hx + hy * hy));
+                if (ai.divePhase == 0) {
+                    if (hd < Config::WISP_SENSE) {
+                        tr.velocity.x = hx / hd * Config::WISP_DRIFT;
+                        tr.velocity.y = hy / hd * Config::WISP_DRIFT + std::sin(ai.sinT * 3.f) * 20.f;
+                    } else {
+                        tr.velocity.x = 0.f;
+                        tr.velocity.y = std::sin(ai.sinT * 2.f) * 20.f;
+                    }
+                    tr.facingRight = hx > 0;
+                    if (hd < Config::WISP_LUNGE_RANGE && ai.diveCd <= 0.f) { ai.divePhase = 1; ai.diveT = 0.f; }
+                    if (sp) sp->Play("float");
+                } else if (ai.divePhase == 1) {                                // the tell
+                    ai.diveT += lastFrameTime;
+                    tr.velocity.x = 0.f; tr.velocity.y = 0.f;
+                    if (sp) sp->Play("tell");
+                    if (ai.diveT >= Config::WISP_TELL) {
+                        ai.diveVX = hx / hd * Config::WISP_LUNGE_SPEED;
+                        ai.diveVY = hy / hd * Config::WISP_LUNGE_SPEED;
+                        ai.divePhase = 2; ai.diveT = 0.f;
+                    }
+                } else if (ai.divePhase == 2) {                                // the lunge
+                    ai.diveT += lastFrameTime;
+                    tr.velocity.x = ai.diveVX; tr.velocity.y = ai.diveVY;
+                    tr.facingRight = ai.diveVX >= 0;
+                    if (sp) sp->Play("lunge");
+                    auto& ec = e->getComponent<ColliderComponent>().collider;
+                    auto& pc = player.getComponent<ColliderComponent>().collider;
+                    bool done = ai.diveT >= Config::WISP_LUNGE_TIME;
+                    if (Collision::AABB(ec, pc)) {
+                        if (Damage::applyToPlayer(player, Config::WISP_DAMAGE, sink.shieldCharges,
+                                                  sink.invincT, sink.iframeT, screenShake)) {
+                            auto& ptr = player.getComponent<TransformComponent>();
+                            ptr.velocity.x += (ai.diveVX >= 0 ? 1.f : -1.f) * 200.f;
+                        }
+                        done = true;
+                    }
+                    if (done) { ai.divePhase = 0; ai.diveCd = Config::WISP_COOLDOWN; }
+                }
+                break;
+            }
             case EnemyAIComponent::Kind::Bat: {
                 ai.sinT += lastFrameTime;
                 // Batch C: hover (tell) -> dive at where you were -> climb back
@@ -967,6 +1051,7 @@ void step(std::vector<Entity*>& enemies, Entity& player,
             ai.kind == EnemyAIComponent::Kind::Slime ||
             ai.kind == EnemyAIComponent::Kind::Mage ||
             ai.kind == EnemyAIComponent::Kind::Archer ||
+            ai.kind == EnemyAIComponent::Kind::Spitter ||
             ai.kind == EnemyAIComponent::Kind::Boss) {
             if (e->hasComponent<ColliderComponent>() &&
                 player.hasComponent<ColliderComponent>()) {

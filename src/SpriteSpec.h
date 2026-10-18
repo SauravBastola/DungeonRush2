@@ -96,6 +96,13 @@ namespace Sprites {
         "bomber", 32, 32, 1.00f, 26, 30, Anchor::Feet, true };
 
     // villain_boss.png 150x150 -> single cell
+    // Batch C4: enemy_spitter.png 4x4 of 40x48 (idle 4, tell 3, spit 2, die 4)
+    inline constexpr Spec SPITTER{
+        "spitter", 40, 48, 1.00f, 30, 40, Anchor::Feet, true };
+    // Batch C4: enemy_wisp.png 4x4 of 32x32 (float 4, tell 2, lunge 2, die 3)
+    inline constexpr Spec WISP{
+        "wisp", 32, 32, 1.00f, 18, 28, Anchor::Feet, true };
+
     inline constexpr Spec BOSS{
         "boss", 96, 104, 1.00f, 88, 100, Anchor::Feet, true };
 

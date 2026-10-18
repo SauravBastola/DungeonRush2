@@ -100,6 +100,22 @@ namespace Config {
     constexpr float BAT_DIVE_TIME      = 0.70f;
     constexpr float BAT_DIVE_CD        = 2.20f;
     constexpr float BAT_DIVE_DAMAGE    = 12.f;
+    // Batch C4: spitter (rooted pod that lobs seeds) and wisp (floats, lunges)
+    constexpr float ENEMY_HP_SPITTER   = 20.f;
+    constexpr float SPITTER_RANGE      = 440.f;
+    constexpr float SPITTER_TELL       = 0.60f;
+    constexpr float SPITTER_SEED_VX    = 260.f;    // horizontal speed of the arc
+    constexpr float SPITTER_DAMAGE     = 12.f;
+    constexpr float SPITTER_COOLDOWN   = 2.20f;
+    constexpr float ENEMY_HP_WISP      = 12.f;
+    constexpr float WISP_SENSE         = 520.f;
+    constexpr float WISP_DRIFT         = 55.f;
+    constexpr float WISP_LUNGE_RANGE   = 170.f;
+    constexpr float WISP_TELL          = 0.50f;
+    constexpr float WISP_LUNGE_SPEED   = 380.f;
+    constexpr float WISP_LUNGE_TIME    = 0.45f;
+    constexpr float WISP_DAMAGE        = 12.f;
+    constexpr float WISP_COOLDOWN      = 1.60f;
 
     // ---- dash ----
     constexpr float DASH_SPEED         = 720.f;

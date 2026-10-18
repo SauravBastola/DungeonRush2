@@ -987,6 +987,90 @@ def hero(path, svg):
     _sheet(rows, 48, 56, path, svg)
 
 
+# ------------------------------------------------------------- spitter (C4)
+def _spitter(sway=0, swell=0, mouth=0, glow=False, wilt=0):
+    """A red seed-pod on a thick stem; mouth on the facing (right) side."""
+    c = Px(40, 48)
+    base, cx = 46, 19
+    # leaves at the base
+    c.part(_pg([(cx - 1, base), (cx - 14, base - 4), (cx - 15, base - 9), (cx - 4, base - 4)]),
+           PAL.GRASS_MID, PAL.GRASS, PAL.TEAL)
+    c.part(_pg([(cx + 2, base), (cx + 15, base - 3), (cx + 16, base - 8), (cx + 5, base - 4)]),
+           PAL.GRASS_MID, PAL.GRASS, PAL.TEAL, sep=True)
+    if wilt >= 3:                                # a wilted heap on the ground
+        c.part(_el(cx - 9, base - 7, cx + 9, base + 1), PAL.RED_DK, PAL.RED, PAL.BROWN_XD)
+        c.dot(cx - 3, base - 4, PAL.BROWN_DK); c.dot(cx + 3, base - 3, PAL.BROWN_DK)
+        return c.outline()
+    top = 18 + wilt * 6
+    px_ = cx + sway + wilt * 3                  # pod centre (it droops forward when wilting)
+    # thick stem, slightly curved
+    c.part(_ln([(cx, base), (cx + sway // 2, base - 12), (px_, top + 6)], 4),
+           PAL.TEAL, PAL.GRASS_MID, PAL.TEAL_DK)
+    rx, ry = 10 + swell - wilt, 9 + swell - wilt
+    c.part(_el(px_ - rx, top - ry, px_ + rx, top + ry), PAL.RED, PAL.PINK, PAL.RED_DK, sep=True)
+    for sx, sy in ((-5, -4), (-1, -6), (-6, 1)):          # orange spots
+        c.dot(px_ + sx, top + sy, PAL.ORANGE)
+    # the mouth on the facing side
+    mx, my = px_ + rx - 4, top + 1
+    if mouth == 0:
+        c.part(_ln([(mx - 3, my), (mx + 2, my)], 1), PAL.INK)
+    else:
+        w, h = (3, 2) if mouth == 1 else (5, 4)
+        c.part(_el(mx - w, my - h, mx + w, my + h), PAL.INK)
+        if glow:                                 # the tell: an ORANGE/YELLOW glow inside
+            c.part(_el(mx - w + 2, my - h + 2, mx + w - 2, my + h - 2), PAL.ORANGE, PAL.YELLOW)
+        c.dot(mx - 1, my - h + 1, PAL.CREAM); c.dot(mx + 1, my + h - 1, PAL.CREAM)   # teeth
+    return c.outline()
+
+
+def enemy_spitter(path, svg):
+    """enemy_spitter.png 4x4 of 40x48: idle 4, tell 3 (pod swells, mouth glows),
+    spit 2, die 4.  Collider 30x38."""
+    _sheet([[_spitter(sway=s) for s in (0, 1, 0, -1)],
+            [_spitter(swell=1, mouth=1, glow=True), _spitter(swell=2, mouth=1, glow=True),
+             _spitter(swell=3, mouth=2, glow=True)],
+            [_spitter(swell=0, mouth=2, sway=-2), _spitter(swell=1, mouth=1, sway=-1)],
+            [_spitter(wilt=w) for w in (1, 2, 3, 3)]], 40, 48, path, svg)
+
+
+# ---------------------------------------------------------------- wisp (C4)
+def _wisp(t=0, flare=False, lunge=False, fade=0):
+    """A teardrop of blue flame with a cream core and two eyes."""
+    c = Px(32, 32)
+    if fade >= 2:                                # dissipating: a few sparks
+        for i, (x, y) in enumerate(((10, 14), (18, 10), (22, 18), (14, 22), (16, 16))):
+            if i < 5 - fade:
+                c.part(_el(x - 1, y - 1, x + 1, y + 1), PAL.WATER, PAL.CREAM)
+        return c.outline()
+    body = PAL.PLATE if flare else PAL.WATER
+    hi = PAL.CREAM if flare else PAL.SLATE_LT
+    sh = PAL.VIOLET if flare else PAL.WATER_DK
+    cx, cy = 15, 12 + (1 if t % 2 else 0)
+    w = 8 if lunge else 6 - fade             # a narrow, tall flame (not a ball)
+    tip = cx - 11 if lunge else cx - 2 + (t % 3) - 1          # flame tip trails behind
+    # tail flames, flickering by frame
+    # tail flames flicker, but the middle one always reaches the last row
+    tails = [(cx - 4, 26 - (t % 2) * 2), (cx, 30), (cx + 4, 25 + (t % 2))]
+    for (x, y) in tails:
+        c.part(_pg([(x - 1, cy + 7), (x + 1, cy + 7), (x, y)]), body, hi, sh)
+    c.part(_el(cx - w, cy - 9, cx + w, cy + 9), body, hi, sh)
+    c.part(_pg([(cx - 4, cy - 6), (tip, 2 if not lunge else cy - 4), (cx + 4, cy - 6)]), body, hi, sh)
+    core = PAL.ORCHID if flare else PAL.CREAM
+    c.part(_el(cx - 3, cy - 2, cx + 3, cy + 6), core, PAL.BLUSH if flare else None)
+    for ex in (cx, cx + 3):                     # eyes, two pixels tall
+        c.dot(ex, cy, PAL.INK); c.dot(ex, cy + 1, PAL.INK)
+    return c.outline()
+
+
+def enemy_wisp(path, svg):
+    """enemy_wisp.png 4x4 of 32x32: float 4, tell 2 (flares violet-white),
+    lunge 2, die 3.  Collider 22x24."""
+    _sheet([[_wisp(t=i) for i in range(4)],
+            [_wisp(t=0, flare=True), _wisp(t=1, flare=True)],
+            [_wisp(t=0, lunge=True), _wisp(t=1, lunge=True)],
+            [_wisp(fade=f) for f in (1, 2, 3)]], 32, 32, path, svg)
+
+
 # ===========================================================================
 def main():
     os.makedirs(SPRITES, exist_ok=True)
@@ -1015,6 +1099,8 @@ def main():
         (enemy_bomber,   "enemy_bomber.png"),
         (boss,           "enemy_boss.png"),
         (hero,           "player_sprites.png"),
+        (enemy_spitter,  "enemy_spitter.png"),
+        (enemy_wisp,     "enemy_wisp.png"),
     ]
     only = set(sys.argv[1:])     # e.g. `build_art.py enemy_slime.png`
     if only:

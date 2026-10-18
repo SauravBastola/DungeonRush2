@@ -52,7 +52,7 @@ namespace Combat {
 void spawnMeleeHitbox(Entity& owner, const Config::AttackDef& def, int dir,
                       float damage, int kind);
 void spawnPlayerBolt(Entity& owner, int dir, bool heavy);
-void spawnProjectile(Entity& owner, Vector2D vel, float damage, const std::string& tag,
+Entity& spawnProjectile(Entity& owner, Vector2D vel, float damage, const std::string& tag,
                      const std::string& tex = "projectile", float life = 1.2f);
 
 // Ground-hugging shockwave thrown out by the boss's jump slam.  Travels

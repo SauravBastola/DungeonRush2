@@ -1063,7 +1063,8 @@ STAGE_SPECS = [
         ledges=[(52, 4), (74, 3), (88, 4), (108, 3), (134, 4), (160, 3), (170, 3)],
         movers=[(62, False), (116, True), (142, False)],
         checkpoints=[30, 72, 112, 152], shrines=[58, 128], key_col=164,
-        mix={"slime": 4, "bat": 4, "archer": 3, "skeleton": 3, "bomber": 1, "mage": 2},
+        mix={"slime": 4, "bat": 4, "archer": 3, "skeleton": 3, "bomber": 1, "mage": 2,
+             "wisp": 3, "spitter": 2},
         n_enemies=38),
     StageSpec(
         name="Ember Canyon", folder="stage3", theme=2,
@@ -1075,7 +1076,8 @@ STAGE_SPECS = [
                 (146, 4), (158, 3), (170, 3)],
         movers=[(76, True), (108, False), (136, True)],
         checkpoints=[34, 74, 116, 154], shrines=[60, 126], key_col=166,
-        mix={"skeleton": 4, "mage": 3, "bomber": 3, "archer": 3, "bat": 2, "slime": 1},
+        mix={"skeleton": 4, "mage": 3, "bomber": 3, "archer": 3, "bat": 2, "slime": 1,
+             "spitter": 3, "wisp": 2},
         n_enemies=40),
 ]
 
@@ -1193,15 +1195,15 @@ def build_stage(spec: StageSpec) -> Level:
             # lip, where it throws you into the pit (fullrun found this)
             if kind == "skeleton" and any(abs(cc - c) <= 3 for c in chasm_cols):
                 continue
-            ground = kind not in ("bat", "mage")
+            ground = kind not in ("bat", "mage", "wisp")
             if ground and (cc in chasm_cols or cc in hazard_cols or g[cc] is None or g[cc] < 0):
                 continue
             if sum(1 for x in placed if cc - 11 <= x <= cc + 11) >= 4:
                 continue
             if cc in placed:
                 continue
-            if kind == "bat":
-                L.enemies.append(EnemySpawn("bat", cc, _clamp_row(surf(cc) - 5 - int(_h(cc) * 3)),
+            if kind in ("bat", "wisp"):
+                L.enemies.append(EnemySpawn(kind, cc, _clamp_row(surf(cc) - 5 - int(_h(cc) * 3)),
                                             stands_on="air"))
             elif kind == "mage":
                 L.enemies.append(EnemySpawn("mage", cc, stands_on="platform"))
