@@ -125,7 +125,9 @@ void Game::init(const char* title, int width, int height, bool fullscreen) {
 
     assets = new AssetManager(&manager);
     loadAssets();
+    buildLogo();                                        // Batch Q: needs the fonts loaded above
     loadLevel();
+    state = State::Title;                               // Batch Q: the title screen first (after loadLevel's Menu)
     spawnPlayer();
 
     playMusic("stage1", true);                        // Batch E
@@ -214,10 +216,17 @@ void Game::loadAssets() {
     auto font = [&](const char* id, const char* rel, int size) {
         assets->AddFont(id, assetPath(rel), size);
     };
-    font("small",  "fonts/FiraCode-Regular.ttf", 14);
-    font("body",   "fonts/FiraCode-Regular.ttf", 18);
-    font("title",  "fonts/FiraCode-Regular.ttf", 32);
-    font("big",    "fonts/FiraCode-Regular.ttf", 56);
+    // Batch Q: two open-licensed faces (assets/fonts/*-OFL.txt) - Pixelify Sans
+    // for headings and buttons (a pixel display face that suits the art),
+    // Inter for body text; Fira Code stays for fixed-width numbers.
+    font("small",  "fonts/Inter.ttf", 15);
+    font("body",   "fonts/Inter.ttf", 18);
+    font("title",  "fonts/PixelifySans.ttf", 32);
+    font("big",    "fonts/PixelifySans.ttf", 56);
+    font("head",   "fonts/PixelifySans.ttf", 22);
+    font("logo",   "fonts/PixelifySans.ttf", 104);
+    font("logoS",  "fonts/PixelifySans.ttf", 72);
+    font("mono",   "fonts/FiraCode-Regular.ttf", 14);
 }
 
 // ===========================================================================
@@ -2150,6 +2159,131 @@ void Game::drawReactiveProps() {
     }
 }
 
+// ============================================================================
+// Batch Q: title screen, logo, pixel icons, HUD toggle
+// ============================================================================
+void Game::toggleHud() {
+    hudHidden = !hudHidden;
+    hudNoticeT = hudHidden ? 2.0f : 0.f;
+    saveSettings();
+}
+
+// The logo: Pixelify Sans rendered without anti-aliasing (crisp pixels),
+// given an ink outline, a drop shadow and a gold-to-ember gradient - built
+// once into a texture per size.
+void Game::buildLogo() {
+    const char* fonts[2] = { "logo", "logoS" };
+    for (int k = 0; k < 2; ++k) {
+        TTF_Font* f = assets->GetFont(fonts[k]);
+        if (!f) continue;
+        SDL_Surface* raw = TTF_RenderUTF8_Solid(f, "DUNGEON RUSH", SDL_Color{ 255, 255, 255, 255 });
+        if (!raw) continue;
+        SDL_Surface* src = SDL_ConvertSurfaceFormat(raw, SDL_PIXELFORMAT_ARGB8888, 0);
+        SDL_FreeSurface(raw);
+        if (!src) continue;
+        const int ol = k == 0 ? 5 : 4, sh = k == 0 ? 7 : 5, pad = ol + sh + 2;
+        const int W = src->w + pad * 2, H = src->h + pad * 2;
+        SDL_Surface* out = SDL_CreateRGBSurfaceWithFormat(0, W, H, 32, SDL_PIXELFORMAT_ARGB8888);
+        SDL_FillRect(out, nullptr, 0);
+        auto* sp = (Uint32*)src->pixels; auto* op = (Uint32*)out->pixels;
+        const int sw = src->pitch / 4, ow = out->pitch / 4;
+        auto on = [&](int x, int y) { return x >= 0 && y >= 0 && x < src->w && y < src->h && (sp[y * sw + x] >> 24) > 127; };
+        // shadow (offset ink), then the outline (dilated ink), then the fill
+        for (int y = 0; y < src->h; ++y)
+            for (int x = 0; x < src->w; ++x) {
+                if (!on(x, y)) continue;
+                for (int dy = -ol; dy <= ol; ++dy)
+                    for (int dx = -ol; dx <= ol; ++dx) {
+                        const int sx = x + pad + dx + sh, sy = y + pad + dy + sh;
+                        op[sy * ow + sx] = 0xB4100A10;                     // shadow, translucent ink
+                    }
+            }
+        for (int y = 0; y < src->h; ++y)
+            for (int x = 0; x < src->w; ++x) {
+                if (!on(x, y)) continue;
+                for (int dy = -ol; dy <= ol; ++dy)
+                    for (int dx = -ol; dx <= ol; ++dx)
+                        op[(y + pad + dy) * ow + (x + pad + dx)] = 0xFF1C121C;  // INK
+            }
+        for (int y = 0; y < src->h; ++y) {
+            const float t = (float)y / (float)std::max(1, src->h - 1);
+            // gold at the top to ember at the bottom, a cream band near the top
+            Uint8 r = 255, g = (Uint8)(226 - 110 * t), b = (Uint8)(80 - 40 * t);
+            if (t > 0.18f && t < 0.26f) { g = 240; b = 196; }
+            for (int x = 0; x < src->w; ++x)
+                if (on(x, y)) op[(y + pad) * ow + (x + pad)] = 0xFF000000u | (r << 16) | (g << 8) | b;
+        }
+        m_logo[k] = SDL_CreateTextureFromSurface(renderer, out);
+        m_logoW[k] = W; m_logoH[k] = H;
+        SDL_FreeSurface(out); SDL_FreeSurface(src);
+    }
+}
+
+void Game::drawLogo(int cx, int y, bool big) {
+    const int k = big ? 0 : 1;
+    if (!m_logo[k]) { drawText("big", "DUNGEON RUSH", cx, y + 40, SDL_Color{ 255, 200, 37, 255 }, true); return; }
+    SDL_Rect r{ cx - m_logoW[k] / 2, y, m_logoW[k], m_logoH[k] };
+    SDL_RenderCopy(renderer, m_logo[k], nullptr, &r);
+}
+
+// A little scene for the title: the hero squares up to a skeleton, a slime
+// hops, a bat flaps overhead - each on its own idle loop, at a whole-number
+// scale so the pixels stay square.
+void Game::drawIllustration(int cx, int groundY, int sc) {
+    auto cell = [&](const char* tex, int fw, int fh, int row, int frames, int ms, int dx, bool flip, int dy = 0) {
+        SDL_Texture* t = assets->GetTexture(tex);
+        if (!t) return;
+        const int f = (int)(m_menuTime * 1000.f / ms) % frames;
+        SDL_Rect src{ f * fw, row * fh, fw, fh };
+        SDL_Rect dst{ cx + dx - fw * sc / 2, groundY - fh * sc + dy, fw * sc, fh * sc };
+        SDL_RenderCopyEx(renderer, t, &src, &dst, 0.0, nullptr, flip ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
+    };
+    // the ledge: a grass cap with blades, soil with speckles, an ink rim
+    const int L = cx - 330, Wd = 660;
+    SDL_SetRenderDrawColor(renderer, 93, 44, 40, 255);   SDL_Rect soil{ L, groundY + 10, Wd, 30 }; SDL_RenderFillRect(renderer, &soil);
+    SDL_SetRenderDrawColor(renderer, 60, 30, 34, 255);   SDL_Rect band{ L, groundY + 28, Wd, 12 }; SDL_RenderFillRect(renderer, &band);
+    SDL_SetRenderDrawColor(renderer, 140, 70, 52, 255);
+    for (int x = L + 6; x < L + Wd - 6; x += 23) { SDL_Rect sp{ x + (x * 7) % 9, groundY + 16 + (x * 3) % 10, 4, 3 }; SDL_RenderFillRect(renderer, &sp); }
+    SDL_SetRenderDrawColor(renderer, 30, 111, 80, 255);  SDL_Rect cap{ L, groundY, Wd, 12 }; SDL_RenderFillRect(renderer, &cap);
+    SDL_SetRenderDrawColor(renderer, 90, 197, 79, 255);  SDL_Rect lit{ L, groundY, Wd, 5 }; SDL_RenderFillRect(renderer, &lit);
+    for (int x = L + 3; x < L + Wd - 3; x += 7) {          // blades along the top
+        const int h = 3 + (x * 13) % 6;
+        SDL_Rect bl{ x, groundY - h, 2, h }; SDL_RenderFillRect(renderer, &bl);
+    }
+    SDL_SetRenderDrawColor(renderer, 28, 18, 28, 255);   SDL_Rect rim{ L, groundY + 40, Wd, 4 }; SDL_RenderFillRect(renderer, &rim);
+    cell("player",   64, 56, 0, 6, 160, -150, false);             // the hero, facing right
+    cell("skeleton", 40, 56, 2, 1, 1000, 150, true);              // a skeleton, sword raised
+    cell("slime",    32, 32, 1, 6, 110, 260, true);               // a slime hopping
+    cell("bat",      32, 32, 0, 6, 70, 40, false, -50 * sc);      // a bat overhead (scales with the scene)
+}
+
+void Game::drawTitle() {
+    const int W = Config::WINDOW_WIDTH, H = Config::WINDOW_HEIGHT;
+    const float bob = std::sin(m_menuTime * 1.6f) * 4.f;
+    drawLogo(W / 2, 92 + (int)bob, true);
+    drawText("head", "A PIXEL-ART ACTION PLATFORMER", W / 2, 262, SDL_Color{ 249, 230, 207, 255 }, true);
+    drawIllustration(W / 2, 600, 3);
+    if (((int)(m_menuTime * 2.2f)) % 2 == 0)
+        drawText("title", "PRESS ENTER", W / 2, 700, SDL_Color{ 255, 230, 120, 255 }, true);
+    drawText("small", "Fonts: Pixelify Sans, Inter (SIL Open Font License)", W / 2, H - 28,
+             SDL_Color{ 130, 140, 165, 255 }, true);
+}
+
+// 10 x 10 pixel icons for the menu buttons, drawn at a whole-number scale.
+void Game::drawPixelIcon(int which, int x, int y, int sc, SDL_Color c) {
+    static const char* I[6][10] = {
+        { "..........", ".##.......", ".####.....", ".######...", ".########.", ".########.", ".######...", ".####.....", ".##.......", ".........." },  // play
+        { "..........", "#...#.....", "##..##....", "###.###...", "########..", "########..", "###.###...", "##..##....", "#...#.....", ".........." },  // continue
+        { "..####....", ".##..##...", ".....##...", "....##....", "...##.....", "...##.....", "..........", "...##.....", "...##.....", ".........." },  // help
+        { "#.######.#", "#.######.#", ".########.", "..######..", "...####...", "....##....", "....##....", "...####...", "..######..", ".........." },  // trophy
+        { "...##.##..", ".########.", ".##....##.", "##..##..##", "#..####..#", "#..####..#", "##..##..##", ".##....##.", ".########.", "...##.##.." },  // gear
+        { ".#######..", ".#.....#..", ".#.....#..", ".#.....#..", ".#....##..", ".#.....#.#", ".#.....###", ".#.....#.#", ".#######..", ".........." } }; // door
+    SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, c.a);
+    for (int r = 0; r < 10; ++r)
+        for (int q = 0; q < 10; ++q)
+            if (I[which][r][q] == '#') { SDL_Rect px{ x + q * sc, y + r * sc, sc, sc }; SDL_RenderFillRect(renderer, &px); }
+}
+
 void Game::startJump() {
     if (state != State::Playing) return;
     auto& p = *manager.getGroup(groupPlayers)[0];
@@ -2485,9 +2619,10 @@ void Game::update() {
         if (ptr.position.x >= Level::stage().zoneArena * (float)Config::TILE_SIZE)
             m_bossMusicOn = playMusic("boss", false) || true;   // stop re-checking either way
     }
-    if ((state == State::Menu || state == State::Achievements) && !ambientId.empty())
+    if ((state == State::Menu || state == State::Achievements || state == State::Title) && !ambientId.empty())
         playAmbient("");                                // Batch P: quiet in the menu
-    if (state == State::Menu || state == State::Instructions || state == State::Achievements) {
+    if (state == State::Menu || state == State::Instructions || state == State::Achievements ||
+        state == State::Title) {
         handlePlayerInput();
         manager.refresh();
         // The menu draws no world, so simulating it there only lets gravity
@@ -2747,7 +2882,7 @@ void Game::drawSettings() {
     SDL_Rect full{ 0, 0, W, H };
     SDL_RenderFillRect(renderer, &full);
 
-    const int pw = 620, ph = 530;                       // Batch F + K: three more rows
+    const int pw = 620, ph = 580;                       // Batch F + K + Q: four more rows
     const int px = (W - pw) / 2, py = (H - ph) / 2;
     SDL_SetRenderDrawColor(renderer, 28, 34, 56, 250);
     SDL_Rect panel{ px, py, pw, ph };
@@ -2767,10 +2902,10 @@ void Game::drawSettings() {
 
     // ---- rows ----
     struct Row { const char* label; int y; };
-    const int rowY[7] = { py + 150, py + 200, py + 250, py + 300, py + 350, py + 400, py + 456 };
-    const char* labels[7] = { "Music", "Effects", "Mute all", "Display", "Pixels", "Hints", "Back" };
+    const int rowY[8] = { py + 150, py + 200, py + 250, py + 300, py + 350, py + 400, py + 450, py + 506 };
+    const char* labels[8] = { "Music", "Effects", "Mute all", "Display", "Pixels", "Hints", "HUD", "Back" };
 
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < 8; i++) {
         bool sel = (settingsSelection == i);
         if (sel) {   // highlight the selected row
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
@@ -2805,6 +2940,9 @@ void Game::drawSettings() {
                      muted ? colRed : colGreen, false);
         } else if (i == 3) {                                       // Batch F
             drawText("body", fullscreen ? "Fullscreen" : "Windowed", px + 300, rowY[i], norm, false);
+        } else if (i == 6) {                                       // Batch Q
+            drawText("body", hudHidden ? "Hidden" : "Shown", px + 300, rowY[i], norm, false);
+            drawText("small", "Tab or F1 in play", px + 420, rowY[i], dim, false);
         } else if (i == 5) {                                       // Batch K
             const char* m = hintMode == 0 ? "Smart" : hintMode == 1 ? "All" : "Off";
             drawText("body", m, px + 300, rowY[i], norm, false);
@@ -2929,15 +3067,16 @@ void Game::handleSettingsInput(SDL_Keycode key) {
     const int step = 8;
     switch (key) {
         case SDLK_UP:    case SDLK_w:
-            settingsSelection = (settingsSelection + 6) % 7; break;
+            settingsSelection = (settingsSelection + 7) % 8; break;
         case SDLK_DOWN:  case SDLK_s:
-            settingsSelection = (settingsSelection + 1) % 7; break;
+            settingsSelection = (settingsSelection + 1) % 8; break;
         case SDLK_LEFT:  case SDLK_a:
             if (settingsSelection == 0) musicVolume = std::max(0,   musicVolume - step);
             if (settingsSelection == 1) sfxVolume   = std::max(0,   sfxVolume   - step);
             if (settingsSelection == 3) setFullscreen(!fullscreen);
             if (settingsSelection == 4) { scaling = (Scaling)(((int)scaling + 2) % 3); applyScaling(); }
             if (settingsSelection == 5) hintMode = (hintMode + 2) % 3;
+            if (settingsSelection == 6) hudHidden = !hudHidden;
             applyVolumes();
             break;
         case SDLK_RIGHT: case SDLK_d:
@@ -2946,6 +3085,7 @@ void Game::handleSettingsInput(SDL_Keycode key) {
             if (settingsSelection == 3) setFullscreen(!fullscreen);
             if (settingsSelection == 4) { scaling = (Scaling)(((int)scaling + 1) % 3); applyScaling(); }
             if (settingsSelection == 5) hintMode = (hintMode + 1) % 3;
+            if (settingsSelection == 6) hudHidden = !hudHidden;
             applyVolumes();
             break;
         case SDLK_RETURN: case SDLK_SPACE: case SDLK_KP_ENTER:
@@ -2953,7 +3093,8 @@ void Game::handleSettingsInput(SDL_Keycode key) {
             else if (settingsSelection == 3) setFullscreen(!fullscreen);
             else if (settingsSelection == 4) { scaling = (Scaling)(((int)scaling + 1) % 3); applyScaling(); }
             else if (settingsSelection == 5) hintMode = (hintMode + 1) % 3;
-            else if (settingsSelection == 6) { saveSettings(); state = m_returnState; }
+            else if (settingsSelection == 6) hudHidden = !hudHidden;
+            else if (settingsSelection == 7) { saveSettings(); state = m_returnState; }
             break;
         case SDLK_ESCAPE:
             saveSettings();
@@ -2989,6 +3130,8 @@ void Game::loadSettings() {
         if (f >> us) unlockedStage = menuStage = std::max(0, std::min(Level::N_STAGES - 1, us));
         int hm = 0; unsigned lm = 0;                     // Batch K: hints (older saves lack them)
         if (f >> hm >> lm) { hintMode = std::max(0, std::min(2, hm)); learned = lm; }
+        int hh = 0;                                      // Batch Q (older saves lack it)
+        if (f >> hh) hudHidden = hh != 0;
     }
     musicVolume = std::max(0, std::min(128, musicVolume));
     sfxVolume   = std::max(0, std::min(128, sfxVolume));
@@ -3002,7 +3145,8 @@ void Game::saveSettings() {
       << musicVolume << " " << sfxVolume << " " << bestScore << " "
       << (fullscreen ? 1 : 0) << " " << (int)scaling << " "        // Batch F
       << unlockedStage << " "                                       // Batch H
-      << hintMode << " " << learned << "\n";                       // Batch K
+      << hintMode << " " << learned << " "                          // Batch K
+      << (hudHidden ? 1 : 0) << "\n";                               // Batch Q
 }
 
 void Game::handleEvents() {
@@ -3049,6 +3193,14 @@ void Game::handleEvents() {
                 state = m_returnState;
             continue;
         }
+        if (state == State::Title) {                         // Batch Q: any key opens the menu
+            if (event.type == SDL_KEYDOWN && !event.key.repeat) {
+                if (k == SDLK_ESCAPE) { isRunning = false; break; }
+                state = State::Menu; m_menuTransition = 0.f;
+                Sfx::play("coin");
+            }
+            continue;
+        }
         if (state == State::Achievements) {                  // Batch L
             if (event.type == SDL_KEYDOWN) {
                 if (k == SDLK_ESCAPE || k == SDLK_RETURN || k == SDLK_SPACE) state = State::Menu;
@@ -3067,6 +3219,7 @@ void Game::handleEvents() {
                 case SDLK_LSHIFT: case SDLK_RSHIFT: case SDLK_l: startDash(); break;
                 case SDLK_u: case SDLK_c: startParry(); break;          // Batch C
                 case SDLK_e: case SDLK_v: startGrapple(); break;        // Batch C
+                case SDLK_TAB: case SDLK_F1: toggleHud(); break;        // Batch Q
                 case SDLK_p:
                     if (state == State::Playing) { state = State::Paused; isPaused = true; }
                     else if (state == State::Paused) { state = State::Playing; isPaused = false; }
@@ -3484,6 +3637,14 @@ void Game::drawMinimap() {
 }
 
 void Game::drawHUD() {
+    if (hudHidden) {                                        // Batch Q
+        if (hudNoticeT > 0.f) {
+            hudNoticeT -= lastFrameTime;
+            drawTextA("small", "HUD hidden  -  Tab or F1 to show", 18, Config::WINDOW_HEIGHT - 32,
+                      SDL_Color{ 214, 224, 236, 255 }, (Uint8)(255 * std::min(1.f, hudNoticeT)), false);
+        }
+        return;
+    }
     // Batch B: "Stage N - Name" for the first seconds of every stage
     if (stageBannerT > 0.f) {
         const float a = std::min(1.f, stageBannerT / 0.6f);
@@ -3794,63 +3955,12 @@ void Game::drawMenu() {
     drawMenuBackdrop();
 
     const int W = Config::WINDOW_WIDTH;
-    float glow = 0.5f + 0.5f * std::sin(m_menuTime * 2.6f);
     float slideOffset = (1.0f - m_menuTransition) * -30.0f;
     int titleY = (int)(76 + slideOffset);
+    // Batch Q: the pixel-art logo and the tagline
+    drawLogo(W / 2, titleY - 52, false);
+    drawText("small", "A PIXEL-ART ACTION PLATFORMER", W / 2, titleY + 76, SDL_Color{ 200, 210, 230, 230 }, true);
 
-    // ---- Title with drop-shadow + glow pulse ----
-    if (auto* fBig = assets->GetFont("big")) {
-        SDL_Color cWhite{ 255, 255, 255, 255 };
-        SDL_Surface* sTitle = TTF_RenderUTF8_Blended(fBig, "DUNGEON  RUSH  2", cWhite);
-        if (sTitle) {
-            SDL_Texture* txTitle = SDL_CreateTextureFromSurface(renderer, sTitle);
-            if (txTitle) {
-                int tx = W / 2 - sTitle->w / 2;
-
-                // 1. Drop shadow (+3, +4)
-                SDL_SetTextureColorMod(txTitle, 0, 0, 0);
-                SDL_SetTextureAlphaMod(txTitle, 190);
-                SDL_Rect shadowR{ tx + 3, titleY + 4, sTitle->w, sTitle->h };
-                SDL_RenderCopy(renderer, txTitle, nullptr, &shadowR);
-
-                // 2. Warm amber/gold ambient glow pulse
-                Uint8 glowAlpha = (Uint8)(35 + 45 * glow);
-                SDL_SetTextureColorMod(txTitle, 255, 190, 50);
-                SDL_SetTextureAlphaMod(txTitle, glowAlpha);
-                for (int dx = -2; dx <= 2; dx += 2) {
-                    for (int dy = -2; dy <= 2; dy += 2) {
-                        if (dx == 0 && dy == 0) continue;
-                        SDL_Rect glowR{ tx + dx, titleY + dy, sTitle->w, sTitle->h };
-                        SDL_RenderCopy(renderer, txTitle, nullptr, &glowR);
-                    }
-                }
-
-                // 3. Crisp vibrant golden foreground
-                SDL_SetTextureColorMod(txTitle, 255, (Uint8)(225 + 25 * glow), 105);
-                SDL_SetTextureAlphaMod(txTitle, 255);
-                SDL_Rect titleR{ tx, titleY, sTitle->w, sTitle->h };
-                SDL_RenderCopy(renderer, txTitle, nullptr, &titleR);
-
-                SDL_DestroyTexture(txTitle);
-            }
-            SDL_FreeSurface(sTitle);
-        }
-
-        // Subtitle badge
-        int subY = titleY + 68;
-        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-        SDL_SetRenderDrawColor(renderer, 16, 22, 38, 190);
-        SDL_Rect subBadge{ W / 2 - 180, subY, 360, 26 };
-        SDL_RenderFillRect(renderer, &subBadge);
-        SDL_SetRenderDrawColor(renderer, 80, 160, 220, 90);
-        SDL_RenderDrawRect(renderer, &subBadge);
-        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-
-        drawText("body", "Modern 2D Platformer  ·  SDL2 + ECS", W / 2, subY + 13,
-                 SDL_Color{ 200, 220, 245, 230 }, true);
-    }
-
-    // ---- Best Score Badge ----
     if (bestScore > 0) {
         int badgeW = 210, badgeH = 26;
         int badgeX = W / 2 - badgeW / 2;
@@ -3925,14 +4035,8 @@ void Game::drawMenu() {
         SDL_Rect pillBorder{ bx + 1, by + 1, bw - 2, bh - 2 };
         SDL_RenderDrawRect(renderer, &pillBorder);
 
-        // Left selection indicator pip
-        if (lerp > 0.1f) {
-            Uint8 pipA = (Uint8)(255 * lerp);
-            SDL_SetRenderDrawColor(renderer, 255, 230, 110, pipA);
-            int pipSize = 8;
-            SDL_Rect pipR{ bx + 20, by + bh / 2 - pipSize / 2, pipSize, pipSize };
-            SDL_RenderFillRect(renderer, &pipR);
-        }
+        // (Batch Q: the selection pip gave way to the icons - the highlight
+        //  and the gold icon show the selection)
 
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 
@@ -3940,8 +4044,16 @@ void Game::drawMenu() {
         SDL_Color textCol = (menuSelection == i)
             ? SDL_Color{ 255, 255, 255, 255 }
             : SDL_Color{ 190, 205, 225, 215 };
-        drawText("title", buttonLabels[i], bx + bw / 2 + (lerp > 0.1f ? 8 : 0),
-                 by + bh / 2, textCol, true);
+        {   // Batch Q: an icon, then the label left-aligned after it
+            const std::string lb = buttonLabels[i];
+            const int icon = (nItems == 6 && i == 0) ? 1 : lb == "PLAY" || lb == "NEW GAME" ? 0
+                           : lb == "HOW TO PLAY" ? 2 : lb == "ACHIEVEMENTS" ? 3 : lb == "SETTINGS" ? 4 : 5;
+            const SDL_Color ic = (menuSelection == i) ? SDL_Color{ 255, 200, 37, 255 } : textCol;
+            drawPixelIcon(icon, bx + 28, by + bh / 2 - 10, 2, ic);
+            TTF_Font* tf = assets->GetFont("title");
+            const int th = tf ? TTF_FontHeight(tf) : 36;
+            drawText("title", buttonLabels[i], bx + 68, by + bh / 2 - th / 2, textCol, false);
+        }
         if (nItems == 6 && i == 0) {            // Batch H: CONTINUE - which stage
             const std::string cap = std::string("continue: ") + Level::STAGES[menuStage].name;
             drawText("small", cap.c_str(), bx + bw + 16, by + bh / 2 - 9, SDL_Color{ 255, 230, 120, 255 }, false);
@@ -3950,6 +4062,7 @@ void Game::drawMenu() {
         }
     }
 
+    drawIllustration(W / 2, 790, 2);                         // Batch Q: the scene, smaller
     // ---- Footer hints with key-cap pills ----
     {
         const int footY = 570;
@@ -4107,206 +4220,157 @@ namespace {
 } // namespace
 
 void Game::drawInstructionsPanel(bool overWorld) {
+    // Batch Q: a visual field guide - sections of picture cards (icons cut
+    // from the game's own sprites), key caps and one-line descriptions.
     const int W = Config::WINDOW_WIDTH, H = Config::WINDOW_HEIGHT;
-    const int panelX = 60, panelY = 30;
-    const int panelW = W - 120, panelH = H - 60;
-    // Header height is derived from the two fonts' line skips instead of a
-    // hard-coded 62: the 32 px title alone needs ~42 px, so the old value put
-    // the subtitle on top of it (R-13).
-    TTF_Font* fTitle = assets->GetFont("title");
-    TTF_Font* fSmallH = assets->GetFont("small");
-    const int titleSkip = fTitle  ? TTF_FontLineSkip(fTitle)  : 42;
-    const int smallSkip = fSmallH ? TTF_FontLineSkip(fSmallH) : 17;
-    const int headPad   = 10;
-    const int headH = headPad + titleSkip + smallSkip + 10;
-    const int footH = 34;
-
-    SDL_Rect panel{ panelX, panelY, panelW, panelH };
+    const int px = 60, py = 30, pw = W - 120, ph = H - 60;
+    (void)overWorld;                       // the caller dims the world behind
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(renderer, 14, 18, 30, overWorld ? 245 : 252);
-    SDL_RenderFillRect(renderer, &panel);
-    SDL_SetRenderDrawColor(renderer, 60, 180, 230, 220);
-    SDL_RenderDrawRect(renderer, &panel);
+    SDL_SetRenderDrawColor(renderer, 18, 22, 38, 246);
+    SDL_Rect panel{ px, py, pw, ph }; SDL_RenderFillRect(renderer, &panel);
+    SDL_SetRenderDrawColor(renderer, 120, 200, 255, 200); SDL_RenderDrawRect(renderer, &panel);
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+    const SDL_Color cream{ 249, 230, 207, 255 }, text{ 214, 224, 236, 255 }, dim{ 140, 150, 170, 255 };
 
-    // ---- Content viewport ----
-    const int viewX = panelX + 6;
-    const int viewY = panelY + headH + 4;
-    const int viewW = panelW - 12;
-    const int viewH = panelH - headH - footH - 8;
+    // a key cap; returns its width
+    auto keycap = [&](int x, int y, const char* k) {
+        const int w = textWidth("small", k) + 14;
+        SDL_Rect cap{ x, y, w, 22 };
+        SDL_SetRenderDrawColor(renderer, 44, 52, 80, 255); SDL_RenderFillRect(renderer, &cap);
+        SDL_SetRenderDrawColor(renderer, 160, 175, 205, 255); SDL_RenderDrawRect(renderer, &cap);
+        SDL_SetRenderDrawColor(renderer, 20, 24, 40, 255); SDL_RenderDrawLine(renderer, x + 1, y + 22, x + w - 2, y + 22);
+        drawText("small", k, x + w / 2, y + 11, cream, true);
+        return w;
+    };
+    // an icon cut from a sheet, centred in a box at 1:1 (cropped if larger)
+    auto icon = [&](const char* tex, SDL_Rect src, int bx, int by, int box, int scale = 1) {
+        SDL_Texture* t = assets->GetTexture(tex);
+        if (!t) return;
+        int w = src.w * scale, h = src.h * scale;
+        if (w > box) { src.x += (src.w - box / scale) / 2; src.w = box / scale; w = src.w * scale; }
+        if (h > box) { src.y += (src.h - box / scale);     src.h = box / scale; h = src.h * scale; }
+        SDL_Rect dst{ bx + (box - w) / 2, by + (box - h) / 2, w, h };
+        SDL_RenderCopy(renderer, t, &src, &dst);
+    };
+    // header
+    drawText("title", "HOW TO PLAY", px + 30, py + 14, cream, false);
+    drawText("small", "Everything you need, one move at a time.", px + 32, py + 56, dim, false);
+    { int x = px + pw - 260; x += keycap(x, py + 22, "W / S") + 6; drawText("small", "scroll", x, py + 25, dim, false);
+      x += 60; x += keycap(x, py + 22, "ESC") + 6; drawText("small", "back", x, py + 25, dim, false); }
+
+    // content, laid out top to bottom; drawn clipped and scrolled
+    const int viewX = px + 20, viewY = py + 90, viewW = pw - 40, viewH = ph - 130;
     SDL_Rect view{ viewX, viewY, viewW, viewH };
-
-    const int cardHeadH = 34;
-    const int itemH = 32;
-    int contentH = 0;
-    for (int i = 0; i < CARD_COUNT; i++) {
-        int cardH = cardHeadH + CARDS[i].itemCount * itemH + 14;
-        contentH += cardH + 16;
-    }
-
-    const int maxScroll = std::max(0, contentH - viewH + 20);
-    if (instructionsScroll > maxScroll) instructionsScroll = maxScroll;
-    if (instructionsScroll < 0)        instructionsScroll = 0;
-
-    int scrollY = (int)m_instructionsScrollPos;
-
-    // Render clipped cards
+    const int scroll = (int)m_instructionsScrollPos;
     SDL_RenderSetClipRect(renderer, &view);
-
-    int cardOffset = 0;
-    for (int i = 0; i < CARD_COUNT; i++) {
-        const auto& card = CARDS[i];
-        int cardH = cardHeadH + card.itemCount * itemH + 14;
-        int cardY = viewY + 12 + cardOffset - scrollY;
-        cardOffset += cardH + 16;
-
-        // Culling: Skip cards entirely outside the viewport
-        if (cardY + cardH < viewY - 8 || cardY > viewY + viewH + 8) {
-            continue;
-        }
-
-        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-        // Card body background
-        SDL_SetRenderDrawColor(renderer, 18, 24, 38, 235);
-        SDL_Rect cardR{ panelX + 18, cardY, panelW - 36, cardH };
-        SDL_RenderFillRect(renderer, &cardR);
-
-        // Header strip
-        SDL_SetRenderDrawColor(renderer, card.accent.r / 5, card.accent.g / 5, card.accent.b / 5, 230);
-        SDL_Rect headBar{ cardR.x, cardY, cardR.w, cardHeadH };
-        SDL_RenderFillRect(renderer, &headBar);
-
-        // Header accent bottom line
-        SDL_SetRenderDrawColor(renderer, card.accent.r, card.accent.g, card.accent.b, 200);
-        SDL_RenderDrawLine(renderer, cardR.x, cardY + cardHeadH, cardR.x + cardR.w, cardY + cardHeadH);
-
-        // Card border
-        SDL_SetRenderDrawColor(renderer, card.accent.r / 3, card.accent.g / 3, card.accent.b / 3, 140);
-        SDL_RenderDrawRect(renderer, &cardR);
-        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-
-        // Icon & title
-        char titleBuf[64];
-        std::snprintf(titleBuf, sizeof(titleBuf), "%s  %s", card.icon, card.title);
-        drawText("body", titleBuf, cardR.x + 14, cardY + cardHeadH / 2, card.accent, false);
-
-        // Items inside card
-        for (int j = 0; j < card.itemCount; j++) {
-            int itemY = cardY + cardHeadH + 8 + j * itemH;
-            if (itemY + itemH < viewY || itemY > viewY + viewH) continue;
-
-            // Column 1: Keycap pill badge
-            int keyPillW = 160, keyPillH = 24;
-            int keyPillX = cardR.x + 14;
-            int keyPillY = itemY + itemH / 2 - keyPillH / 2;
-
-            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-            SDL_SetRenderDrawColor(renderer, 32, 40, 58, 230);
-            SDL_Rect pillR{ keyPillX, keyPillY, keyPillW, keyPillH };
-            SDL_RenderFillRect(renderer, &pillR);
-            SDL_SetRenderDrawColor(renderer, 65, 85, 120, 180);
-            SDL_RenderDrawRect(renderer, &pillR);
-            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-
-            drawText("small", card.items[j].key, keyPillX + keyPillW / 2, itemY + itemH / 2,
-                     SDL_Color{ 255, 230, 125, 255 }, true);
-
-            // Column 2: Action Title + Description
-            int textColX = cardR.x + 186;
-            TTF_Font* fSmall = assets->GetFont("small");
-            int titleW = 0, titleH = 0;
-            if (fSmall) {
-                TTF_SizeText(fSmall, card.items[j].title, &titleW, &titleH);
+    struct Card { const char* title; const char* keys[3]; const char* desc; int kind; SDL_Rect src; };
+    // icon kinds: 0 hero cell, 1 skeleton cell, 2 coin, 3 key, 4 checkpoint, 5 props cell, 6 ring, 7 star
+    auto hero = [](int r, int c) { return SDL_Rect{ c * 64, r * 56, 64, 56 }; };
+    struct Section { const char* name; SDL_Color accent; std::vector<Card> cards; };
+    const std::vector<Section> S = {
+        { "THE GOAL", { 255, 200, 37, 255 }, {
+            { "Find the key, open the gate", { "", "", "" }, "Then beat the stage's boss. Three stages, three bosses.", 3, {} },
+            { "Three lives, checkpoints", { "", "", "" }, "Touch a flag and you'll restart there if you fall.", 4, {} } } },
+        { "MOVE", { 120, 200, 255, 255 }, {
+            { "Run", { "A / D", "\u2190 / \u2192", "" }, "Hold to speed up; let go and you skid to a stop.", 0, hero(1, 3) },
+            { "Jump", { "W", "Space", "\u2191" }, "Press again in the air for a double jump.", 0, hero(5, 3) },
+            { "Dash", { "Shift", "L", "" }, "A burst that passes straight through enemies.", 0, hero(5, 1) },
+            { "Slide", { "S", "\u2193", "" }, "While running: a low slide that ducks under shots.", 0, hero(4, 1) },
+            { "Wall jump", { "into a wall", "Jump", "" }, "Hold toward a wall to slide down it, then kick off.", 0, hero(10, 0) },
+            { "Grapple", { "E", "V", "" }, "Near a ring over a gap: hook on, swing, jump to let go.", 6, {} } } },
+        { "FIGHT", { 255, 137, 51, 255 }, {
+            { "Sword", { "J", "Z", "" }, "Tap three times for a combo. \u2191+J uppercut, \u2193+J in air slams.", 0, hero(3, 3) },
+            { "Bolt", { "K", "X", "" }, "A ranged shot - hold it to charge a piercing bolt.", 0, hero(6, 2) },
+            { "Parry", { "U", "C", "" }, "Just as a hit lands: arrows fly back, attackers stagger.", 0, hero(3, 1) },
+            { "Read the warnings", { "", "", "" }, "Red eyes, a glow or a '!' on the ground: an attack is coming.", 1, SDL_Rect{ 2 * 40, 2 * 56, 40, 56 } } } },
+        { "THE WORLD", { 90, 197, 79, 255 }, {
+            { "Coins", { "", "", "" }, "Collect them all. Crates, barrels and bushes can hide more.", 2, {} },
+            { "Signposts", { "", "", "" }, "Walk up to one and a scroll explains what's ahead.", 5, SDL_Rect{ (10 % 8) * 64, (10 / 8) * 64, 64, 64 } },
+            { "Stars and tasks", { "P", "", "" }, "Each stage has three tasks (see them when paused) - up to 3 stars.", 7, {} },
+            { "Achievements", { "", "", "" }, "24 to earn - see them from the main menu.", 7, {} } } } };
+    const int cardW = (viewW - 16) / 2, cardH = 84, gap = 12, iconBox = 72;
+    int y = viewY + 6 - scroll;
+    for (const auto& sec : S) {
+        // section heading with a rule
+        drawText("head", sec.name, viewX + 4, y, sec.accent, false);
+        SDL_SetRenderDrawColor(renderer, sec.accent.r, sec.accent.g, sec.accent.b, 255);
+        SDL_Rect rule{ viewX + 4 + textWidth("head", sec.name) + 14, y + 14, viewW - textWidth("head", sec.name) - 24, 2 };
+        SDL_RenderFillRect(renderer, &rule);
+        y += 40;
+        for (size_t i = 0; i < sec.cards.size(); ++i) {
+            const auto& c = sec.cards[i];
+            const int cx = viewX + (int)(i % 2) * (cardW + 16), cy = y + (int)(i / 2) * (cardH + gap);
+            if (cy + cardH < viewY || cy > viewY + viewH) continue;
+            SDL_SetRenderDrawColor(renderer, 26, 32, 52, 255);
+            SDL_Rect card{ cx, cy, cardW, cardH }; SDL_RenderFillRect(renderer, &card);
+            SDL_SetRenderDrawColor(renderer, sec.accent.r / 3, sec.accent.g / 3, sec.accent.b / 3, 255);
+            SDL_RenderDrawRect(renderer, &card);
+            SDL_SetRenderDrawColor(renderer, sec.accent.r, sec.accent.g, sec.accent.b, 255);
+            SDL_Rect stripe{ cx, cy, 3, cardH }; SDL_RenderFillRect(renderer, &stripe);
+            // the icon box
+            const int ix = cx + 10, iy = cy + (cardH - iconBox) / 2;
+            SDL_SetRenderDrawColor(renderer, 14, 18, 30, 255);
+            SDL_Rect ib{ ix, iy, iconBox, iconBox }; SDL_RenderFillRect(renderer, &ib);
+            switch (c.kind) {
+                case 0: icon("player", c.src, ix, iy, iconBox); break;
+                case 1: icon("skeleton", c.src, ix, iy, iconBox); break;
+                case 2: icon("coin", SDL_Rect{ 0, 0, 61, 62 }, ix, iy, iconBox); break;
+                case 3: icon("key", SDL_Rect{ 0, 0, 22, 22 }, ix, iy, iconBox, 2); break;
+                case 4: icon("checkpoint", SDL_Rect{ 0, 0, 32, 64 }, ix, iy, iconBox); break;
+                case 5: icon("props", c.src, ix, iy, iconBox); break;
+                case 6: {                                            // a grapple ring
+                    const int rx = ix + iconBox / 2, ry = iy + iconBox / 2;
+                    SDL_SetRenderDrawColor(renderer, 28, 18, 28, 255);
+                    SDL_Rect a1{ rx - 12, ry - 16, 24, 32 }, a2{ rx - 16, ry - 12, 32, 24 };
+                    SDL_RenderFillRect(renderer, &a1); SDL_RenderFillRect(renderer, &a2);
+                    SDL_SetRenderDrawColor(renderer, 66, 76, 110, 255);
+                    SDL_Rect b1{ rx - 9, ry - 13, 18, 26 }, b2{ rx - 13, ry - 9, 26, 18 };
+                    SDL_RenderFillRect(renderer, &b1); SDL_RenderFillRect(renderer, &b2);
+                    SDL_SetRenderDrawColor(renderer, 14, 18, 30, 255);
+                    SDL_Rect hole{ rx - 5, ry - 5, 10, 10 }; SDL_RenderFillRect(renderer, &hole);
+                    SDL_SetRenderDrawColor(renderer, 255, 200, 37, 255);
+                    SDL_Rect glint{ rx + 6, ry - 11, 4, 4 }; SDL_RenderFillRect(renderer, &glint);
+                    break;
+                }
+                case 7: drawStar(renderer, ix + iconBox / 2, iy + iconBox / 2, true, 255, 5); break;
             }
-            drawText("small", card.items[j].title, textColX, itemY + itemH / 2,
-                     SDL_Color{ 255, 255, 255, 255 }, false);
-
-            drawText("small", "·", textColX + titleW + 8, itemY + itemH / 2,
-                     SDL_Color{ 100, 130, 165, 200 }, false);
-
-            drawText("small", card.items[j].desc, textColX + titleW + 20, itemY + itemH / 2,
-                     SDL_Color{ 185, 198, 218, 230 }, false);
+            // title, keys, description
+            const int tx = ix + iconBox + 14;
+            drawText("head", c.title, tx, cy + 8, cream, false);
+            int kx = tx + textWidth("head", c.title) + 12;
+            for (const char* k : c.keys) if (k && *k) kx += keycap(kx, cy + 10, k) + 6;
+            drawText("small", c.desc, tx, cy + 46, text, false);
         }
+        y += (int)((sec.cards.size() + 1) / 2) * (cardH + gap) + 18;
     }
-
+    // game keys: a compact two-column list
+    drawText("head", "GAME KEYS", viewX + 4, y, SDL_Color{ 200, 160, 255, 255 }, false);
+    SDL_SetRenderDrawColor(renderer, 200, 160, 255, 255);
+    SDL_Rect rule2{ viewX + 4 + textWidth("head", "GAME KEYS") + 14, y + 14, viewW - textWidth("head", "GAME KEYS") - 24, 2 };
+    SDL_RenderFillRect(renderer, &rule2);
+    y += 40;
+    const char* keys[][2] = { { "P / ESC", "Pause - tasks, settings, run stats" }, { "O", "Settings" },
+        { "H", "This help" }, { "M", "Mute" }, { "F11 / Alt+Enter", "Fullscreen" },
+        { "Tab / F1", "Hide or show the HUD" }, { "R", "Restart after a game over" } };
+    for (int i = 0; i < 7; ++i) {
+        const int kx = viewX + (i % 2) * (cardW + 16), ky = y + (i / 2) * 34;
+        const int w = keycap(kx, ky, keys[i][0]);
+        drawText("small", keys[i][1], kx + w + 12, ky + 3, text, false);
+    }
+    y += 4 * 34 + 20;
     SDL_RenderSetClipRect(renderer, nullptr);
-
-    // ---- Fade edges (smooth dissolve at top & bottom) ----
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    for (int f = 0; f < 10; f++) {
-        Uint8 fadeA = (Uint8)(240 * (1.0f - (float)f / 10.0f));
-        SDL_SetRenderDrawColor(renderer, 14, 18, 30, fadeA);
-        SDL_RenderDrawLine(renderer, viewX, viewY + f, viewX + viewW, viewY + f);
-    }
-    for (int f = 0; f < 10; f++) {
-        Uint8 fadeA = (Uint8)(240 * ((float)f / 10.0f));
-        SDL_SetRenderDrawColor(renderer, 14, 18, 30, fadeA);
-        SDL_RenderDrawLine(renderer, viewX, viewY + viewH - 10 + f, viewX + viewW, viewY + viewH - 10 + f);
-    }
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-
-    // ---- Thin Scrollbar ----
+    // scrolling: clamp, and show how far down we are
+    const int contentH = (y + scroll) - (viewY + 6);
+    const int maxScroll = std::max(0, contentH - viewH);
+    if (instructionsScroll > maxScroll) instructionsScroll = maxScroll;
+    if (instructionsScroll < 0) instructionsScroll = 0;
     if (maxScroll > 0) {
-        const int trackX = panelX + panelW - 12;
-        SDL_Rect track{ trackX, viewY + 4, 6, viewH - 8 };
-        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 16);
-        SDL_RenderFillRect(renderer, &track);
-
-        int thumbH = std::max(36, (int)((float)viewH * (float)viewH / (float)contentH));
-        int thumbY = viewY + 4 + (int)(((float)viewH - 8.f - (float)thumbH) * (m_instructionsScrollPos / (float)maxScroll));
-        SDL_SetRenderDrawColor(renderer, 80, 210, 255, 220);
-        SDL_Rect thumb{ trackX - 1, thumbY, 8, thumbH };
-        SDL_RenderFillRect(renderer, &thumb);
-
-        SDL_SetRenderDrawColor(renderer, 200, 245, 255, 255);
-        SDL_RenderDrawLine(renderer, trackX + 1, thumbY + 2, trackX + 1, thumbY + thumbH - 3);
-        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+        const int trackH = viewH, thumbH = std::max(40, viewH * viewH / (contentH + 1));
+        const int thumbY = viewY + (int)((trackH - thumbH) * (float)scroll / maxScroll);
+        SDL_SetRenderDrawColor(renderer, 40, 48, 72, 255);  SDL_Rect tr{ px + pw - 12, viewY, 4, trackH }; SDL_RenderFillRect(renderer, &tr);
+        SDL_SetRenderDrawColor(renderer, 120, 200, 255, 255); SDL_Rect th{ px + pw - 12, thumbY, 4, thumbH }; SDL_RenderFillRect(renderer, &th);
     }
-
-    // ---- Sticky Header ----
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(renderer, 18, 24, 38, 252);
-    SDL_Rect headR{ panelX, panelY, panelW, headH };
-    SDL_RenderFillRect(renderer, &headR);
-    SDL_SetRenderDrawColor(renderer, 80, 210, 255, 220);
-    SDL_RenderDrawLine(renderer, panelX, panelY + headH, panelX + panelW, panelY + headH);
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-
-    drawText("title", "HOW TO PLAY", panelX + 24, panelY + headPad,
-             SDL_Color{ 255, 255, 255, 255 }, false);
-    drawText("small", "Field Guide & Combat Manual  ·  DungeonRush 2",
-             panelX + 26, panelY + headPad + titleSkip,
-             SDL_Color{ 130, 180, 220, 220 }, false);
-
-    int kw1 = 0, kw2 = 0;
-    int kx = panelX + panelW - 320;
-    drawKeycap("Wheel / ↑↓", kx, panelY + headH / 2, kw1);
-    drawText("small", "Scroll", kx + kw1 + 6, panelY + headH / 2, SDL_Color{ 180, 200, 225, 230 }, false);
-
-    kx += kw1 + 56;
-    drawKeycap("ESC / ENTER", kx, panelY + headH / 2, kw2);
-    drawText("small", "Close", kx + kw2 + 6, panelY + headH / 2, SDL_Color{ 180, 200, 225, 230 }, false);
-
-    // ---- Sticky Footer ----
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(renderer, 16, 20, 32, 252);
-    SDL_Rect footR{ panelX, panelY + panelH - footH, panelW, footH };
-    SDL_RenderFillRect(renderer, &footR);
-    SDL_SetRenderDrawColor(renderer, 60, 80, 110, 160);
-    SDL_RenderDrawLine(renderer, panelX, footR.y, panelX + panelW, footR.y);
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-
-    drawText("small", "DungeonRush 2  ·  Use Up / Down / PageUp / PageDown / Mouse Wheel to navigate",
-             panelX + 24, footR.y + footH / 2, SDL_Color{ 130, 150, 180, 220 }, false);
-
-    char pctBuf[32];
-    int pct = (maxScroll > 0) ? (int)(100.f * m_instructionsScrollPos / (float)maxScroll) : 100;
-    pct = std::max(0, std::min(100, pct));
-    std::snprintf(pctBuf, sizeof(pctBuf), "%d%%", pct);
-
-    int kwPct = 0;
-    drawKeycap(pctBuf, panelX + panelW - 70, footR.y + footH / 2, kwPct);
+    drawText("small", "Mouse wheel, \u2191 \u2193, Page Up / Down to scroll", px + 32, py + ph - 30, dim, false);
 }
 
 // A translucent full-screen scrim.  Every overlay draws one of these first so
@@ -4462,7 +4526,10 @@ void Game::render() {
     //
     // There is exactly one SDL_RenderPresent call now, and no early return.
     // ------------------------------------------------------------------
-    if (state == State::Achievements) {                     // Batch L
+    if (state == State::Title) {                            // Batch Q
+        drawMenuBackdrop();
+        drawTitle();
+    } else if (state == State::Achievements) {              // Batch L
         drawMenuBackdrop();
         drawAchievements();
     } else if (state == State::Menu) {

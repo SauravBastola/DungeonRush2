@@ -21,7 +21,8 @@ class Game {
 public:
     enum class State { Menu, Instructions, Playing, Paused,
                        Settings, Stats, GameOver, Victory, LevelComplete,
-                       Achievements };                       // Batch L
+                       Achievements,                         // Batch L
+                       Title };                              // Batch Q
 
     Game();
     ~Game();
@@ -168,6 +169,17 @@ public:
     void     playAmbient(const char* id);
     int      weatherKind() const;          // 0 none, 1 rain (stage 2), 2 ash (stage 3)
     void     drawWeather();
+    // ---- Batch Q: title screen, logo, HUD toggle ------------------------------
+    SDL_Texture* m_logo[2] = { nullptr, nullptr };       // big (title), small (menu)
+    int      m_logoW[2] = { 0, 0 }, m_logoH[2] = { 0, 0 };
+    void     buildLogo();
+    void     drawLogo(int cx, int y, bool big);
+    void     drawTitle();
+    void     drawIllustration(int cx, int groundY, int scale);
+    void     drawPixelIcon(int which, int x, int y, int scale, SDL_Color c);
+    bool     hudHidden = false;
+    float    hudNoticeT = 0.f;
+    void     toggleHud();
     // ---- Batch P2: props that react (lifted out of the props tile layer) ----
     struct RProp { int id = 0; float x = 0, y = 0; int hp = 1; float sway = 0, swayV = 0, shake = 0;
                    bool gone = false; int index = 0; float leafT = 0; };
