@@ -177,9 +177,12 @@ public:
     void     drawTitle();
     void     drawIllustration(int cx, int groundY, int scale);
     void     drawPixelIcon(int which, int x, int y, int scale, SDL_Color c);
-    bool     hudHidden = false;
-    float    hudNoticeT = 0.f;
-    void     toggleHud();
+    // Hints on / off during play (Tab or F1): Off hides the hint dock, the
+    // tutorial scrolls and the corner reminder.  hintsOnMode is the mode to
+    // return to (Smart or All).  A short tip at the start of a run says how.
+    int      hintsOnMode = 0;
+    float    hintNoticeT = 0.f, runTipT = 0.f;
+    void     toggleHints();
     // ---- Batch P2: props that react (lifted out of the props tile layer) ----
     struct RProp { int id = 0; float x = 0, y = 0; int hp = 1; float sway = 0, swayV = 0, shake = 0;
                    bool gone = false; int index = 0; float leafT = 0; };

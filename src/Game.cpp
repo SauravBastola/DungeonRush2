@@ -1532,7 +1532,7 @@ void Game::updateHints() {
     for (auto& h : hints) h.alpha += ((h.want ? 1.f : 0.f) - h.alpha) * k;
     for (auto& sg : signs) {                       // tutorial scrolls open near their sign
         float want = 0.f;
-        if (state == State::Playing) {
+        if (state == State::Playing && hintMode != 2) {          // Off: no scrolls either
             auto& tr = manager.getGroup(groupPlayers)[0]->getComponent<TransformComponent>();
             if (std::fabs(tr.position.x + 16.f - sg.x) < 150.f && std::fabs(tr.position.y + 50.f - sg.y) < 260.f)
                 want = 1.f;
@@ -2162,9 +2162,11 @@ void Game::drawReactiveProps() {
 // ============================================================================
 // Batch Q: title screen, logo, pixel icons, HUD toggle
 // ============================================================================
-void Game::toggleHud() {
-    hudHidden = !hudHidden;
-    hudNoticeT = hudHidden ? 2.0f : 0.f;
+void Game::toggleHints() {
+    if (hintMode == 2) hintMode = hintsOnMode;          // back to Smart (or All)
+    else { hintsOnMode = hintMode; hintMode = 2; }      // remember it, then Off
+    hintNoticeT = 2.5f;
+    runTipT = 0.f;                                      // the start-of-run tip has done its job
     saveSettings();
 }
 
@@ -2482,6 +2484,7 @@ void Game::restartLevel() {
     buildSigns();                                       // Batch K
     resetStageRun();                                    // Batch L
     playAmbient("amb_meadow");                          // Batch P
+    runTipT = (hintMode != 2) ? 6.f : 0.f;              // how to turn hints off
     state = State::Playing;
     isPaused = false;
     pauseSelection = 0;
@@ -2882,7 +2885,7 @@ void Game::drawSettings() {
     SDL_Rect full{ 0, 0, W, H };
     SDL_RenderFillRect(renderer, &full);
 
-    const int pw = 620, ph = 580;                       // Batch F + K + Q: four more rows
+    const int pw = 620, ph = 530;                       // Batch F + K: three more rows
     const int px = (W - pw) / 2, py = (H - ph) / 2;
     SDL_SetRenderDrawColor(renderer, 28, 34, 56, 250);
     SDL_Rect panel{ px, py, pw, ph };
@@ -2902,10 +2905,10 @@ void Game::drawSettings() {
 
     // ---- rows ----
     struct Row { const char* label; int y; };
-    const int rowY[8] = { py + 150, py + 200, py + 250, py + 300, py + 350, py + 400, py + 450, py + 506 };
-    const char* labels[8] = { "Music", "Effects", "Mute all", "Display", "Pixels", "Hints", "HUD", "Back" };
+    const int rowY[7] = { py + 150, py + 200, py + 250, py + 300, py + 350, py + 400, py + 456 };
+    const char* labels[7] = { "Music", "Effects", "Mute all", "Display", "Pixels", "Hints", "Back" };
 
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 7; i++) {
         bool sel = (settingsSelection == i);
         if (sel) {   // highlight the selected row
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
@@ -2940,14 +2943,12 @@ void Game::drawSettings() {
                      muted ? colRed : colGreen, false);
         } else if (i == 3) {                                       // Batch F
             drawText("body", fullscreen ? "Fullscreen" : "Windowed", px + 300, rowY[i], norm, false);
-        } else if (i == 6) {                                       // Batch Q
-            drawText("body", hudHidden ? "Hidden" : "Shown", px + 300, rowY[i], norm, false);
-            drawText("small", "Tab or F1 in play", px + 420, rowY[i], dim, false);
         } else if (i == 5) {                                       // Batch K
             const char* m = hintMode == 0 ? "Smart" : hintMode == 1 ? "All" : "Off";
             drawText("body", m, px + 300, rowY[i], norm, false);
-            drawText("small", hintMode == 0 ? "only what helps now" : hintMode == 1 ? "always show the keys"
-                              : "no hints", px + 420, rowY[i], dim, false);
+            drawText("small", hintMode == 0 ? "only what helps now  (Tab in play)" : hintMode == 1
+                              ? "always show the keys  (Tab in play)" : "no hints  (Tab in play)",
+                     px + 420, rowY[i], dim, false);
         } else if (i == 4) {
             const char* m = scaling == Scaling::Auto ? "Auto" : scaling == Scaling::Sharp ? "Sharp" : "Fill";
             drawText("body", m, px + 300, rowY[i], norm, false);
@@ -3067,16 +3068,15 @@ void Game::handleSettingsInput(SDL_Keycode key) {
     const int step = 8;
     switch (key) {
         case SDLK_UP:    case SDLK_w:
-            settingsSelection = (settingsSelection + 7) % 8; break;
+            settingsSelection = (settingsSelection + 6) % 7; break;
         case SDLK_DOWN:  case SDLK_s:
-            settingsSelection = (settingsSelection + 1) % 8; break;
+            settingsSelection = (settingsSelection + 1) % 7; break;
         case SDLK_LEFT:  case SDLK_a:
             if (settingsSelection == 0) musicVolume = std::max(0,   musicVolume - step);
             if (settingsSelection == 1) sfxVolume   = std::max(0,   sfxVolume   - step);
             if (settingsSelection == 3) setFullscreen(!fullscreen);
             if (settingsSelection == 4) { scaling = (Scaling)(((int)scaling + 2) % 3); applyScaling(); }
-            if (settingsSelection == 5) hintMode = (hintMode + 2) % 3;
-            if (settingsSelection == 6) hudHidden = !hudHidden;
+            if (settingsSelection == 5) { hintMode = (hintMode + 2) % 3; if (hintMode != 2) hintsOnMode = hintMode; }
             applyVolumes();
             break;
         case SDLK_RIGHT: case SDLK_d:
@@ -3084,17 +3084,15 @@ void Game::handleSettingsInput(SDL_Keycode key) {
             if (settingsSelection == 1) sfxVolume   = std::min(128, sfxVolume   + step);
             if (settingsSelection == 3) setFullscreen(!fullscreen);
             if (settingsSelection == 4) { scaling = (Scaling)(((int)scaling + 1) % 3); applyScaling(); }
-            if (settingsSelection == 5) hintMode = (hintMode + 1) % 3;
-            if (settingsSelection == 6) hudHidden = !hudHidden;
+            if (settingsSelection == 5) { hintMode = (hintMode + 1) % 3; if (hintMode != 2) hintsOnMode = hintMode; }
             applyVolumes();
             break;
         case SDLK_RETURN: case SDLK_SPACE: case SDLK_KP_ENTER:
             if (settingsSelection == 2) { muted = !muted; applyVolumes(); }
             else if (settingsSelection == 3) setFullscreen(!fullscreen);
             else if (settingsSelection == 4) { scaling = (Scaling)(((int)scaling + 1) % 3); applyScaling(); }
-            else if (settingsSelection == 5) hintMode = (hintMode + 1) % 3;
-            else if (settingsSelection == 6) hudHidden = !hudHidden;
-            else if (settingsSelection == 7) { saveSettings(); state = m_returnState; }
+            else if (settingsSelection == 5) { hintMode = (hintMode + 1) % 3; if (hintMode != 2) hintsOnMode = hintMode; }
+            else if (settingsSelection == 6) { saveSettings(); state = m_returnState; }
             break;
         case SDLK_ESCAPE:
             saveSettings();
@@ -3130,8 +3128,8 @@ void Game::loadSettings() {
         if (f >> us) unlockedStage = menuStage = std::max(0, std::min(Level::N_STAGES - 1, us));
         int hm = 0; unsigned lm = 0;                     // Batch K: hints (older saves lack them)
         if (f >> hm >> lm) { hintMode = std::max(0, std::min(2, hm)); learned = lm; }
-        int hh = 0;                                      // Batch Q (older saves lack it)
-        if (f >> hh) hudHidden = hh != 0;
+        int ho = 0;                                      // the hint mode Tab returns to
+        if (f >> ho) hintsOnMode = (ho == 1) ? 1 : 0;
     }
     musicVolume = std::max(0, std::min(128, musicVolume));
     sfxVolume   = std::max(0, std::min(128, sfxVolume));
@@ -3146,7 +3144,7 @@ void Game::saveSettings() {
       << (fullscreen ? 1 : 0) << " " << (int)scaling << " "        // Batch F
       << unlockedStage << " "                                       // Batch H
       << hintMode << " " << learned << " "                          // Batch K
-      << (hudHidden ? 1 : 0) << "\n";                               // Batch Q
+      << hintsOnMode << "\n";                                       // Tab returns to this
 }
 
 void Game::handleEvents() {
@@ -3219,7 +3217,7 @@ void Game::handleEvents() {
                 case SDLK_LSHIFT: case SDLK_RSHIFT: case SDLK_l: startDash(); break;
                 case SDLK_u: case SDLK_c: startParry(); break;          // Batch C
                 case SDLK_e: case SDLK_v: startGrapple(); break;        // Batch C
-                case SDLK_TAB: case SDLK_F1: toggleHud(); break;        // Batch Q
+                case SDLK_TAB: case SDLK_F1: toggleHints(); break;      // hints on / off
                 case SDLK_p:
                     if (state == State::Playing) { state = State::Paused; isPaused = true; }
                     else if (state == State::Paused) { state = State::Playing; isPaused = false; }
@@ -3637,14 +3635,7 @@ void Game::drawMinimap() {
 }
 
 void Game::drawHUD() {
-    if (hudHidden) {                                        // Batch Q
-        if (hudNoticeT > 0.f) {
-            hudNoticeT -= lastFrameTime;
-            drawTextA("small", "HUD hidden  -  Tab or F1 to show", 18, Config::WINDOW_HEIGHT - 32,
-                      SDL_Color{ 214, 224, 236, 255 }, (Uint8)(255 * std::min(1.f, hudNoticeT)), false);
-        }
-        return;
-    }
+
     // Batch B: "Stage N - Name" for the first seconds of every stage
     if (stageBannerT > 0.f) {
         const float a = std::min(1.f, stageBannerT / 0.6f);
@@ -3843,6 +3834,33 @@ void Game::drawHUD() {
     }
 
     drawMinimap();
+    // drawn last, so nothing in the HUD covers it -
+    // a small panel under the health bars: the hints notice (after Tab) or,
+    // at the start of a run with hints on, a tip on how to turn them off
+    {
+        const char* line1 = nullptr; const char* line2 = nullptr; float t = 0.f;
+        if (hintNoticeT > 0.f) {
+            hintNoticeT -= lastFrameTime; t = hintNoticeT;
+            line1 = hintMode == 2 ? "Hints off" : (hintMode == 1 ? "Hints on (all)" : "Hints on");
+            line2 = "Tab to switch  -  also in Settings > Hints";
+        } else if (runTipT > 0.f && hintMode != 2 && state == State::Playing) {
+            runTipT -= lastFrameTime; t = runTipT;
+            line1 = "Tip: press Tab to turn hints off";
+            line2 = "also in Settings > Hints";
+        }
+        if (line1) {
+            const Uint8 a = (Uint8)(255 * std::min(1.f, t));
+            const int w = std::max(textWidth("body", line1), textWidth("small", line2)) + 28;
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(renderer, 14, 18, 32, (Uint8)(240 * std::min(1.f, t)));
+            SDL_Rect box{ 12, 52, w, 56 }; SDL_RenderFillRect(renderer, &box);
+            SDL_SetRenderDrawColor(renderer, 120, 200, 255, (Uint8)(180 * std::min(1.f, t)));
+            SDL_Rect bar{ 12, 52, 3, 56 }; SDL_RenderFillRect(renderer, &bar);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+            drawTextA("body", line1, 26, 58, SDL_Color{ 255, 244, 228, 255 }, a, false);
+            drawTextA("small", line2, 26, 84, SDL_Color{ 190, 202, 222, 255 }, a, false);
+        }
+    }
 }
 
 // G// ===========================================================================
@@ -4240,7 +4258,7 @@ void Game::drawInstructionsPanel(bool overWorld) {
     y += 40;
     const char* keys[][2] = { { "P / ESC", "Pause - tasks, settings, run stats" }, { "O", "Settings" },
         { "H", "This help" }, { "M", "Mute" }, { "F11 / Alt+Enter", "Fullscreen" },
-        { "Tab / F1", "Hide or show the HUD" }, { "R", "Restart after a game over" } };
+        { "Tab / F1", "Turn hints on or off" }, { "R", "Restart after a game over" } };
     for (int i = 0; i < 7; ++i) {
         const int kx = viewX + (i % 2) * (cardW + 16), ky = y + (i / 2) * 34;
         const int w = keycap(kx, ky, keys[i][0]);
