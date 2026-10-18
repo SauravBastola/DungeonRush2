@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <set>
 #include <cstddef>
 #include "Config.h"
 
@@ -19,7 +20,8 @@ class UILabel;
 class Game {
 public:
     enum class State { Menu, Instructions, Playing, Paused,
-                       Settings, Stats, GameOver, Victory, LevelComplete };
+                       Settings, Stats, GameOver, Victory, LevelComplete,
+                       Achievements };                       // Batch L
 
     Game();
     ~Game();
@@ -91,7 +93,7 @@ public:
     // the stage the menu's CONTINUE will start
     int unlockedStage = 0;
     int menuStage = 0;
-    int menuItems() const { return unlockedStage > 0 ? 5 : 4; }
+    int menuItems() const { return unlockedStage > 0 ? 6 : 5; }     // Batch L: + ACHIEVEMENTS
     void startRunAt(int stage);
     // Batch J: the moving platform the hero stands on (sticky ride)
     Entity* ridePlat = nullptr;
@@ -116,6 +118,38 @@ public:
     void     buildSigns();
     void     drawSigns();
     float    nearestSignOpen() const;
+
+    // ---- Batch L: achievements and tasks (saved in dungeonrush.progress) ----
+    struct Ach  { const char* id; const char* title; const char* desc; const char* stat; int target; };
+    struct Task { const char* text; const char* stat; int target; bool atClear; bool atMost; };
+    static const std::vector<Ach>& achList();
+    static const Task* tasksFor(int stage);            // three per stage
+    std::map<std::string, int> life;                   // lifetime counters
+    std::set<std::string> unlocked;                    // achievement ids
+    unsigned signsRead = 0;                            // tutorial scrolls read (bit per sign)
+    int      tasksDone[3] = { 0, 0, 0 };               // per stage, bit per task
+    struct StageRun { int coins = 0, kills = 0, parries = 0, grapples = 0, hits = 0, deaths = 0; float time = 0.f; };
+    StageRun srun;
+    int      snapCoins = -1, snapParries = 0, snapGrapples = 0, snapDeaths = 0;
+    bool     snapDoor = false;
+    struct Toast { std::string head, text; float t = 0.f; };
+    std::vector<Toast> toasts;
+    int      achScroll = 0;
+    void     lifeAdd(const std::string& k, int n = 1);
+    void     lifeMax(const std::string& k, int v);
+    int      achValue(const Ach& a) const;
+    int      taskValue(int stage, const Task& t) const;
+    void     resetStageRun();
+    void     updateProgress();                         // every playing frame
+    void     onKill(const std::string& tag);
+    void     onStageClear();
+    void     checkAchievements();
+    void     evalTasks(bool atClear);
+    void     loadProgress();
+    void     saveProgress();
+    void     drawToasts();
+    void     drawAchievements();
+    void     drawTasksPanel();
     void     drawTextA(const char* fontId, const char* text, int x, int y, SDL_Color c, Uint8 alpha, bool centered);
     int      textWidth(const char* fontId, const char* text);
     void pickRidePlatform();
@@ -282,7 +316,7 @@ private:
     float m_menuTime = 0.f;
     float m_menuTransition = 0.f;
     float m_instructionsScrollPos = 0.f;
-    float m_buttonAnim[5] = { 0.f, 0.f, 0.f, 0.f, 0.f };
+    float m_buttonAnim[6] = { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
 
     struct Firefly {
         float x, y;

@@ -112,6 +112,7 @@ void Game::init(const char* title, int width, int height, bool fullscreen) {
 
     // restore the player's saved volumes before the first note plays
     loadSettings();
+    loadProgress();                                     // Batch L
 
     if (TTF_Init() == -1) std::cerr << "TTF_Init: " << TTF_GetError() << "\n";
     if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 1024) == -1)
@@ -312,6 +313,7 @@ void Game::loadStage(int n) {
     m_bossMusicOn = false;
     playMusic("stage" + std::to_string(n + 1), true);          // Batch E
     buildSigns();                                               // Batch K
+    resetStageRun();                                            // Batch L
 }
 
 void Game::loadLevel() {
@@ -760,6 +762,7 @@ void Game::handlePlayerInput() {
         iframeTimer = std::max(iframeTimer, Config::SLIDE_TIME);
         Sfx::play("slide");
         noteUsed(L_SLIDE);                                          // Batch K
+        lifeAdd("slides");                                          // Batch L
     }
     prevDownKey = downKey;
     if (slideT > 0.f) {
@@ -784,7 +787,7 @@ void Game::handlePlayerInput() {
     }
     {   // Batch G2: any HP loss (any source) lights the hurt glow
         const float hpNow = manager.getGroup(groupPlayers)[0]->getComponent<HealthComponent>().hp;
-        if (lastHeroHp >= 0.f && hpNow < lastHeroHp - 0.5f) hurtFlashT = 0.35f;
+        if (lastHeroHp >= 0.f && hpNow < lastHeroHp - 0.5f) { hurtFlashT = 0.35f; srun.hits++; }   // + Batch L
         lastHeroHp = hpNow;
         if (hurtFlashT > 0.f) hurtFlashT -= lastFrameTime;
     }
@@ -1198,6 +1201,7 @@ bool Game::tryReflect(Entity& shot) {
     pc.gravity = false;
     pc.dead.clear();
     parryLanded(*this, tr.position.x, tr.position.y);
+    lifeAdd("reflects");                                        // Batch L
     return true;
 }
 
@@ -1486,6 +1490,10 @@ void Game::updateHints() {
         }
         sg.open += (want - sg.open) * std::min(1.f, lastFrameTime * 7.f);
         if (sg.open < 0.004f) sg.open = 0.f;
+        if (sg.open > 0.9f) {                                       // Batch L: read it
+            const unsigned bit = 1u << (unsigned)(&sg - &signs[0]);
+            if (!(signsRead & bit)) { signsRead |= bit; saveProgress(); }
+        }
     }
 }
 
@@ -1628,6 +1636,281 @@ float Game::nearestSignOpen() const {
     return m;
 }
 
+// ============================================================================
+// Batch L: achievements and tasks
+// ============================================================================
+const std::vector<Game::Ach>& Game::achList() {
+    static const std::vector<Ach> A = {
+        { "first_blood", "First Blood",      "Defeat an enemy",                    "kills",     1 },
+        { "hunter",      "Hunter",           "Defeat 50 enemies",                  "kills",     50 },
+        { "slayer",      "Slayer",           "Defeat 200 enemies",                 "kills",     200 },
+        { "combo",       "Combo Artist",     "Land a 10-hit combo",                "combo",     10 },
+        { "parry1",      "En Garde",         "Land a parry",                       "parries",   1 },
+        { "sender",      "Return to Sender", "Parry a shot back at its owner",     "reflects",  1 },
+        { "parry25",     "Iron Wall",        "Land 25 parries",                    "parries",   25 },
+        { "bones",       "Bone Breaker",     "Defeat 20 skeletons",                "skeleton",  20 },
+        { "bats",        "Bat Swatter",      "Defeat 15 bats",                     "bat",       15 },
+        { "wisps",       "Ghost Light",      "Defeat 10 wisps",                    "wisp",      10 },
+        { "weeds",       "Weed Whacker",     "Defeat 10 spitters",                 "spitter",   10 },
+        { "hooked",      "Hooked",           "Use the grappling hook",             "grapples",  1 },
+        { "swinger",     "Swinger",          "Grapple 30 times",                   "grapples",  30 },
+        { "slider",      "Low Profile",      "Slide 25 times",                     "slides",    25 },
+        { "walls",       "Wall Runner",      "Wall-jump 20 times",                 "walljumps", 20 },
+        { "coins100",    "Pocket Money",     "Collect 100 coins",                  "coins",     100 },
+        { "coins500",    "Treasure Hunter",  "Collect 500 coins",                  "coins",     500 },
+        { "scholar",     "Scholar",          "Read all seven tutorial scrolls",    "scrolls",   7 },
+        { "gate",        "Gatekeeper",       "Open a locked gate",                 "gate",      1 },
+        { "boss1",       "Giant Slayer",     "Defeat a boss",                      "bosses",    1 },
+        { "untouched",   "Untouchable",      "Clear a stage without being hit",    "untouched", 1 },
+        { "swift",       "Swift",            "Clear a stage in under 3 minutes",   "fast",      1 },
+        { "champion",    "Champion",         "Beat the final boss",                "win",       1 } };
+    return A;
+}
+
+const Game::Task* Game::tasksFor(int stage) {
+    static const Task T[3][3] = {
+        { { "Collect 60 coins",              "coins",   60,  false, false },
+          { "Land 3 parries",                "parries", 3,   false, false },
+          { "Clear the stage without dying", "deaths",  0,   true,  true  } },
+        { { "Collect 50 coins",              "coins",   50,  false, false },
+          { "Grapple 3 times",               "grapples", 3,  false, false },
+          { "Defeat 15 enemies",             "kills",   15,  false, false } },
+        { { "Collect 60 coins",              "coins",   60,  false, false },
+          { "Clear it in under 4 minutes",   "time",    240, true,  true  },
+          { "Take 5 hits or fewer",          "hits",    5,   true,  true  } } };
+    return T[std::max(0, std::min(2, stage))];
+}
+
+void Game::lifeAdd(const std::string& k, int n) { life[k] += n; checkAchievements(); }
+void Game::lifeMax(const std::string& k, int v) { if (v > life[k]) { life[k] = v; checkAchievements(); } }
+
+int Game::achValue(const Ach& a) const {
+    if (std::string(a.stat) == "scrolls") {
+        int n = 0; for (unsigned b = signsRead; b; b >>= 1) n += b & 1u; return n;
+    }
+    auto it = life.find(a.stat);
+    return it == life.end() ? 0 : it->second;
+}
+
+int Game::taskValue(int, const Task& t) const {
+    const std::string k = t.stat;
+    if (k == "coins")    return srun.coins;
+    if (k == "parries")  return srun.parries;
+    if (k == "grapples") return srun.grapples;
+    if (k == "kills")    return srun.kills;
+    if (k == "deaths")   return srun.deaths;
+    if (k == "hits")     return srun.hits;
+    if (k == "time")     return (int)srun.time;
+    return 0;
+}
+
+void Game::resetStageRun() {
+    srun = StageRun{};
+    snapCoins = coinsCollected; snapParries = parriesLanded; snapGrapples = grapplesUsed;
+    snapDeaths = deaths; snapDoor = doorUnlocked;
+}
+
+void Game::updateProgress() {
+    if (state != State::Playing) return;
+    srun.time += lastFrameTime;
+    if (snapCoins < 0) resetStageRun();
+    if (coinsCollected > snapCoins) { const int d = coinsCollected - snapCoins; srun.coins += d; life["coins"] += d; }
+    if (parriesLanded > snapParries) { const int d = parriesLanded - snapParries; srun.parries += d; life["parries"] += d; }
+    if (grapplesUsed > snapGrapples) { const int d = grapplesUsed - snapGrapples; srun.grapples += d; life["grapples"] += d; }
+    if (deaths > snapDeaths) { srun.deaths += deaths - snapDeaths; saveProgress(); }
+    if (doorUnlocked && !snapDoor) life["gate"] = std::max(1, life["gate"]);
+    snapCoins = coinsCollected; snapParries = parriesLanded; snapGrapples = grapplesUsed;
+    snapDeaths = deaths; snapDoor = doorUnlocked;
+    life["combo"] = std::max(life["combo"], bestCombo);
+    checkAchievements();
+    evalTasks(false);
+}
+
+void Game::onKill(const std::string& tag) {
+    srun.kills++;
+    life["kills"]++;
+    if (tag == "skeleton" || tag == "bat" || tag == "wisp" || tag == "spitter") life[tag]++;
+    checkAchievements();
+}
+
+void Game::onStageClear() {
+    life["bosses"]++;
+    life["stages"]++;
+    if (srun.hits == 0) life["untouched"] = std::max(1, life["untouched"]);
+    if (srun.time < 180.f) life["fast"] = std::max(1, life["fast"]);
+    if (Level::g_stage + 1 >= Level::N_STAGES) life["win"] = std::max(1, life["win"]);
+    checkAchievements();
+    evalTasks(true);
+    saveProgress();
+}
+
+void Game::checkAchievements() {
+    bool any = false;
+    for (const auto& a : achList()) {
+        if (unlocked.count(a.id) || achValue(a) < a.target) continue;
+        unlocked.insert(a.id);
+        Toast t; t.head = "ACHIEVEMENT UNLOCKED"; t.text = a.title;
+        toasts.push_back(t);
+        Sfx::play("key");
+        any = true;
+    }
+    if (any) saveProgress();
+}
+
+void Game::evalTasks(bool atClear) {
+    const int st = std::max(0, std::min(2, Level::g_stage));
+    const Task* T = tasksFor(st);
+    for (int i = 0; i < 3; ++i) {
+        if (tasksDone[st] & (1 << i)) continue;
+        const Task& t = T[i];
+        if (t.atClear && !atClear) continue;
+        const int v = taskValue(st, t);
+        const bool done = t.atMost ? (v <= t.target) : (v >= t.target);
+        if (!done) continue;
+        tasksDone[st] |= (1 << i);
+        Toast to; to.head = "TASK COMPLETE"; to.text = t.text;
+        toasts.push_back(to);
+        Sfx::play("checkpoint");
+        saveProgress();
+    }
+}
+
+// key=value lines; unknown keys are ignored, missing ones keep defaults.
+void Game::loadProgress() {
+    std::ifstream f("dungeonrush.progress");
+    if (!f) return;
+    std::string line;
+    while (std::getline(f, line)) {
+        const auto eq = line.find('=');
+        if (eq == std::string::npos) continue;
+        const std::string k = line.substr(0, eq), v = line.substr(eq + 1);
+        if (k == "ach") {
+            std::string id; std::istringstream is(v);
+            while (std::getline(is, id, ',')) if (!id.empty()) unlocked.insert(id);
+        } else if (k == "signs") signsRead = (unsigned)std::stoul(v);
+        else if (k == "tasks") {
+            std::istringstream is(v); char c;
+            is >> tasksDone[0] >> c >> tasksDone[1] >> c >> tasksDone[2];
+        } else if (k.rfind("life.", 0) == 0) life[k.substr(5)] = std::atoi(v.c_str());
+    }
+}
+
+void Game::saveProgress() {
+    std::ofstream f("dungeonrush.progress", std::ios::trunc);
+    if (!f) return;
+    f << "# DungeonRush2 progress (Batch L)\n";
+    f << "ach=";
+    bool first = true;
+    for (const auto& id : unlocked) { f << (first ? "" : ",") << id; first = false; }
+    f << "\nsigns=" << signsRead << "\ntasks=" << tasksDone[0] << "," << tasksDone[1] << "," << tasksDone[2] << "\n";
+    for (const auto& kv : life) f << "life." << kv.first << "=" << kv.second << "\n";
+}
+
+// A small gold star, drawn in pixels (lit or dim).
+static void drawStar(SDL_Renderer* r, int cx, int cy, bool lit, Uint8 a) {
+    const char* S[9] = { "....#....", "...###...", "#########", ".#######.", "..#####..",
+                         "..##.##..", ".##...##.", ".#.....#.", "........." };
+    for (int y = 0; y < 9; ++y)
+        for (int x = 0; x < 9; ++x) {
+            if (S[y][x] != '#') continue;
+            const bool rim = (y == 2 && (x == 0 || x == 8)) || y == 7;
+            if (lit) SDL_SetRenderDrawColor(r, rim ? 255 : 255, rim ? 137 : (y < 3 ? 235 : 200), rim ? 51 : 37, a);
+            else     SDL_SetRenderDrawColor(r, 66, 76, 110, a);
+            SDL_Rect px{ cx - 9 + x * 2, cy - 9 + y * 2, 2, 2 };
+            SDL_RenderFillRect(r, &px);
+        }
+}
+
+// Toasts slide down from the top, hold, and slide away (one at a time).
+void Game::drawToasts() {
+    if (toasts.empty()) return;
+    Toast& t = toasts.front();
+    t.t += lastFrameTime;
+    const float life_ = 3.2f;
+    if (t.t > life_) { toasts.erase(toasts.begin()); return; }
+    const float in = std::min(1.f, t.t / 0.25f), out = std::min(1.f, (life_ - t.t) / 0.25f);
+    const float k = std::min(in, out);
+    const float e = k * k * (3.f - 2.f * k);
+    const int W = Config::WINDOW_WIDTH, w = 440, h = 58;
+    const int x = W / 2 - w / 2, y = (int)(-h + (h + 64) * e);
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, 18, 22, 38, (Uint8)(235 * e));
+    SDL_Rect body{ x + 3, y, w - 6, h }; SDL_RenderFillRect(renderer, &body);
+    SDL_Rect side{ x, y + 3, w, h - 6 }; SDL_RenderFillRect(renderer, &side);
+    SDL_SetRenderDrawColor(renderer, 255, 200, 37, (Uint8)(220 * e));
+    SDL_Rect bar{ x + 3, y, w - 6, 3 }; SDL_RenderFillRect(renderer, &bar);
+    drawStar(renderer, x + 34, y + h / 2, true, (Uint8)(255 * e));
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+    drawTextA("small", t.head.c_str(), x + 62, y + 10, SDL_Color{ 255, 200, 37, 255 }, (Uint8)(255 * e), false);
+    drawTextA("body", t.text.c_str(), x + 62, y + 28, SDL_Color{ 249, 230, 207, 255 }, (Uint8)(255 * e), false);
+}
+
+void Game::drawAchievements() {
+    const int W = Config::WINDOW_WIDTH, H = Config::WINDOW_HEIGHT;
+    drawScrim(160);
+    const int pw = 1140, ph = 690, px = (W - pw) / 2, py = (H - ph) / 2;
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, 22, 28, 48, 248);
+    SDL_Rect panel{ px, py, pw, ph }; SDL_RenderFillRect(renderer, &panel);
+    SDL_SetRenderDrawColor(renderer, 120, 200, 255, 220); SDL_RenderDrawRect(renderer, &panel);
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+    const auto& A = achList();
+    char head[64]; std::snprintf(head, sizeof(head), "ACHIEVEMENTS   %zu / %zu", unlocked.size(), A.size());
+    drawText("title", head, W / 2, py + 34, SDL_Color{ 255, 230, 120, 255 }, true);
+    const int rows = (int)(A.size() + 1) / 2, rowH = 47, top = py + 72;
+    for (size_t i = 0; i < A.size(); ++i) {
+        const auto& a = A[i];
+        const int col = (int)i / rows, row = (int)i % rows;
+        const int x = px + 30 + col * (pw / 2), y = top + row * rowH;
+        const bool got = unlocked.count(a.id) > 0;
+        drawStar(renderer, x + 12, y + 18, got, 255);
+        drawText("body", a.title, x + 36, y + 2, got ? SDL_Color{ 249, 230, 207, 255 } : SDL_Color{ 150, 160, 180, 255 }, false);
+        drawText("small", a.desc, x + 36, y + 25, SDL_Color{ 140, 150, 170, 255 }, false);
+        if (!got) {                                  // a progress bar for what is not yet earned
+            const int v = std::min(achValue(a), a.target);
+            const int bx = x + 330, bw = 110, by = y + 12;
+            SDL_SetRenderDrawColor(renderer, 50, 58, 86, 255); SDL_Rect tr{ bx, by, bw, 8 }; SDL_RenderFillRect(renderer, &tr);
+            SDL_SetRenderDrawColor(renderer, 120, 200, 255, 255);
+            SDL_Rect fl{ bx, by, (int)(bw * (float)v / a.target), 8 }; SDL_RenderFillRect(renderer, &fl);
+            char pr[24]; std::snprintf(pr, sizeof(pr), "%d / %d", v, a.target);
+            drawText("small", pr, bx + bw + 10, y + 4, SDL_Color{ 160, 170, 190, 255 }, false);
+        } else {
+            drawText("small", "earned", x + 330, y + 4, SDL_Color{ 255, 200, 37, 255 }, false);
+        }
+    }
+    drawText("small", "ESC or ENTER to go back", W / 2, py + ph - 22, SDL_Color{ 140, 150, 170, 255 }, true);
+}
+
+// Beside the pause panel: this stage's three tasks, ticked as they are done.
+void Game::drawTasksPanel() {
+    const int W = Config::WINDOW_WIDTH, H = Config::WINDOW_HEIGHT;
+    const int st = std::max(0, std::min(2, Level::g_stage));
+    const Task* T = tasksFor(st);
+    // right of the pause panel, below its wide key-hint line
+    const int pw = 340, ph = 200, px = W / 2 + 300, py = H / 2 - 100;
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, 22, 28, 48, 248);
+    SDL_Rect panel{ px, py, pw, ph }; SDL_RenderFillRect(renderer, &panel);
+    SDL_SetRenderDrawColor(renderer, 255, 200, 37, 200); SDL_RenderDrawRect(renderer, &panel);
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+    char head[48]; std::snprintf(head, sizeof(head), "STAGE %d TASKS", st + 1);
+    drawText("body", head, px + pw / 2, py + 22, SDL_Color{ 255, 230, 120, 255 }, true);
+    for (int i = 0; i < 3; ++i) {
+        const int y = py + 54 + i * 46;
+        const bool done = tasksDone[st] & (1 << i);
+        SDL_Rect box{ px + 18, y + 2, 16, 16 };
+        SDL_SetRenderDrawColor(renderer, done ? 90 : 60, done ? 197 : 70, done ? 79 : 100, 255);
+        if (done) SDL_RenderFillRect(renderer, &box); else SDL_RenderDrawRect(renderer, &box);
+        drawText("small", T[i].text, px + 44, y, done ? SDL_Color{ 160, 230, 150, 255 } : SDL_Color{ 225, 230, 240, 255 }, false);
+        char pr[40];
+        const int v = taskValue(st, T[i]);
+        if (T[i].atClear && !done) std::snprintf(pr, sizeof(pr), "%s", T[i].atMost
+                                         ? (std::string("so far: ") + std::to_string(v)).c_str() : "at the boss");
+        else std::snprintf(pr, sizeof(pr), "%d / %d", std::min(v, T[i].target), T[i].target);
+        drawText("small", done ? "done" : pr, px + 44, y + 18, SDL_Color{ 140, 150, 170, 255 }, false);
+    }
+}
+
 void Game::startJump() {
     if (state != State::Playing) return;
     auto& p = *manager.getGroup(groupPlayers)[0];
@@ -1655,6 +1938,7 @@ void Game::startJump() {
         wallJumpLockT = Config::WALL_JUMP_LOCK;
         facingRight = wallDir < 0; tr.facingRight = facingRight;
         Sfx::play("wall_jump");
+        lifeAdd("walljumps");                                       // Batch L
         jumpsRemaining = Config::MAX_JUMPS - 1;
         isGrounded = false;
         Sfx::play("jump");
@@ -1823,6 +2107,7 @@ void Game::restartLevel() {
     m_bossMusicOn = false;
     playMusic("stage1", true);                          // Batch E: a new run, stage 1's theme
     buildSigns();                                       // Batch K
+    resetStageRun();                                    // Batch L
     state = State::Playing;
     isPaused = false;
     pauseSelection = 0;
@@ -1937,6 +2222,7 @@ void Game::checkLevelState() {
             m_victoryTimer = 9999.f;
             gameScore += Config::BOSS_SCORE;
             Sfx::play("stage_clear");
+            onStageClear();                                     // Batch L
             // Batch H: clearing a stage unlocks the next (all of them on a win)
             {
                 const int next = std::min(Level::g_stage + 1, Level::N_STAGES - 1);
@@ -1959,7 +2245,7 @@ void Game::update() {
         if (ptr.position.x >= Level::stage().zoneArena * (float)Config::TILE_SIZE)
             m_bossMusicOn = playMusic("boss", false) || true;   // stop re-checking either way
     }
-    if (state == State::Menu || state == State::Instructions) {
+    if (state == State::Menu || state == State::Instructions || state == State::Achievements) {
         handlePlayerInput();
         manager.refresh();
         // The menu draws no world, so simulating it there only lets gravity
@@ -2009,6 +2295,7 @@ void Game::update() {
     handlePlayerInput();
     stepPlayerPhysics();
     updateHints();                           // Batch K
+    updateProgress();                        // Batch L
     pickRidePlatform();                      // Batch J: what the hero stands on now
     Physics::stepPlatforms(manager.getGroup(groupPlatforms));
     rideMovingPlatform();                    // ... and ride it exactly
@@ -2135,6 +2422,7 @@ void Game::update() {
                                                 : Config::ENEMY_SCORE;
             gameScore += (int)(base * comboMultiplier());
             enemiesDefeated++;
+            onKill(e->tag);                                     // Batch L
             float cx = e->getComponent<TransformComponent>().position.x
                      + e->getComponent<TransformComponent>().width/2;
             float cy = e->getComponent<TransformComponent>().position.y
@@ -2339,7 +2627,7 @@ void Game::handleMenuInput(SDL_Keycode key) {
     if (state == State::Menu) {
         // Batch H: with a later stage unlocked the list starts with CONTINUE;
         // `act` maps the selection onto the original four actions.
-        const int n = menuItems(), off = n - 4;
+        const int n = menuItems(), off = n - 5;
         if (menuSelection >= n) menuSelection = 0;
         const int act = menuSelection - off;          // -1 = CONTINUE
         if (key == SDLK_UP || key == SDLK_w) menuSelection = (menuSelection + n - 1) % n;
@@ -2357,8 +2645,9 @@ void Game::handleMenuInput(SDL_Keycode key) {
                 m_instructionsScrollPos = 0.f;
                 state = State::Instructions;
             }
-            else if (act == 2) { m_returnState = State::Menu; state = State::Settings; }
-            else if (act == 3) isRunning = false;
+            else if (act == 2) { achScroll = 0; state = State::Achievements; }       // Batch L
+            else if (act == 3) { m_returnState = State::Menu; state = State::Settings; }
+            else if (act == 4) isRunning = false;
         } else if (key == SDLK_ESCAPE) isRunning = false;
     } else if (state == State::Instructions) {
         // Smooth lerped scroll navigation
@@ -2501,6 +2790,12 @@ void Game::handleEvents() {
             if (event.type == SDL_KEYDOWN &&
                 (k == SDLK_ESCAPE || k == SDLK_RETURN || k == SDLK_SPACE))
                 state = m_returnState;
+            continue;
+        }
+        if (state == State::Achievements) {                  // Batch L
+            if (event.type == SDL_KEYDOWN) {
+                if (k == SDLK_ESCAPE || k == SDLK_RETURN || k == SDLK_SPACE) state = State::Menu;
+            }
             continue;
         }
         if (state == State::Paused) {
@@ -3269,18 +3564,18 @@ void Game::drawMenu() {
     char contLabel[64];
     std::snprintf(contLabel, sizeof(contLabel), "%s STAGE %d %s",          // shown only once unlocked
                   menuStage > 0 ? "<" : " ", menuStage + 1, menuStage < unlockedStage ? ">" : " ");
-    const char* labels4[4] = { "PLAY", "HOW TO PLAY", "SETTINGS", "QUIT" };
-    const char* buttonLabels[5] = { contLabel, "NEW GAME", "HOW TO PLAY", "SETTINGS", "QUIT" };
+    const char* labels5[5] = { "PLAY", "HOW TO PLAY", "ACHIEVEMENTS", "SETTINGS", "QUIT" };
+    const char* buttonLabels[6] = { contLabel, "NEW GAME", "HOW TO PLAY", "ACHIEVEMENTS", "SETTINGS", "QUIT" };
     const int nItems = menuItems();
-    if (nItems == 4) for (int i = 0; i < 4; i++) buttonLabels[i] = labels4[i];
-    const int baseY = (bestScore > 0) ? 255 : 245;
-    const int gap = (nItems == 5) ? 60 : 68;
+    if (nItems == 5) for (int i = 0; i < 5; i++) buttonLabels[i] = labels5[i];
+    const int baseY = (bestScore > 0) ? 250 : 240;
+    const int gap = (nItems == 6) ? 52 : 60;
 
     for (int i = 0; i < nItems; i++) {
         float lerp = m_buttonAnim[i];
         int slideX = (int)(lerp * 14.f);
         int bw = 320 + (int)(lerp * 24.f);
-        int bh = 52 + (int)(lerp * 4.f);
+        int bh = (nItems == 6 ? 44 : 52) + (int)(lerp * 4.f);   // Batch L: room between six
         int bx = W / 2 - bw / 2 + slideX;
         int by = baseY + i * gap - (int)(lerp * 2.f);
 
@@ -3336,7 +3631,7 @@ void Game::drawMenu() {
             : SDL_Color{ 190, 205, 225, 215 };
         drawText("title", buttonLabels[i], bx + bw / 2 + (lerp > 0.1f ? 8 : 0),
                  by + bh / 2, textCol, true);
-        if (nItems == 5 && i == 0)              // Batch H: CONTINUE - which stage
+        if (nItems == 6 && i == 0)              // Batch H: CONTINUE - which stage
             drawText("small", (std::string("continue: ") + Level::STAGES[menuStage].name).c_str(),
                      bx + bw + 16, by + bh / 2, SDL_Color{ 255, 230, 120, 255 }, false);
     }
@@ -3718,7 +4013,9 @@ void Game::drawPauseOverlay() {
     drawScrim(150);
 
     const int W = Config::WINDOW_WIDTH, H = Config::WINDOW_HEIGHT;
-    const int pw = 420, ph = 400;
+    // Batch L: wide enough for the key-hint line, and the buttons start below
+    // it (the line used to run through the Resume highlight)
+    const int pw = 560, ph = 440;
     const int px = (W - pw) / 2, py = (H - ph) / 2;
 
     SDL_SetRenderDrawColor(renderer, 22, 28, 48, 248);
@@ -3742,7 +4039,7 @@ void Game::drawPauseOverlay() {
     const char* labels[5] = { "Resume", "Restart run", "Settings",
                               "Run stats", "Quit to menu" };
     const int rowH = 52;
-    const int top  = py + 130;
+    const int top  = subCy + smallSkip / 2 + 44;
     for (int i = 0; i < 5; i++) {
         const int y = top + i * rowH;
         const bool sel = (pauseSelection == i);
@@ -3808,7 +4105,10 @@ void Game::render() {
     //
     // There is exactly one SDL_RenderPresent call now, and no early return.
     // ------------------------------------------------------------------
-    if (state == State::Menu) {
+    if (state == State::Achievements) {                     // Batch L
+        drawMenuBackdrop();
+        drawAchievements();
+    } else if (state == State::Menu) {
         drawMenu();
     } else if (state == State::Instructions) {
         // Instructions is reachable from the menu AND mid-run (H).  Draw the
@@ -3827,12 +4127,15 @@ void Game::render() {
         drawWorld();
         if (state == State::Playing || state == State::Paused) drawHUD();
 
-        if      (state == State::Paused)        drawPauseOverlay();
+        if      (state == State::Paused)        { drawPauseOverlay(); drawTasksPanel(); }
         else if (state == State::Settings)      drawSettings();
         else if (state == State::Stats)         drawStats();
         else if (state == State::GameOver)      drawGameOverOverlay();
         else if (state == State::Victory)       drawVictoryOverlay();
         else if (state == State::LevelComplete) drawVictoryOverlay();
+        // Batch L: toasts last, above every overlay
+        if (state == State::Playing || state == State::Paused || state == State::LevelComplete ||
+            state == State::Victory) drawToasts();
     }
     SDL_RenderPresent(renderer);
 }
