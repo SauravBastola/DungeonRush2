@@ -13,3 +13,8 @@ lib/
 artifacts/
 dungeonrush.save
 *.progress
+*.log
+harness/
+DungeonRush2_*.md
+assets/sprites/archer.png
+assets/sprites/bomber.png
