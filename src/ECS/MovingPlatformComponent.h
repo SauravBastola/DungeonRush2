@@ -30,11 +30,15 @@ public:
     // two reversal checks per frame undid each other at the end of the run, so
     // platforms never turned round and drifted thousands of pixels away.
     void update() override {}
+    // Batch J: exactly how far step() moved the platform this frame - the
+    // rider is carried by this, not by velocity * dt guesses.
+    float lastDx = 0.f, lastDy = 0.f;
     void step() {
         auto& tr = entity->getComponent<TransformComponent>();
         float step = speed * lastFrameTime * dir;
         tr.position.x += axis.x * step;
         tr.position.y += axis.y * step;
+        lastDx = axis.x * step; lastDy = axis.y * step;
         float dx = tr.position.x - startPos.x;
         float dy = tr.position.y - startPos.y;
         if (std::sqrt(dx*dx + dy*dy) > range) dir *= -1;

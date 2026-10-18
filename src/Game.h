@@ -93,6 +93,11 @@ public:
     int menuStage = 0;
     int menuItems() const { return unlockedStage > 0 ? 5 : 4; }
     void startRunAt(int stage);
+    // Batch J: the moving platform the hero stands on (sticky ride)
+    Entity* ridePlat = nullptr;
+    float   rideOffX = 0.f;          // hero x - platform x while riding (exact)
+    void pickRidePlatform();
+    void rideMovingPlatform();
     float lastHeroHp = -1.f;
     void addShake(float m) { m_shakeMag += m; }
     float dashTrailTimer = 0.f;     // paces the dash afterimages

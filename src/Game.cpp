@@ -1324,6 +1324,51 @@ void Game::drawHurtFlash() {
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 }
 
+// ---- Batch J: riding moving platforms -----------------------------------
+// The old carry guessed "standing" from overlapping boxes and moved the hero
+// by velocity * dt; rounding broke contact every few frames, so on a vertical
+// platform the idle hero fell a pixel and "landed" again (crouch, thud, dust)
+// about 20 times a second, and a horizontal one could slide out from under
+// it.  Now: remember the platform the hero is grounded on, move the hero by
+// exactly what that platform moved, and keep the feet on its top - until the
+// hero jumps, grapples or walks off the end.
+void Game::pickRidePlatform() {
+    auto& p = *manager.getGroup(groupPlayers)[0];
+    auto& tr = p.getComponent<TransformComponent>();
+    Entity* prev = ridePlat;
+    if (!isGrounded || hooked || tr.velocity.y < 0.f) { ridePlat = nullptr; return; }
+    const SDL_Rect& h = p.getComponent<ColliderComponent>().collider;
+    const float feet = tr.position.y + Config::PLAYER_H;
+    ridePlat = nullptr;
+    for (auto* e : manager.getGroup(groupPlatforms)) {
+        if (!e->isActive() || !e->hasComponent<MovingPlatformComponent>()) continue;
+        auto& pt = e->getComponent<TransformComponent>();
+        const bool over = h.x + h.w > (int)pt.position.x && h.x < (int)pt.position.x + pt.width;
+        if (over && feet >= pt.position.y - 3.f && feet <= pt.position.y + 4.f) { ridePlat = e; break; }
+    }
+    // The offset along the slab is taken when the ride starts and whenever
+    // the hero moves on it under its own power - never while standing still.
+    // (Collision snaps the hero to whole pixels each frame; re-reading the
+    // offset then would lose the fraction every frame and slide the rider off.)
+    if (ridePlat && (ridePlat != prev || std::fabs(tr.velocity.x) > 1.f))
+        rideOffX = tr.position.x - ridePlat->getComponent<TransformComponent>().position.x;
+}
+
+void Game::rideMovingPlatform() {
+    if (!ridePlat || !ridePlat->isActive()) { ridePlat = nullptr; return; }
+    auto& p = *manager.getGroup(groupPlayers)[0];
+    auto& tr = p.getComponent<TransformComponent>();
+    auto& pt = ridePlat->getComponent<TransformComponent>();
+    tr.position.x = pt.position.x + rideOffX;             // exactly where it was on the slab
+    const SDL_Rect& h = p.getComponent<ColliderComponent>().collider;
+    const bool over = h.x + h.w > (int)pt.position.x && h.x < (int)pt.position.x + pt.width;
+    if (!over) { ridePlat = nullptr; p.getComponent<ColliderComponent>().update(); return; }   // walked off
+    tr.position.y = pt.position.y - Config::PLAYER_H;     // feet exactly on the slab
+    if (tr.velocity.y > 0.f) tr.velocity.y = 0.f;
+    isGrounded = true;
+    p.getComponent<ColliderComponent>().update();         // INV-2
+}
+
 void Game::startJump() {
     if (state != State::Playing) return;
     auto& p = *manager.getGroup(groupPlayers)[0];
@@ -1447,7 +1492,7 @@ void Game::respawn() {
     dashActive = false;
     slideT = 0.f; slideCooldown = 0.f; wallJumpLockT = 0.f; wallSliding = false;
     parryT = 0.f; parryCooldown = 0.f; parryHit = false;
-    hooked = false; noJumpCutT = 0.f; landT = 0.f;
+    hooked = false; noJumpCutT = 0.f; landT = 0.f; ridePlat = nullptr;
     hurtFlashT = 0.f; lastHeroHp = -1.f;                       // Batch G2: no glow on respawn
     setSlideHitbox(false);                 // Batch C: never respawn crouched
     iframeTimer = Config::RESPAWN_INVULN;
@@ -1467,6 +1512,7 @@ void Game::restartLevel() {
     for (auto* e : manager.getGroup(groupEnemies))   e->destroy();
     for (auto* c : manager.getGroup(groupCoins))     c->destroy();
     for (auto* p : manager.getGroup(groupPowerups))  p->destroy();
+    ridePlat = nullptr;                      // Batch J: never keep a platform being destroyed
     for (auto* p : manager.getGroup(groupPlatforms)) p->destroy();
     for (auto* h : manager.getGroup(groupHazards))   h->destroy();
     for (auto* f : manager.getGroup(groupFacilities))f->destroy();
@@ -1700,9 +1746,9 @@ void Game::update() {
 
     handlePlayerInput();
     stepPlayerPhysics();
+    pickRidePlatform();                      // Batch J: what the hero stands on now
     Physics::stepPlatforms(manager.getGroup(groupPlatforms));
-    Physics::applyPlatformCarry(*manager.getGroup(groupPlayers)[0],
-                                manager.getGroup(groupPlatforms));
+    rideMovingPlatform();                    // ... and ride it exactly
     stepEnemies();
     stepEnemyPhysics();
     emitDashTrail(lastFrameTime);
