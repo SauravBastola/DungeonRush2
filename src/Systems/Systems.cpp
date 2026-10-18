@@ -386,6 +386,20 @@ Entity& spawnProjectile(Entity& owner, Vector2D vel, float damage, const std::st
     return pr;                              // Batch C4: callers can adjust it (gravity)
 }
 
+Entity& spawnBossFx(Entity& owner, float x, float y, Vector2D vel, float damage, int cell, bool gravity, float life) {
+    auto& pr = manager.addEntity("bossfx");
+    pr.addComponent<TransformComponent>(x, y, 32, 32, 1.f);
+    auto& sp = pr.addComponent<SpriteComponent>("bossfx", 32, 32, 1.f, true);
+    sp.addAnim("fx", Animation(0, 1, 100, cell));
+    sp.Play("fx");
+    auto& col = pr.addComponent<ColliderComponent>("projectile", 4, 4, 24, 24);
+    col.sensor = true; col.solid = false;
+    auto& pc = pr.addComponent<ProjectileComponent>(vel, damage, "enemy", &owner, life);
+    pc.gravity = gravity;
+    pr.addGroup(Game::groupProjectiles);
+    return pr;
+}
+
 void spawnShockwave(Entity& owner, int dir, float damage) {
     auto& sw = manager.addEntity("shockwave");
     auto& tr = owner.getComponent<TransformComponent>();
@@ -983,6 +997,60 @@ void step(std::vector<Entity*>& enemies, Entity& player,
             case EnemyAIComponent::Kind::Boss: {
                 bool enrage = hp.hp < hp.hpMax * Config::BOSS_ENRAGE_RATIO;
                 ai.enraged = enrage;
+                // ---- Batch O: the phase change - it stops and roars ----
+                if (enrage && !ai.wasEnraged) {
+                    ai.wasEnraged = true;
+                    ai.roarT = Config::BOSS_ROAR_TIME;
+                    ai.specialT = Config::BOSS_SPECIAL_INTERVAL - 2.f;    // first special soon after
+                    Sfx::play("roar");
+                    screenShake += 22.f;
+                    if (e->hasComponent<SpriteComponent>()) e->getComponent<SpriteComponent>().flash(0.35f);
+                    Particles::emitDeathBurst(tr.position.x + tr.width * 0.5f, tr.position.y + tr.height * 0.4f,
+                                              255, 137, 51);
+                }
+                if (ai.roarT > 0.f) {
+                    ai.roarT -= lastFrameTime;
+                    hp.iframes = std::max(hp.iframes, 0.1f);               // the roar can't be interrupted
+                    tr.velocity.x = 0.f;
+                    if (e->hasComponent<SpriteComponent>()) e->getComponent<SpriteComponent>().Play("attack");
+                    break;
+                }
+                // ---- Batch O: each stage's signature attack, in phase 2 ----
+                if (enrage && ai.slamPhase == 0) {
+                    ai.specialT += lastFrameTime;
+                    const int stg = Level::g_stage;
+                    const float hx = pt.position.x + 16.f;
+                    if (ai.specialPhase == 0 && ai.specialT > Config::BOSS_SPECIAL_INTERVAL && adx < 700.f) {
+                        ai.specialPhase = 1; ai.specialT = 0.f;
+                        Sfx::play("boss_charge");
+                        if (stg == 0)      { ai.nSpecial = 3; for (int k = 0; k < 3; ++k) ai.specialX[k] = hx + (k - 1) * 160.f; }
+                        else if (stg == 1) { ai.nSpecial = 4; for (int k = 0; k < 4; ++k) ai.specialX[k] = hx + (k - 1.5f) * 120.f; }
+                        else               { ai.nSpecial = 0; }
+                    } else if (ai.specialPhase == 1) {
+                        tr.velocity.x *= 0.8f;                              // it plants itself for the tell
+                        if (ai.specialT >= Config::BOSS_SPECIAL_TELL) {
+                            const float topY = (float)Game::camera.y - 40.f;
+                            if (stg == 0)
+                                for (int k = 0; k < ai.nSpecial; ++k)       // rockfall
+                                    Combat::spawnBossFx(*e, ai.specialX[k] - 16.f, topY, Vector2D(0.f, 220.f),
+                                                        Config::BOSS_SPECIAL_DAMAGE, 0, true, 3.f);
+                            else if (stg == 1)
+                                for (int k = 0; k < ai.nSpecial; ++k)       // spore rain: slower, drifting
+                                    Combat::spawnBossFx(*e, ai.specialX[k] - 16.f, topY,
+                                                        Vector2D((k % 2 ? 30.f : -30.f), 240.f),
+                                                        Config::BOSS_SPECIAL_DAMAGE, 1, false, 4.f);
+                            else {                                          // lava waves along the floor
+                                const float fy = tr.position.y + tr.height - 32.f;
+                                for (int d : { -1, 1 })
+                                    Combat::spawnBossFx(*e, tr.position.x + tr.width * 0.5f - 16.f + d * 50.f, fy,
+                                                        Vector2D(d * Config::BOSS_LAVA_SPEED, 0.f),
+                                                        Config::BOSS_SPECIAL_DAMAGE, 2, false, 2.6f);
+                                screenShake += 8.f;
+                            }
+                            ai.specialPhase = 0; ai.specialT = 0.f;
+                        }
+                    }
+                }
                 float speed = enrage ? Config::BOSS_SPEED * 1.3f : Config::BOSS_SPEED;
                 bool slamming = (ai.slamPhase != 0);
 

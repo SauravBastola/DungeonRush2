@@ -51,6 +51,13 @@ public:
     int      slamPhase  = 0;
     float    slamT      = 0.f;
     float    fanT       = 0.f;          // projectile-fan cadence (phase 2)
+    // Batch O: the phase change (a roar) and each stage's signature attack
+    bool     wasEnraged = false;
+    float    roarT      = 0.f;
+    int      specialPhase = 0;          // 0 waiting, 1 tell (markers), 2 done
+    float    specialT   = 0.f;
+    float    specialX[4] = { 0.f, 0.f, 0.f, 0.f };
+    int      nSpecial   = 0;
 
     // Batch C - skeleton swing: 0 chase, 1 wind-up (tell), 2 strike, 3 guard
     int      swingPhase = 0;

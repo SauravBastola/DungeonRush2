@@ -59,6 +59,8 @@ Entity& spawnProjectile(Entity& owner, Vector2D vel, float damage, const std::st
 // Ground-hugging shockwave thrown out by the boss's jump slam.  Travels
 // horizontally at ground level; the player must jump over it.
 void spawnShockwave(Entity& owner, int dir, float damage);
+// Batch O: a boss attack piece (boss_fx.png cell 0 rock, 1 spore, 2 lava)
+Entity& spawnBossFx(Entity& owner, float x, float y, Vector2D vel, float damage, int cell, bool gravity, float life);
 
 // Three bolts fanned out over `spread` radians — the boss's phase-2 ranged
 // attack.  Fires them all centred on the direction to `target`.

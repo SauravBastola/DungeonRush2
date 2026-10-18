@@ -1148,6 +1148,32 @@ def enemy_wisp(path, svg):
             [_wisp(fade=f) for f in (1, 2, 3)]], 32, 32, path, svg)
 
 
+# ------------------------------------------------------------ boss fx (O)
+def _boss_fx(kind):
+    c = Px(32, 32)
+    if kind == "rock":
+        c.part(_el(6, 6, 26, 26), PAL.SLATE, PAL.SLATE_LT, PAL.SLATE_XD)
+        c.part(_ln([(12, 11), (16, 16), (14, 21)], 1), PAL.SLATE_XD)            # a crack
+        c.part(_el(9, 9, 14, 13), PAL.PLATE)                                     # a lit facet
+    elif kind == "spore":
+        c.part(_el(8, 8, 24, 24), PAL.GRASS_MID, PAL.GRASS, PAL.TEAL)
+        for (x, y) in ((12, 12), (19, 14), (14, 19), (20, 20)):
+            c.dot(x, y, PAL.YELLOW)                                              # glowing specks
+        c.part(_el(11, 10, 15, 13), PAL.GRASS)
+    else:                                                                        # lava
+        c.part(_pg([(2, 31), (6, 16), (11, 22), (16, 8), (21, 20), (26, 14), (30, 31)]),
+               PAL.EMBER, PAL.ORANGE, PAL.RED_DK)
+        c.part(_pg([(8, 31), (12, 24), (16, 16), (20, 24), (24, 31)]), PAL.ORANGE, PAL.YELLOW)
+        c.dot(16, 26, PAL.CREAM)
+    return c.outline()
+
+
+def boss_fx(path, svg):
+    """boss_fx.png 3x1 of 32x32 (Batch O): rock, spore, lava - the bosses'
+    stage-specific phase-2 attacks."""
+    _sheet([[_boss_fx("rock"), _boss_fx("spore"), _boss_fx("lava")]], 32, 32, path, svg)
+
+
 # ===========================================================================
 def main():
     os.makedirs(SPRITES, exist_ok=True)
@@ -1178,6 +1204,7 @@ def main():
         (hero,           "player_sprites.png"),
         (enemy_spitter,  "enemy_spitter.png"),
         (enemy_wisp,     "enemy_wisp.png"),
+        (boss_fx,        "boss_fx.png"),
     ]
     only = set(sys.argv[1:])     # e.g. `build_art.py enemy_slime.png`
     if only:

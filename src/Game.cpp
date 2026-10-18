@@ -153,6 +153,7 @@ void Game::loadAssets() {
     tex("skeleton",    "sprites/enemy_skeleton.png");
     tex("spitter",     "sprites/enemy_spitter.png");    // Batch C4
     tex("wisp",        "sprites/enemy_wisp.png");       // Batch C4
+    tex("bossfx",      "sprites/boss_fx.png");          // Batch O
     tex("slime",       "sprites/enemy_slime.png");
     tex("bat",         "sprites/enemy_bat.png");
     tex("mage",        "sprites/enemy_mage.png");
@@ -205,7 +206,7 @@ void Game::loadAssets() {
                             "land", "grapple_fire", "grapple_latch", "key", "checkpoint", "door",
                             "stage_clear", "explosion", "skel_tell", "skel_strike", "bat_tell",
                             "bat_dive", "spit_tell", "spit", "wisp_tell", "wisp_lunge",
-                            "boss_charge" })
+                            "boss_charge", "roar" })
         snd(id, (std::string("sounds/sfx/") + id + ".wav").c_str());
     snd("fuse",         "sounds/sfx/skel_tell.wav");    // a hissing scrape suits a fuse
 
@@ -2347,6 +2348,19 @@ void Game::update() {
 
     handlePlayerInput();
     stepPlayerPhysics();
+    // Batch O: a falling boss rock / spore shatters where it meets the ground
+    for (auto* pr : manager.getGroup(groupProjectiles)) {
+        if (!pr->isActive() || pr->tag != "bossfx") continue;
+        auto& t = pr->getComponent<TransformComponent>();
+        if (t.velocity.y <= 0.f) continue;                               // lava rolls along the floor
+        const int col = std::max(0, std::min(Level::WIDTH_TILES - 1, (int)((t.position.x + 16.f) / Config::TILE_SIZE)));
+        const int top = Level::stage().groundTop[col];
+        if (top >= 0 && t.position.y + 30.f >= (top + 1) * (float)Config::TILE_SIZE) {
+            Particles::emitDust(t.position.x + 16.f, (top + 1) * (float)Config::TILE_SIZE, 150, 150, 160);
+            Particles::emitDust(t.position.x + 8.f, (top + 1) * (float)Config::TILE_SIZE, 150, 150, 160);
+            pr->destroy();
+        }
+    }
     updateHints();                           // Batch K
     updateProgress();                        // Batch L
     pickRidePlatform();                      // Batch J: what the hero stands on now
@@ -3120,6 +3134,52 @@ void Game::drawWorld() {
     for (auto* p : manager.getGroup(groupPowerups)) p->draw();
     // enemies
     for (auto* e : manager.getGroup(groupEnemies)) e->draw();
+    // Batch O: a boss's signature-attack tell - marks on the ground first
+    for (auto* e : manager.getGroup(groupEnemies)) {
+        if (!e->isActive() || e->tag != "boss" || !e->hasComponent<EnemyAIComponent>()) continue;
+        auto& ai = e->getComponent<EnemyAIComponent>();
+        if (ai.specialPhase != 1) continue;
+        const float k = std::min(1.f, ai.specialT / Config::BOSS_SPECIAL_TELL);
+        const bool blink = ((int)(ai.specialT * 12.f)) % 2 == 0;
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        if (ai.nSpecial > 0) {                       // rockfall / spore rain: a shadow that grows
+            const bool spores = Level::g_stage == 1;
+            for (int i = 0; i < ai.nSpecial; ++i) {
+                const int col = std::max(0, std::min(Level::WIDTH_TILES - 1, (int)(ai.specialX[i] / Config::TILE_SIZE)));
+                const int top = Level::stage().groundTop[col];
+                if (top < 0) continue;
+                const int gx = (int)ai.specialX[i] - camera.x, gy = (top + 1) * Config::TILE_SIZE - camera.y;
+                const int w = 16 + (int)(28 * k);
+                const Uint8 cr = spores ? 90 : 255, cg = spores ? 197 : 137, cb = spores ? 79 : 51;
+                // a dashed column of light from the top of the screen down to the spot
+                SDL_SetRenderDrawColor(renderer, cr, cg, cb, (Uint8)(40 + 70 * k));
+                for (int y = 0; y < gy - 30; y += 14) { SDL_Rect d{ gx - 1, y, 3, 8 }; SDL_RenderFillRect(renderer, &d); }
+                // a shadow on the ground that grows through the tell
+                SDL_SetRenderDrawColor(renderer, 20, 12, 20, (Uint8)(120 + 110 * k));
+                SDL_Rect sh{ gx - w, gy - 5, w * 2, 8 }; SDL_RenderFillRect(renderer, &sh);
+                SDL_SetRenderDrawColor(renderer, cr, cg, cb, (Uint8)(blink ? 240 : 150));
+                SDL_Rect rim{ gx - w, gy - 6, w * 2, 2 }; SDL_RenderFillRect(renderer, &rim);
+                // a bold "!" above it
+                SDL_SetRenderDrawColor(renderer, 28, 18, 28, 230);
+                SDL_Rect o1{ gx - 5, gy - 36, 10, 20 }; SDL_RenderFillRect(renderer, &o1);
+                SDL_Rect o2{ gx - 5, gy - 14, 10, 8 };  SDL_RenderFillRect(renderer, &o2);
+                SDL_SetRenderDrawColor(renderer, cr, cg, cb, (Uint8)(blink ? 255 : 190));
+                SDL_Rect m1{ gx - 3, gy - 34, 6, 16 }; SDL_RenderFillRect(renderer, &m1);
+                SDL_Rect m2{ gx - 3, gy - 12, 6, 4 };  SDL_RenderFillRect(renderer, &m2);
+            }
+        } else {                                     // lava: the ground glows either side of it
+            auto& bt = e->getComponent<TransformComponent>();
+            const int gy = (int)(bt.position.y + bt.height) - camera.y;
+            const int reach = (int)(80 + 240 * k);
+            SDL_SetRenderDrawColor(renderer, 255, 137, 51, (Uint8)(blink ? 200 : 120));
+            for (int d : { -1, 1 }) {
+                const int x0 = (int)(bt.position.x + bt.width * 0.5f) - camera.x;
+                SDL_Rect g{ d < 0 ? x0 - reach : x0, gy - 3, reach, 3 };
+                SDL_RenderFillRect(renderer, &g);
+            }
+        }
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+    }
     // Batch C: a guarding skeleton shows a shield on the side that blocks
     for (auto* e : manager.getGroup(groupEnemies)) {
         if (!e->isActive() || !e->hasComponent<EnemyAIComponent>()) continue;
@@ -3407,12 +3467,19 @@ void Game::drawHUD() {
         SDL_Rect bb2{ bx2, by2, bw2, bh2 };
         SDL_RenderFillRect(renderer, &bb2);
         int fill = (int)(bw2 * hp.hp / hp.hpMax);
-        SDL_SetRenderDrawColor(renderer, 220, 60, 60, 255);
+        const bool enr = e->hasComponent<EnemyAIComponent>() && e->getComponent<EnemyAIComponent>().enraged;
+        if (enr) SDL_SetRenderDrawColor(renderer, 255, 137, 51, 255);          // Batch O: phase 2
+        else     SDL_SetRenderDrawColor(renderer, 220, 60, 60, 255);
         SDL_Rect bbf{ bx2, by2, fill, bh2 };
         SDL_RenderFillRect(renderer, &bbf);
+        SDL_SetRenderDrawColor(renderer, 249, 230, 207, 255);                  // the halfway notch
+        SDL_Rect notch{ bx2 + (int)(bw2 * Config::BOSS_ENRAGE_RATIO) - 1, by2 - 3, 2, bh2 + 6 };
+        SDL_RenderFillRect(renderer, &notch);
+        if (enr) drawText("small", "ENRAGED", bx2 + bw2 - 70, by2 - 20, SDL_Color{ 255, 137, 51, 255 }, false);
         if (auto* f = assets->GetFont("body")) {
             SDL_Color c{ 255, 230, 90, 255 };
-            SDL_Surface* s = TTF_RenderUTF8_Blended(f, "THE OVERLORD", c);
+            static const char* NAMES[3] = { "THE OVERLORD", "THE THORN KING", "THE EMBER TITAN" };
+            SDL_Surface* s = TTF_RenderUTF8_Blended(f, NAMES[std::max(0, std::min(2, Level::g_stage))], c);
             if (s) {
                 SDL_Texture* t = SDL_CreateTextureFromSurface(renderer, s);
                 SDL_Rect r{ bx2, by2 - 22, s->w, s->h };

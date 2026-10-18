@@ -320,6 +320,12 @@ namespace Config {
     constexpr int   POWERUP_SCORE      = 50;
     constexpr int   ENEMY_SCORE        = 100;
     constexpr int   BOSS_SCORE         = 1500;
+    // Batch O: phase change and the stage-specific phase-2 attacks
+    constexpr float BOSS_ROAR_TIME       = 1.0f;     // stops, roars, can't be hurt
+    constexpr float BOSS_SPECIAL_INTERVAL= 6.0f;
+    constexpr float BOSS_SPECIAL_TELL    = 0.8f;     // markers on the ground first
+    constexpr float BOSS_SPECIAL_DAMAGE  = 12.f;
+    constexpr float BOSS_LAVA_SPEED      = 300.f;
     constexpr int   KEY_SCORE          = 250;
     constexpr float IFRAME_TIME        = 0.8f;     // after taking damage
     constexpr float RESPAWN_INVULN     = 1.2f;
