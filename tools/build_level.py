@@ -1064,7 +1064,7 @@ STAGE_SPECS = [
         movers=[(62, False), (116, True), (142, False)],
         checkpoints=[30, 72, 112, 152], shrines=[58, 128], key_col=164,
         mix={"slime": 4, "bat": 4, "archer": 3, "skeleton": 3, "bomber": 1, "mage": 2,
-             "wisp": 3, "spitter": 2},
+             "wisp": 3, "spitter": 1},          # Batch G2: spitter 2 -> 1
         n_enemies=38),
     StageSpec(
         name="Ember Canyon", folder="stage3", theme=2,
@@ -1077,7 +1077,7 @@ STAGE_SPECS = [
         movers=[(76, True), (108, False), (136, True)],
         checkpoints=[34, 74, 116, 154], shrines=[60, 126], key_col=166,
         mix={"skeleton": 4, "mage": 3, "bomber": 3, "archer": 3, "bat": 2, "slime": 1,
-             "spitter": 3, "wisp": 2},
+             "spitter": 1, "wisp": 2},          # Batch G2: spitter 3 -> 1
         n_enemies=40),
 ]
 
@@ -1172,10 +1172,25 @@ def build_stage(spec: StageSpec) -> Level:
     cp_cols = [f.col for f in L.facilities if f.kind == "checkpoint"]
     static_ledges = [p for p in L.platforms if not p.moving and (p.col, p.w) in spec.ledges]
     placed: List[int] = []
+    counts: dict = {}                    # Batch G2: kinds chosen so far (for the caps)
     step = (172 - 14) / spec.n_enemies
     for i in range(spec.n_enemies):
         c = int(14 + i * step + _h(i * 31 + int(spec.seed * 100)) * 3)
         kind = kinds[int(_h(i * 17 + int(spec.seed * 10)) * len(kinds))]
+        # Batch G2: hashing clusters (a 10 % weight came out as 18 %), so cap
+        # each kind at its fair share plus one; over the cap, take the next
+        # kind in the mix that is still under its own.
+        total_w = sum(spec.mix.values())
+        cap = {k: int(spec.n_enemies * w / total_w) + 1 for k, w in spec.mix.items()}
+        if counts.get(kind, 0) >= cap[kind]:
+            order = sorted(spec.mix)
+            j = order.index(kind)
+            for step_k in range(1, len(order)):
+                alt = order[(j + step_k) % len(order)]
+                if counts.get(alt, 0) < cap[alt]:
+                    kind = alt
+                    break
+        counts[kind] = counts.get(kind, 0) + 1
         offsets = (0, 1, -1, 2, -2, 3, -3)
         if kind == "mage":
             # a mage takes the nearest ledge whose centre is free - never a

@@ -190,6 +190,17 @@ void emitHitSparks(float x, float y) {
     }
 }
 
+// Batch G2: a coin's pickup - six gold sparks thrown up in a fan.  Fixed
+// angles (no rand()), so it never shifts the other effects' random sequence.
+void emitCoinSparkle(float x, float y) {
+    for (int i = 0; i < 6; i++) {
+        const float a = (-150.f + i * 24.f) * 3.1415f / 180.f;       // -150..-30 deg: upward
+        const float s = 110.f + (i % 3) * 30.f;
+        makeParticle(x, y, std::cos(a) * s, std::sin(a) * s,
+                     0, 260.f, 0.35f, 3, 0, 255, 200, 37, 255, 3.f);
+    }
+}
+
 void emitDeathBurst(float x, float y, Uint8 r, Uint8 g, Uint8 b) {
     for (int i = 0; i < 24; i++) {
         float a = (rand() % 360) * 3.1415f / 180.f;
@@ -1158,6 +1169,11 @@ void step(Entity& player,
             int worth = Config::COIN_SCORE * (bag.coinMultT > 0.f ? Config::POWERUP_COIN_MULT : 1);
             bag.score += worth;
             bag.coinsBanked += 1;
+            {   // Batch G2: a sparkle where the coin was
+                auto& ct2 = c->getComponent<TransformComponent>();
+                Particles::emitCoinSparkle(ct2.position.x + ct2.width * ct2.scale * 0.5f,
+                                           ct2.position.y + ct2.height * ct2.scale * 0.5f);
+            }
             c->destroy();
             Sfx::play("coin");
             Particles::emitDust(pcx, pcy, 255, 230, 90);

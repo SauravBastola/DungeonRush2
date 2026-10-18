@@ -37,6 +37,7 @@ namespace Particles {
 
 void emitDust(float x, float y, Uint8 r, Uint8 g, Uint8 b);
 void emitHitSparks(float x, float y);
+void emitCoinSparkle(float x, float y);       // Batch G2
 void emitDeathBurst(float x, float y, Uint8 r, Uint8 g, Uint8 b);
 void emitHeal(float x, float y);
 void step(std::vector<Entity*>& particles);

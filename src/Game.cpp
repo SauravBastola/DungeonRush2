@@ -751,6 +751,12 @@ void Game::handlePlayerInput() {
     }
     if (wallJumpLockT > 0) wallJumpLockT -= lastFrameTime;
     if (landT > 0) landT -= lastFrameTime;                     // Batch D
+    {   // Batch G2: any HP loss (any source) lights the hurt glow
+        const float hpNow = manager.getGroup(groupPlayers)[0]->getComponent<HealthComponent>().hp;
+        if (lastHeroHp >= 0.f && hpNow < lastHeroHp - 0.5f) hurtFlashT = 0.35f;
+        lastHeroHp = hpNow;
+        if (hurtFlashT > 0.f) hurtFlashT -= lastFrameTime;
+    }
     if (parryCooldown > 0) parryCooldown -= lastFrameTime;
     if (parryT > 0) { parryT -= lastFrameTime; stepParry(); pTr.velocity.x *= 0.85f; }
 
@@ -1109,6 +1115,7 @@ static void parryLanded(Game& g, float x, float y) {
     g.parryHit = true;
     g.parryCooldown = std::min(g.parryCooldown, 0.12f);     // reward: chain them
     g.hitStop = std::max(g.hitStop, 0.06f);
+    g.addShake(3.f);                                // Batch G2: a parry lands with a jolt
     Vfx::impactRing(x, y, 249, 230, 207, 44.f, 0.22f);
     Particles::emitHitSparks(x, y);
     Sfx::play("parry");
@@ -1274,6 +1281,24 @@ void Game::drawGrapple() {
     SDL_RenderDrawLine(renderer, hx, hy - 1, kx, ky - 1);
 }
 
+// Batch G2: red bands at the screen edges, fading in 0.35 s - you see a hit
+// land even mid-fight.  Drawn in screen space, after the world.
+void Game::drawHurtFlash() {
+    if (hurtFlashT <= 0.f) return;
+    const int W = Config::WINDOW_WIDTH, H = Config::WINDOW_HEIGHT;
+    const float k = hurtFlashT / 0.35f;
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    const int bands[3] = { 26, 16, 8 };
+    const float alpha[3] = { 30.f, 45.f, 70.f };
+    for (int i = 0; i < 3; ++i) {
+        SDL_SetRenderDrawColor(renderer, 0xb4, 0x20, 0x2a, (Uint8)(alpha[i] * k));   // RED
+        const int b = bands[i];
+        SDL_Rect r[4] = { { 0, 0, W, b }, { 0, H - b, W, b }, { 0, b, b, H - 2 * b }, { W - b, b, b, H - 2 * b } };
+        SDL_RenderFillRects(renderer, r, 4);
+    }
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+}
+
 void Game::startJump() {
     if (state != State::Playing) return;
     auto& p = *manager.getGroup(groupPlayers)[0];
@@ -1398,6 +1423,7 @@ void Game::respawn() {
     slideT = 0.f; slideCooldown = 0.f; wallJumpLockT = 0.f; wallSliding = false;
     parryT = 0.f; parryCooldown = 0.f; parryHit = false;
     hooked = false; noJumpCutT = 0.f; landT = 0.f;
+    hurtFlashT = 0.f; lastHeroHp = -1.f;                       // Batch G2: no glow on respawn
     setSlideHitbox(false);                 // Batch C: never respawn crouched
     iframeTimer = Config::RESPAWN_INVULN;
     // A death should not leave the hero mid-swing or holding a stale combo.
@@ -2428,6 +2454,7 @@ void Game::drawWorld() {
     drawEnemyHpBars(renderer, camera, manager.getGroup(groupEnemies));
     // Nearest plane, in front of the weather: dark out-of-focus leaves.
     drawForegroundSilhouettes(renderer, camera);
+    drawHurtFlash();                                        // Batch G2
 }
 
 // Floating damage numbers.  Drawn in world space so they stay pinned to the

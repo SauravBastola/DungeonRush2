@@ -85,6 +85,10 @@ public:
     int   grapplesUsed = 0;
     // Batch D: the landing crouch (a drawn frame, not a pixel-stretching squash)
     float landT = 0.f;
+    // Batch G2: red glow at the screen edges when the hero is hurt
+    float hurtFlashT = 0.f;
+    float lastHeroHp = -1.f;
+    void addShake(float m) { m_shakeMag += m; }
     float dashTrailTimer = 0.f;     // paces the dash afterimages
     float speedBoostTimer = 0.f;
     float invincibleTimer = 0.f;
@@ -172,6 +176,7 @@ private:
     void stepParry();                  // stagger enemies in the zone
     bool tryReflect(Entity& shot);     // true: the shot was parried
     void drawParryShield();
+    void drawHurtFlash();
     bool nearestHook(float& hx, float& hy) const;
     void startGrapple();
     void releaseGrapple(bool fling);
