@@ -361,8 +361,10 @@ void Game::spawnPlayer() {
     //   row 5 (4)  JUMP         - crouch, launch, rise, apex (feet leave floor)
     //   row 6 (3)  cast
     //   row 7 (7)  die
-    sp.addAnim("idle",   Animation(0, 3, 170));
-    sp.addAnim("run",    Animation(1, 6,  85));
+    // Batch D: hero v2 sheet is 8 x 9 - idle 4, run 8, and row 8 the landing
+    sp.addAnim("idle",   Animation(0, 4, 170));
+    sp.addAnim("run",    Animation(1, 8,  70));
+    sp.addAnim("land",   Animation(8, 2,  70));
     // Airborne: row 5.  Frames 0-1 are the crouch and take-off, 2-3 the rise
     // and the apex.  There is no dedicated "fall" row on this sheet, so the
     // descent reuses the apex frame (2) and the rise frame (3) — the legs are
@@ -686,6 +688,7 @@ void Game::handlePlayerInput() {
         }
     }
     if (wallJumpLockT > 0) wallJumpLockT -= lastFrameTime;
+    if (landT > 0) landT -= lastFrameTime;                     // Batch D
     if (parryCooldown > 0) parryCooldown -= lastFrameTime;
     if (parryT > 0) { parryT -= lastFrameTime; stepParry(); pTr.velocity.x *= 0.85f; }
 
@@ -962,6 +965,7 @@ void Game::updatePlayerAnimation() {
         return;
     }
 
+    if (landT > 0.f)                    { sp.Play("land"); return; }   // Batch D
     if (std::abs(tr.velocity.x) > 14.f) sp.Play("run");
     else                                sp.Play("idle");
 }
@@ -1330,7 +1334,7 @@ void Game::respawn() {
     dashActive = false;
     slideT = 0.f; slideCooldown = 0.f; wallJumpLockT = 0.f; wallSliding = false;
     parryT = 0.f; parryCooldown = 0.f; parryHit = false;
-    hooked = false; noJumpCutT = 0.f;
+    hooked = false; noJumpCutT = 0.f; landT = 0.f;
     setSlideHitbox(false);                 // Batch C: never respawn crouched
     iframeTimer = Config::RESPAWN_INVULN;
     // A death should not leave the hero mid-swing or holding a stale combo.
@@ -1442,8 +1446,9 @@ void Game::stepPlayerPhysics() {
                           ltr.position.y + ltr.height,
                           0.6f + impact * 1.4f);
             if (impact > 0.55f) m_shakeMag += impact * 4.f;
-            if (player.hasComponent<SpriteComponent>())
-                player.getComponent<SpriteComponent>().squash(1.25f, 0.72f);
+            // Batch D: a drawn landing crouch instead of squash(1.25, 0.72),
+            // which stretched the 1:1 pixels off the grid
+            landT = 0.14f;
         }
     }
     // sync facing for camera lookahead

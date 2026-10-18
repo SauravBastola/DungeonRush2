@@ -855,136 +855,166 @@ def boss(path, svg):
 
 # --------------------------------------------------------------------- hero
 def _hero(bob=0, lean=0, crouch=0, legs=(0, 0, 0, 0), lift=0, fhand=(5, 9),
-          bhand=(-4, 9), sword=70, scarf=(-9, 6), arc=None, glow=0, lie=0, kneel=0):
-    """ART-12 hero at 1:1, 48x56 cell, figure ~30x48, facing right.
+          bhand=(-4, 9), sword=70, scarf=(-9, 6), arc=None, glow=0, lie=0, kneel=0, t=0):
+    """Hero v2 (Batch D) at 1:1, 64x56 cell (body centred; the blade and the
+    swing trails need the room), figure ~30x48, facing right.
 
-    Kept from the hand-made sheet: brown hair, red scarf trailing back, grey
-    tunic, white sleeves and gloves, dark trousers, brown boots, steel sword
-    with a gold guard.  `legs` = (front foot dx, back foot dx, front knee
-    lift, back knee lift); `sword` is the blade angle in degrees (0 = right,
-    90 = straight down); `arc` = (start, end) degrees of a swing trail.
+    Same design as ART-12 - brown hair, red scarf, grey tunic, white
+    sleeves, dark trousers, brown boots, steel sword with a gold guard - with
+    a third tone and texture on every part: hair strands and a fringe, brow
+    and catchlight, collar and centre panel, belt buckle, knee highlights,
+    boot cuffs and toes, leather gloves, a two-tailed scarf with folds that
+    flutters by `t`, and a blade with an edge highlight, fuller and pommel.
     """
-    c = Px(48, 56)
+    c = Px(64, 56)
+    X = 8                                     # 48 -> 64 px cell: everything shifts right
     if lie:                                   # last death frames: lying down
         y = 52
-        c.part(_rc(6, y - 4, 22, y), PAL.NAVY_XD, PAL.SLATE_XD, PAL.INK)
-        c.part(_rc(20, y - 7, 34, y), PAL.SLATE, PAL.SLATE_LT, PAL.SLATE_XD)
-        c.part(_pg([(30, y - 6), (40, y - 8 + lie), (36, y - 2)]), PAL.RED, PAL.PINK, PAL.RED_DK)
-        c.part(_el(33, y - 10, 44, y), PAL.TAN_LT, PAL.CREAM, PAL.TAN)
-        c.part(_el(35, y - 11, 46, y - 3), PAL.BROWN, PAL.TAN, PAL.BROWN_DK)
-        c.part(_rc(2, y - 2, 6, y + 1), PAL.BROWN_DK, PAL.BROWN, PAL.BROWN_XD)
-        c.part(_ln([(10, y - 9), (26, y - 12)], 2), PAL.PLATE, PAL.CREAM, PAL.SLATE_LT)
+        c.part(_rc(X + 6, y - 4, X + 22, y), PAL.NAVY_XD, PAL.SLATE_XD, PAL.INK)
+        c.part(_rc(X + 20, y - 7, X + 34, y), PAL.SLATE, PAL.SLATE_LT, PAL.SLATE_XD)
+        c.part(_rc(X + 26, y - 7, X + 28, y), PAL.SLATE_LT)
+        c.part(_pg([(X + 30, y - 6), (X + 40, y - 8 + lie), (X + 36, y - 2)]), PAL.RED, PAL.PINK, PAL.RED_DK)
+        c.part(_el(X + 33, y - 10, X + 44, y), PAL.TAN_LT, PAL.CREAM, PAL.TAN)
+        c.part(_el(X + 35, y - 11, X + 46, y - 3), PAL.BROWN, PAL.TAN, PAL.BROWN_DK)
+        c.part(_rc(X + 2, y - 2, X + 6, y + 1), PAL.BROWN_DK, PAL.BROWN, PAL.BROWN_XD)
+        c.part(_ln([(X + 10, y - 9), (X + 26, y - 12)], 2), PAL.PLATE, PAL.CREAM, PAL.SLATE_LT)
         return c.outline()
-    hx, hy = 23 + lean // 2, 37 + crouch + kneel
-    sx, sy = 24 + lean, 22 + bob + crouch + kneel
+    hx, hy = X + 23 + lean // 2, 37 + crouch + kneel
+    sx, sy = X + 24 + lean, 22 + bob + crouch + kneel
     feet_y = 54 - lift
-    # back leg, back arm, scarf tail behind the body
+    flut = (0, 1, 2, 1)[t % 4]                # scarf / hair flutter phase
     ffx, bfx, fkl, bkl = legs
-    for (fx, kl, col, shade) in ((bfx, bkl, PAL.NAVY_XD, PAL.INK),):
-        kx, ky = hx - 1 + fx // 2, hy + 9 - kl
-        c.part(_ln([(hx - 2, hy), (kx, ky)], 4), col, PAL.SLATE_XD, shade)
-        c.part(_ln([(kx, ky), (hx - 2 + fx, feet_y - 2 - kl // 2)], 4), col, PAL.SLATE_XD, shade)
-        c.part(_rc(hx - 4 + fx, feet_y - 3 - kl // 2, hx + 1 + fx, feet_y - kl // 2),
-               PAL.BROWN_DK, PAL.BROWN, PAL.BROWN_XD)
-    c.part(_ln([(sx - 4, sy + 2), (sx - 4 + bhand[0], sy + 2 + bhand[1])], 3),
-           PAL.PLATE, PAL.CREAM, PAL.SLATE_LT)
-    tx, ty = sx - 3 + scarf[0], sy + scarf[1]
-    c.part(_pg([(sx - 3, sy - 2), (tx - 2, ty - 2), (tx + 1, ty + 2), (sx - 1, sy + 3)]),
-           PAL.RED, PAL.PINK, PAL.RED_DK)
-    # torso: grey tunic and a belt
+
+    def leg(x0, fx, kl, front):
+        kx, ky = x0 + (1 if front else -1) + fx // 2, hy + 9 - kl
+        fy = feet_y - 2 - kl // 2
+        c.part(_ln([(x0, hy), (kx, ky)], 4), PAL.NAVY_XD, PAL.SLATE_XD, PAL.INK, sep=front)
+        c.part(_ln([(kx, ky), (x0 + fx, fy)], 4), PAL.NAVY_XD, PAL.SLATE_XD, PAL.INK)
+        c.dot(kx - 1, ky - 1, PAL.SLATE)                               # knee highlight
+        bx = x0 + fx - (2 if front else 2)
+        c.part(_rc(bx, fy - 1, bx + 5, fy + 2), PAL.BROWN_DK, PAL.BROWN, PAL.BROWN_XD)   # boot
+        c.part(_rc(bx, fy - 2, bx + 4, fy - 1), PAL.BROWN)                              # cuff
+        c.dot(bx + 5, fy + 1, PAL.TAN)                                                  # toe cap
+
+    # back leg, back arm, scarf tails behind the body
+    leg(hx - 2, bfx, bkl, False)
+    bh = (sx - 4 + bhand[0], sy + 2 + bhand[1])
+    c.part(_ln([(sx - 4, sy + 2), bh], 3), PAL.PLATE, PAL.CREAM, PAL.SLATE_LT)
+    c.part(_el(bh[0] - 1, bh[1] - 1, bh[0] + 1, bh[1] + 1), PAL.BROWN_DK, PAL.BROWN)     # glove
+    for k, (dx, dy) in enumerate(((0, 0), (-3, 4))):                                   # two tails
+        tx = max(4, sx - 3 + scarf[0] + dx - flut)          # stays inside the cell
+        ty = sy + scarf[1] + dy + (flut if k else -flut)
+        c.part(_pg([(sx - 3, sy - 2), (tx - 2, ty - 2), (tx + 1, ty + 2), (sx - 1, sy + 3)]),
+               PAL.RED, PAL.PINK, PAL.RED_DK)
+        c.dot((sx - 3 + tx) // 2, (sy + ty) // 2, PAL.RED_DK)                           # fold
+    # torso: tunic with collar, centre panel and stitching; belt with buckle
     c.part(_pg([(sx - 6, sy), (sx + 5, sy), (hx + 5, hy), (hx - 5, hy)]),
            PAL.SLATE, PAL.SLATE_LT, PAL.SLATE_XD)
+    c.part(_pg([(sx - 1, sy + 1), (sx + 2, sy + 1), (hx + 2, hy - 3), (hx - 1, hy - 3)]),
+           PAL.SLATE_LT)                                                               # centre panel
+    for yy in range(sy + 4, hy - 3, 3):
+        c.dot(sx + 3 + (yy - sy) // 6, yy, PAL.SLATE_XD)                              # stitching
     c.part(_rc(hx - 5, hy - 3, hx + 5, hy - 2), PAL.BROWN, PAL.TAN, PAL.BROWN_DK)
-    c.dot(hx + 1, hy - 3, PAL.GOLD)
+    c.part(_rc(hx, hy - 4, hx + 2, hy - 1), PAL.GOLD, PAL.YELLOW, PAL.ORANGE_DK)       # buckle
     # front leg
-    kx, ky = hx + 2 + ffx // 2, hy + 9 - fkl
-    c.part(_ln([(hx + 2, hy), (kx, ky)], 4), PAL.NAVY_XD, PAL.SLATE_XD, PAL.INK, sep=True)
-    c.part(_ln([(kx, ky), (hx + 2 + ffx, feet_y - 2 - fkl // 2)], 4), PAL.NAVY_XD, PAL.SLATE_XD, PAL.INK)
-    c.part(_rc(hx + ffx, feet_y - 3 - fkl // 2, hx + 5 + ffx, feet_y - fkl // 2),
-           PAL.BROWN_DK, PAL.BROWN, PAL.BROWN_XD)
-    # head: face, hair swept back, an eye looking forward
+    leg(hx + 2, ffx, fkl, True)
+    # head: face with ear, hair with strands and a fringe, brow, eye + catchlight
     hc = (sx + 1, sy - 7)
     c.part(_el(hc[0] - 5, hc[1] - 6, hc[0] + 6, hc[1] + 6), PAL.TAN_LT, PAL.CREAM, PAL.TAN)
+    c.dot(hc[0] - 2, hc[1] + 1, PAL.TAN); c.dot(hc[0] - 2, hc[1] + 2, PAL.TAN)          # ear
     c.part(_pg([(hc[0] - 7, hc[1] + 3), (hc[0] - 6, hc[1] - 5), (hc[0] - 1, hc[1] - 8),
-                (hc[0] + 6, hc[1] - 6), (hc[0] + 7, hc[1] - 2), (hc[0] + 2, hc[1] - 3),
-                (hc[0] - 1, hc[1] + 1), (hc[0] - 3, hc[1] + 5)]), PAL.BROWN, PAL.TAN, PAL.BROWN_DK)
+                (hc[0] + 6, hc[1] - 6), (hc[0] + 7, hc[1] - 2), (hc[0] + 4, hc[1] - 3),
+                (hc[0] + 2, hc[1] - 1), (hc[0] + 1, hc[1] - 3), (hc[0] - 1, hc[1] + 1),
+                (hc[0] - 3 - flut // 2, hc[1] + 5)]), PAL.BROWN, PAL.TAN, PAL.BROWN_DK)
+    for (ax, ay, bx, by) in ((-4, -5, 0, -7), (-5, -2, -1, -5), (1, -6, 4, -6)):        # strands
+        c.part(_ln([(hc[0] + ax, hc[1] + ay), (hc[0] + bx, hc[1] + by)], 1), PAL.TAN)
+    c.part(_ln([(hc[0] + 2, hc[1] - 2), (hc[0] + 4, hc[1] - 2)], 1), PAL.BROWN_DK)      # brow
     c.dot(hc[0] + 3, hc[1], PAL.INK); c.dot(hc[0] + 3, hc[1] + 1, PAL.INK)
-    # scarf knot over the collar
+    c.dot(hc[0] + 4, hc[1], PAL.CREAM)                                                  # catchlight
+    c.dot(hc[0] + 4, hc[1] + 4, PAL.TAN)                                                # mouth corner
+    # scarf knot over the collar, with a fold
     c.part(_rc(sx - 4, sy - 2, sx + 4, sy + 1), PAL.RED, PAL.PINK, PAL.RED_DK)
-    # front arm, glove, sword with a gold guard
+    c.part(_ln([(sx - 2, sy - 1), (sx + 2, sy)], 1), PAL.RED_DK)
+    # front arm: sleeve with cuff, leather glove; sword with edge, fuller, pommel
     hand = (sx + 3 + fhand[0], sy + 2 + fhand[1])
     c.part(_ln([(sx + 3, sy + 2), hand], 3), PAL.PLATE, PAL.CREAM, PAL.SLATE_LT, sep=True)
     if sword is not None:
         a = math.radians(sword)
-        tip = (hand[0] + int(round(17 * math.cos(a))), hand[1] + int(round(17 * math.sin(a))))
-        gx, gy = int(round(2 * math.sin(a))), int(round(-2 * math.cos(a)))
-        c.part(_ln([hand, tip], 2), PAL.PLATE, PAL.CREAM, PAL.SLATE_LT, sep=True)
-        c.part(_ln([(hand[0] - gx, hand[1] - gy), (hand[0] + gx, hand[1] + gy)], 2), PAL.GOLD)
-    c.part(_el(hand[0] - 1, hand[1] - 1, hand[0] + 1, hand[1] + 1), PAL.CREAM)
+        ca, sa = math.cos(a), math.sin(a)
+        tip = (hand[0] + int(round(16 * ca)), hand[1] + int(round(16 * sa)))
+        gx, gy = int(round(3 * sa)), int(round(-3 * ca))
+        c.part(_ln([hand, tip], 3), PAL.PLATE, PAL.CREAM, PAL.SLATE_LT, sep=True)
+        c.part(_ln([(hand[0] + int(4 * ca), hand[1] + int(4 * sa)),
+                    (hand[0] + int(13 * ca), hand[1] + int(13 * sa))], 1), PAL.SLATE_LT)  # fuller
+        c.part(_ln([(hand[0] - gx, hand[1] - gy), (hand[0] + gx, hand[1] + gy)], 2),
+               PAL.GOLD, PAL.YELLOW, PAL.ORANGE_DK)
+        c.dot(hand[0] - int(round(3 * ca)), hand[1] - int(round(3 * sa)), PAL.GOLD)     # pommel
+    c.part(_el(hand[0] - 2, hand[1] - 2, hand[0] + 1, hand[1] + 1), PAL.BROWN_DK, PAL.BROWN)  # glove
     if glow:                                  # charged bolt in the open hand
         g = glow
         c.part(_el(hand[0] + 2 - g, hand[1] - g, hand[0] + 2 + g, hand[1] + g),
                PAL.WATER, PAL.CREAM, PAL.WATER_DK)
     c.outline()
-    if arc:                                   # swing trail, drawn after the outline
-        r = 18
+    if arc:                                   # swing trail: three bands, after the outline
         from PIL import ImageDraw
         d = ImageDraw.Draw(c.img)
-        box = [hand[0] - r, hand[1] - r, hand[0] + r, hand[1] + r]
-        d.arc(box, arc[0], arc[1], fill=PAL.CREAM + (255,), width=2)
-        d.arc([box[0] + 2, box[1] + 2, box[2] - 2, box[3] - 2], arc[0], arc[1],
-              fill=PAL.PLATE + (255,), width=1)
+        for r, col, wd in ((17, PAL.WATER, 1), (16, PAL.CREAM, 2), (13, PAL.PLATE, 1)):
+            d.arc([hand[0] - r, hand[1] - r, hand[0] + r, hand[1] + r], arc[0], arc[1],
+                  fill=col + (255,), width=wd)
     return c
 
 
 def hero(path, svg):
-    """player_sprites.png v2 (ART-12): 7 cols x 8 rows of 48x56 at 1:1.
+    """player_sprites.png v2 (Batch D): 8 cols x 9 rows of 64x56 at 1:1.
 
-    Rows keep their meaning: idle 3, run 6, power 5, slash 6, thrust 6,
-    jump 4, cast 3, die 7.  Collider stays 32x50, so no physics changes.
+    Rows: idle 4, run 8, power 5, slash 6, thrust 6, jump 4, cast 3, die 7,
+    land 2 (new - the crouch on landing, drawn instead of stretching pixels).
+    Collider stays 32x50, so no physics changes.
     """
     run = []
-    for i in range(6):
-        p = math.sin(i * math.pi / 3)
-        q = math.cos(i * math.pi / 3)
-        run.append(_hero(lean=3, bob=(1 if i % 3 == 0 else 0),
+    for i in range(8):
+        p = math.sin(i * math.pi / 4)
+        q = math.cos(i * math.pi / 4)
+        run.append(_hero(lean=3, bob=(1 if i % 4 == 0 else 0), t=i,
                          legs=(int(7 * p), int(-7 * p), max(0, int(6 * q)), max(0, int(-6 * q))),
                          fhand=(4 - int(3 * p), 8), bhand=(-3 + int(4 * p), 8),
                          sword=40 - int(10 * p), scarf=(-12, 2 + (i % 2))))
     rows = [
-        [_hero(), _hero(bob=1), _hero(bob=1, scarf=(-9, 7))],
+        [_hero(t=0), _hero(bob=1, t=1), _hero(bob=1, scarf=(-9, 7), t=2), _hero(t=3)],
         run,
-        [_hero(crouch=2, fhand=(-4, -12), sword=-130, scarf=(-10, 4)),
-         _hero(crouch=2, fhand=(-2, -13), sword=-110, scarf=(-10, 4)),
-         _hero(fhand=(6, -8), sword=-40, arc=(-150, -30), legs=(5, -4, 0, 0)),
-         _hero(crouch=3, fhand=(8, 2), sword=30, arc=(-60, 40), legs=(6, -5, 0, 0)),
-         _hero(crouch=3, fhand=(7, 6), sword=70, legs=(6, -5, 0, 0))],
-        [_hero(fhand=(-6, 2), sword=170, legs=(3, -3, 0, 0)),
-         _hero(fhand=(-5, 1), sword=180, legs=(3, -3, 0, 0)),
-         _hero(lean=2, fhand=(3, 1), sword=-10, arc=(150, 230), legs=(5, -4, 0, 0)),
-         _hero(lean=3, fhand=(7, 1), sword=0, arc=(200, 330), legs=(6, -5, 0, 0)),
-         _hero(lean=2, fhand=(6, 3), sword=20, legs=(6, -5, 0, 0)),
-         _hero(fhand=(5, 6), sword=50, legs=(4, -3, 0, 0))],
-        [_hero(crouch=3, fhand=(-3, 4), sword=0, legs=(2, -4, 0, 0)),
-         _hero(crouch=4, fhand=(-5, 4), sword=0, legs=(2, -5, 0, 0)),
-         _hero(crouch=4, lean=4, fhand=(4, 2), sword=0, legs=(8, -7, 0, 0)),
-         _hero(crouch=4, lean=5, fhand=(8, 2), sword=0, legs=(9, -8, 0, 0)),
-         _hero(crouch=3, lean=4, fhand=(8, 3), sword=5, legs=(8, -7, 0, 0)),
-         _hero(crouch=1, lean=2, fhand=(5, 6), sword=40, legs=(4, -3, 0, 0))],
-        [_hero(crouch=4, legs=(3, -3, 0, 0), fhand=(4, 8), sword=60),
-         _hero(lift=2, legs=(1, -4, 0, 4), fhand=(5, 2), sword=20, scarf=(-10, 9)),
-         _hero(lift=6, legs=(3, -2, 6, 7), fhand=(5, 0), sword=10, scarf=(-11, 8)),
-         _hero(lift=7, legs=(4, -1, 8, 8), fhand=(6, -1), sword=0, scarf=(-11, 5))],
-        [_hero(fhand=(6, 2), sword=None, glow=1),
-         _hero(fhand=(7, 1), sword=None, glow=2),
-         _hero(fhand=(8, 1), sword=None, glow=3)],
-        [_hero(lean=-2, bob=1, fhand=(4, 10), sword=80),
-         _hero(lean=-3, crouch=3, fhand=(3, 12), sword=95),
-         _hero(kneel=6, legs=(4, -6, 4, 0), fhand=(4, 10), sword=100),
-         _hero(kneel=10, legs=(5, -7, 6, 0), fhand=(5, 8), sword=110),
+        [_hero(crouch=2, fhand=(-4, -10), sword=-130, scarf=(-10, 4), t=0),
+         _hero(crouch=3, fhand=(-2, -10), sword=-105, scarf=(-10, 4), t=1),
+         _hero(crouch=1, fhand=(6, -6), sword=-40, arc=(-150, -30), legs=(5, -4, 0, 0), t=2),
+         _hero(crouch=3, fhand=(8, 2), sword=30, arc=(-60, 40), legs=(6, -5, 0, 0), t=3),
+         _hero(crouch=3, fhand=(7, 6), sword=70, legs=(6, -5, 0, 0), t=0)],
+        [_hero(fhand=(-6, 2), sword=170, legs=(3, -3, 0, 0), t=0),
+         _hero(fhand=(-5, 1), sword=180, legs=(3, -3, 0, 0), t=1),
+         _hero(lean=2, fhand=(3, 1), sword=-10, arc=(150, 230), legs=(5, -4, 0, 0), t=2),
+         _hero(lean=3, fhand=(7, 1), sword=0, arc=(200, 330), legs=(6, -5, 0, 0), t=3),
+         _hero(lean=2, fhand=(6, 3), sword=20, legs=(6, -5, 0, 0), t=0),
+         _hero(fhand=(5, 6), sword=50, legs=(4, -3, 0, 0), t=1)],
+        [_hero(crouch=3, fhand=(-3, 4), sword=0, legs=(2, -4, 0, 0), t=0),
+         _hero(crouch=4, fhand=(-5, 4), sword=0, legs=(2, -5, 0, 0), t=1),
+         _hero(crouch=4, lean=4, fhand=(4, 2), sword=0, legs=(8, -7, 0, 0), t=2),
+         _hero(crouch=4, lean=3, fhand=(7, 2), sword=0, legs=(9, -8, 0, 0), t=3),
+         _hero(crouch=3, lean=3, fhand=(7, 3), sword=5, legs=(8, -7, 0, 0), t=0),
+         _hero(crouch=1, lean=2, fhand=(5, 6), sword=40, legs=(4, -3, 0, 0), t=1)],
+        [_hero(crouch=4, legs=(3, -3, 0, 0), fhand=(4, 8), sword=60, t=0),
+         _hero(lift=2, legs=(1, -4, 0, 4), fhand=(5, 2), sword=20, scarf=(-10, 9), t=1),
+         _hero(lift=6, legs=(3, -2, 6, 7), fhand=(5, 0), sword=10, scarf=(-11, 8), t=2),
+         _hero(lift=7, legs=(4, -1, 8, 8), fhand=(6, -1), sword=0, scarf=(-11, 5), t=3)],
+        [_hero(fhand=(6, 2), sword=None, glow=1, t=0),
+         _hero(fhand=(7, 1), sword=None, glow=2, t=1),
+         _hero(fhand=(8, 1), sword=None, glow=3, t=2)],
+        [_hero(lean=-2, bob=1, fhand=(4, 10), sword=80, t=0),
+         _hero(lean=-3, crouch=3, fhand=(3, 12), sword=95, t=1),
+         _hero(kneel=6, legs=(4, -6, 4, 0), fhand=(4, 10), sword=100, t=2),
+         _hero(kneel=10, legs=(5, -7, 6, 0), fhand=(5, 8), sword=110, t=3),
          _hero(lie=1), _hero(lie=2), _hero(lie=3)],
+        [_hero(crouch=6, legs=(4, -4, 2, 2), fhand=(5, 10), sword=75, scarf=(-9, 2), t=1),   # land
+         _hero(crouch=2, legs=(3, -3, 0, 0), fhand=(5, 9), sword=72, scarf=(-9, 5), t=2)],
     ]
-    _sheet(rows, 48, 56, path, svg)
+    _sheet(rows, 64, 56, path, svg)
 
 
 # ------------------------------------------------------------- spitter (C4)

@@ -83,6 +83,8 @@ public:
     float hookX = 0.f, hookY = 0.f, ropeLen = 0.f;
     float noJumpCutT = 0.f;           // after a fling, keep its height
     int   grapplesUsed = 0;
+    // Batch D: the landing crouch (a drawn frame, not a pixel-stretching squash)
+    float landT = 0.f;
     float dashTrailTimer = 0.f;     // paces the dash afterimages
     float speedBoostTimer = 0.f;
     float invincibleTimer = 0.f;
