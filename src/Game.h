@@ -163,6 +163,11 @@ public:
     bool     newBestTime = false;
     int      bestStars(int stage) const;
     float    bestTime(int stage) const;
+    // ---- Batch P: weather and ambient sound ---------------------------------
+    std::string ambientId;                 // the loop playing on channel 0 ("" = none)
+    void     playAmbient(const char* id);
+    int      weatherKind() const;          // 0 none, 1 rain (stage 2), 2 ash (stage 3)
+    void     drawWeather();
     void     drawTextA(const char* fontId, const char* text, int x, int y, SDL_Color c, Uint8 alpha, bool centered);
     int      textWidth(const char* fontId, const char* text);
     void pickRidePlatform();

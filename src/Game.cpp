@@ -121,6 +121,7 @@ void Game::init(const char* title, int width, int height, bool fullscreen) {
     if (TTF_Init() == -1) std::cerr << "TTF_Init: " << TTF_GetError() << "\n";
     if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 1024) == -1)
         std::cerr << "Mix_OpenAudio: " << Mix_GetError() << "\n";
+    Mix_ReserveChannels(1);                 // Batch P: channel 0 is the ambient loop
 
     assets = new AssetManager(&manager);
     loadAssets();
@@ -206,7 +207,7 @@ void Game::loadAssets() {
                             "land", "grapple_fire", "grapple_latch", "key", "checkpoint", "door",
                             "stage_clear", "explosion", "skel_tell", "skel_strike", "bat_tell",
                             "bat_dive", "spit_tell", "spit", "wisp_tell", "wisp_lunge",
-                            "boss_charge", "roar" })
+                            "boss_charge", "roar", "amb_meadow", "amb_jungle", "amb_canyon" })
         snd(id, (std::string("sounds/sfx/") + id + ".wav").c_str());
     snd("fuse",         "sounds/sfx/skel_tell.wav");    // a hissing scrape suits a fuse
 
@@ -319,6 +320,8 @@ void Game::loadStage(int n) {
     playMusic("stage" + std::to_string(n + 1), true);          // Batch E
     buildSigns();                                               // Batch K
     resetStageRun();                                            // Batch L
+    { static const char* A[3] = { "amb_meadow", "amb_jungle", "amb_canyon" };
+      playAmbient(A[std::max(0, std::min(2, n))]); }            // Batch P
 }
 
 void Game::loadLevel() {
@@ -1965,6 +1968,62 @@ void Game::drawTasksPanel() {
     }
 }
 
+// ---- Batch P: weather and ambient sound ----------------------------------
+void Game::playAmbient(const char* id) {
+    if (ambientId == id) return;
+    Mix_HaltChannel(0);
+    ambientId = id;
+    if (!*id) return;
+    if (auto* c = assets->GetSound(id)) {
+        Mix_Volume(0, muted ? 0 : sfxVolume / 2);
+        Mix_PlayChannel(0, c, -1);
+    }
+}
+
+int Game::weatherKind() const {
+    if (state == State::Menu || state == State::Instructions || state == State::Achievements) return 0;
+    return Level::g_stage == 1 ? 1 : (Level::g_stage == 2 ? 2 : 0);
+}
+
+// Screen-space, deterministic from game time: rain in Jungle Falls, ash and
+// a few rising embers in Ember Canyon.
+void Game::drawWeather() {
+    const int kind = weatherKind();
+    if (!kind) return;
+    const int W = Config::WINDOW_WIDTH, H = Config::WINDOW_HEIGHT;
+    const float t = gameTime;
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    if (kind == 1) {
+        SDL_SetRenderDrawColor(renderer, 20, 40, 60, 28);                 // a wet, darker sky
+        SDL_Rect all{ 0, 0, W, H }; SDL_RenderFillRect(renderer, &all);
+        for (int i = 0; i < 180; ++i) {
+            const float sp = 760.f + (i % 7) * 40.f;
+            const int x = (int)std::fmod(i * 97.3f + t * 160.f - camera.x * 0.3f + 4000.f * W, (float)W);
+            const int y = (int)std::fmod(i * 53.7f + t * sp - camera.y * 0.3f + 4000.f * H, (float)H);
+            const Uint8 a = (Uint8)(110 + (i % 5) * 25);
+            SDL_SetRenderDrawColor(renderer, 190, 225, 245, a);
+            SDL_RenderDrawLine(renderer, x, y, x - 4, y + 15);
+            if (i % 3 == 0) SDL_RenderDrawLine(renderer, x + 1, y, x - 3, y + 15);   // some drops heavier
+        }
+    } else {
+        for (int i = 0; i < 140; ++i) {
+            const bool ember = i % 6 == 0;
+            const float drift = ember ? -40.f : 26.f + (i % 4) * 6.f;          // ash falls, embers rise
+            const float sway = std::sin(t * 0.9f + i) * 14.f;
+            const int x = (int)std::fmod(i * 131.7f + sway + t * 18.f - camera.x * 0.4f + 4000.f * W, (float)W);
+            const int y = (int)std::fmod(i * 71.3f + t * drift - camera.y * 0.4f + 4000.f * H, (float)H);
+            const int sz = ember ? 3 : ((i % 3) ? 3 : 4);
+            SDL_SetRenderDrawColor(renderer, 40, 28, 36, 120);               // a dark rim: ash reads on bright sky
+            SDL_Rect rim{ x - 1, y - 1, sz + 2, sz + 2 }; SDL_RenderFillRect(renderer, &rim);
+            if (ember) SDL_SetRenderDrawColor(renderer, 255, 160, 60, (Uint8)(180 + 75 * std::fabs(std::sin(t * 3.f + i))));
+            else       SDL_SetRenderDrawColor(renderer, 205, 196, 196, 220);
+            SDL_Rect f{ x, y, sz, sz };
+            SDL_RenderFillRect(renderer, &f);
+        }
+    }
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+}
+
 void Game::startJump() {
     if (state != State::Playing) return;
     auto& p = *manager.getGroup(groupPlayers)[0];
@@ -2162,6 +2221,7 @@ void Game::restartLevel() {
     playMusic("stage1", true);                          // Batch E: a new run, stage 1's theme
     buildSigns();                                       // Batch K
     resetStageRun();                                    // Batch L
+    playAmbient("amb_meadow");                          // Batch P
     state = State::Playing;
     isPaused = false;
     pauseSelection = 0;
@@ -2299,6 +2359,8 @@ void Game::update() {
         if (ptr.position.x >= Level::stage().zoneArena * (float)Config::TILE_SIZE)
             m_bossMusicOn = playMusic("boss", false) || true;   // stop re-checking either way
     }
+    if ((state == State::Menu || state == State::Achievements) && !ambientId.empty())
+        playAmbient("");                                // Batch P: quiet in the menu
     if (state == State::Menu || state == State::Instructions || state == State::Achievements) {
         handlePlayerInput();
         manager.refresh();
@@ -2780,6 +2842,7 @@ void Game::handleSettingsInput(SDL_Keycode key) {
 void Game::applyVolumes() {
     Mix_VolumeMusic(muted ? 0 : musicVolume);
     Mix_Volume(-1, muted ? 0 : sfxVolume);
+    Mix_Volume(0, muted ? 0 : sfxVolume / 2);   // Batch P: the ambient loop sits under the effects
     if (muted) Mix_PauseMusic();
     else if (Mix_PausedMusic()) Mix_ResumeMusic();
 }
@@ -4291,6 +4354,7 @@ void Game::render() {
         }
     } else {
         drawWorld();
+        drawWeather();                                          // Batch P
         if (state == State::Playing || state == State::Paused) drawHUD();
 
         if      (state == State::Paused)        { drawPauseOverlay(); drawTasksPanel(); }
