@@ -85,8 +85,12 @@ Game::~Game() { delete g_map; }
 // init
 // ===========================================================================
 void Game::init(const char* title, int width, int height, bool fullscreen) {
-    int flags = 0;
-    if (fullscreen) flags = SDL_WINDOW_FULLSCREEN;
+    // Batch F: resizable and high-DPI (Retina: the full drawable); fullscreen
+    // is borderless at the desktop resolution - no mode switch on macOS.
+    int flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
+    if (fullscreen) flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+    this->fullscreen = fullscreen;
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");      // nearest: crisp pixels
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
         std::cerr << "SDL_Init: " << SDL_GetError() << "\n";
     }
@@ -97,6 +101,8 @@ void Game::init(const char* title, int width, int height, bool fullscreen) {
                                   SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!renderer) renderer = SDL_CreateRenderer(m_window, -1, SDL_RENDERER_SOFTWARE);
     if (renderer) SDL_SetRenderDrawColor(renderer, 30, 40, 60, 255);
+    // Batch F: draw in fixed logical pixels; SDL scales and letterboxes
+    if (renderer) SDL_RenderSetLogicalSize(renderer, Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT);
 
     // cache the sky gradient once, now that a renderer exists
     Parallax::init(renderer, Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT);
@@ -221,6 +227,30 @@ float Game::stageSpawnY() const {
 
 // Batch B: tear the world down to the player and build stage `n`.  Score,
 // lives and the run clock carry over; key, door, checkpoints do not.
+// Batch F: display ---------------------------------------------------------
+bool Game::sharpFor(Scaling mode, int outW, int outH) {
+    if (mode == Scaling::Sharp) return true;
+    if (mode == Scaling::Fill)  return false;
+    const int k = std::min(outW / Config::WINDOW_WIDTH, outH / Config::WINDOW_HEIGHT);
+    return k >= 2;                               // Auto: sharp once 2x fits
+}
+
+void Game::applyScaling() {
+    if (!renderer) return;
+    int w = 0, h = 0;
+    SDL_GetRendererOutputSize(renderer, &w, &h);   // real pixels (Retina: 2x)
+    const bool sharp = sharpFor(scaling, w, h) &&
+                       std::min(w / Config::WINDOW_WIDTH, h / Config::WINDOW_HEIGHT) >= 1;
+    SDL_RenderSetIntegerScale(renderer, sharp ? SDL_TRUE : SDL_FALSE);
+    SDL_RenderSetLogicalSize(renderer, Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT);
+}
+
+void Game::setFullscreen(bool on) {
+    fullscreen = on;
+    if (m_window) SDL_SetWindowFullscreen(m_window, on ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+    applyScaling();
+}
+
 // Batch E ----------------------------------------------------------------
 std::string Game::assetFile(const std::string& rel) const { return assetPath(rel); }
 
@@ -1809,7 +1839,7 @@ void Game::drawSettings() {
     SDL_Rect full{ 0, 0, W, H };
     SDL_RenderFillRect(renderer, &full);
 
-    const int pw = 620, ph = 380;
+    const int pw = 620, ph = 480;                       // Batch F: two more rows
     const int px = (W - pw) / 2, py = (H - ph) / 2;
     SDL_SetRenderDrawColor(renderer, 28, 34, 56, 250);
     SDL_Rect panel{ px, py, pw, ph };
@@ -1829,10 +1859,10 @@ void Game::drawSettings() {
 
     // ---- rows ----
     struct Row { const char* label; int y; };
-    const int rowY[4] = { py + 150, py + 200, py + 250, py + 306 };
-    const char* labels[4] = { "Music", "Effects", "Mute all", "Back" };
+    const int rowY[6] = { py + 150, py + 200, py + 250, py + 300, py + 350, py + 406 };
+    const char* labels[6] = { "Music", "Effects", "Mute all", "Display", "Pixels", "Back" };
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 6; i++) {
         bool sel = (settingsSelection == i);
         if (sel) {   // highlight the selected row
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
@@ -1865,6 +1895,14 @@ void Game::drawSettings() {
         } else if (i == 2) {
             drawText("body", muted ? "ON" : "OFF", px + 300, rowY[i],
                      muted ? colRed : colGreen, false);
+        } else if (i == 3) {                                       // Batch F
+            drawText("body", fullscreen ? "Fullscreen" : "Windowed", px + 300, rowY[i], norm, false);
+        } else if (i == 4) {
+            const char* m = scaling == Scaling::Auto ? "Auto" : scaling == Scaling::Sharp ? "Sharp" : "Fill";
+            drawText("body", m, px + 300, rowY[i], norm, false);
+            drawText("small", scaling == Scaling::Auto ? "sharp at 2x and up"
+                              : scaling == Scaling::Sharp ? "whole-number scale"
+                              : "fill the screen", px + 420, rowY[i], dim, false);
         }
     }
     drawText("small", "Changes are saved automatically.",
@@ -1967,22 +2005,28 @@ void Game::handleSettingsInput(SDL_Keycode key) {
     const int step = 8;
     switch (key) {
         case SDLK_UP:    case SDLK_w:
-            settingsSelection = (settingsSelection + 3) % 4; break;
+            settingsSelection = (settingsSelection + 5) % 6; break;
         case SDLK_DOWN:  case SDLK_s:
-            settingsSelection = (settingsSelection + 1) % 4; break;
+            settingsSelection = (settingsSelection + 1) % 6; break;
         case SDLK_LEFT:  case SDLK_a:
             if (settingsSelection == 0) musicVolume = std::max(0,   musicVolume - step);
             if (settingsSelection == 1) sfxVolume   = std::max(0,   sfxVolume   - step);
+            if (settingsSelection == 3) setFullscreen(!fullscreen);
+            if (settingsSelection == 4) { scaling = (Scaling)(((int)scaling + 2) % 3); applyScaling(); }
             applyVolumes();
             break;
         case SDLK_RIGHT: case SDLK_d:
             if (settingsSelection == 0) musicVolume = std::min(128, musicVolume + step);
             if (settingsSelection == 1) sfxVolume   = std::min(128, sfxVolume   + step);
+            if (settingsSelection == 3) setFullscreen(!fullscreen);
+            if (settingsSelection == 4) { scaling = (Scaling)(((int)scaling + 1) % 3); applyScaling(); }
             applyVolumes();
             break;
         case SDLK_RETURN: case SDLK_SPACE: case SDLK_KP_ENTER:
             if (settingsSelection == 2) { muted = !muted; applyVolumes(); }
-            else if (settingsSelection == 3) { saveSettings(); state = m_returnState; }
+            else if (settingsSelection == 3) setFullscreen(!fullscreen);
+            else if (settingsSelection == 4) { scaling = (Scaling)(((int)scaling + 1) % 3); applyScaling(); }
+            else if (settingsSelection == 5) { saveSettings(); state = m_returnState; }
             break;
         case SDLK_ESCAPE:
             saveSettings();
@@ -2009,6 +2053,11 @@ void Game::loadSettings() {
     f.read(&magic[0], 7);
     if (magic.compare(0, 7, Config::SAVE_MAGIC) != 0) return;
     f >> musicVolume >> sfxVolume >> bestScore;
+    int fs = 0, sc = 0;                                  // Batch F: older saves lack these
+    if (f >> fs >> sc) {
+        scaling = (Scaling)std::max(0, std::min(2, sc));
+        if (fs != 0) setFullscreen(true); else applyScaling();
+    }
     musicVolume = std::max(0, std::min(128, musicVolume));
     sfxVolume   = std::max(0, std::min(128, sfxVolume));
     applyVolumes();
@@ -2018,12 +2067,27 @@ void Game::saveSettings() {
     std::ofstream f(Config::SAVE_FILE, std::ios::binary | std::ios::trunc);
     if (!f) return;
     f << Config::SAVE_MAGIC << "\n"
-      << musicVolume << " " << sfxVolume << " " << bestScore << "\n";
+      << musicVolume << " " << sfxVolume << " " << bestScore << " "
+      << (fullscreen ? 1 : 0) << " " << (int)scaling << "\n";       // Batch F
 }
 
 void Game::handleEvents() {
     while (SDL_PollEvent(&event)) {
         if (event.type == SDL_QUIT) { isRunning = false; break; }
+        // Batch F: fullscreen toggle in every state; re-pick scaling on resize
+        if (event.type == SDL_KEYDOWN && !event.key.repeat &&
+            (event.key.keysym.sym == SDLK_F11 ||
+             (event.key.keysym.sym == SDLK_RETURN && (event.key.keysym.mod & (KMOD_ALT | KMOD_GUI))))) {
+            setFullscreen(!fullscreen);
+            saveSettings();
+            continue;
+        }
+        if (event.type == SDL_WINDOWEVENT &&
+            (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED ||
+             event.window.event == SDL_WINDOWEVENT_DISPLAY_CHANGED)) {
+            applyScaling();
+            continue;
+        }
 
         // Mouse wheel scrolls the how-to-play.  This has to be handled before
         // the keyboard filter below and before the Menu/Instructions branch —
@@ -2968,6 +3032,7 @@ namespace {
         { "S / Down",       "Slide",            "On the ground while moving: a fast low slide that dodges shots overhead." },
         { "U / C",          "Parry",            "Block just as a hit lands: shots fly back at the shooter, attackers stagger." },
         { "E / V",          "Grapple",          "Near a ring over a gap: hook on and swing. Jump to let go with a fling." },
+        { "F11 / Alt+Enter", "Fullscreen",      "Toggle fullscreen. Settings > Pixels: Auto, Sharp or Fill scaling." },
     };
 
     static const HelpItem ITEMS_COMBAT[] = {

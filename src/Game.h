@@ -271,6 +271,16 @@ public:
     std::string m_musicFile;
     bool playMusic(const std::string& name, bool fallback);
     std::string assetFile(const std::string& rel) const;   // absolute path, as the game sees it
+    // Batch F: display.  The game always draws in WINDOW_WIDTH x WINDOW_HEIGHT
+    // logical pixels; SDL letterboxes that to any window or screen.
+    enum class Scaling { Auto, Sharp, Fill };
+    bool    fullscreen = false;
+    Scaling scaling = Scaling::Auto;
+    void setFullscreen(bool on);
+    void applyScaling();
+    // Pure rule (the harness checks it): sharp (whole-number) scaling when the
+    // output can fit at least 2x, otherwise fill; Sharp/Fill force it.
+    static bool sharpFor(Scaling mode, int outW, int outH);
 private:
     bool m_bossMusicOn = false;
     float       m_shake = 0.f;
