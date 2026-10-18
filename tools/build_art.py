@@ -855,7 +855,7 @@ def boss(path, svg):
 
 # --------------------------------------------------------------------- hero
 def _hero(bob=0, lean=0, crouch=0, legs=(0, 0, 0, 0), lift=0, fhand=(5, 9),
-          bhand=(-4, 9), sword=70, scarf=(-9, 6), arc=None, glow=0, lie=0, kneel=0, t=0):
+          bhand=(-4, 9), sword=70, scarf=(-9, 6), arc=None, glow=0, lie=0, kneel=0, t=0, blink=False):
     """Hero v2 (Batch D) at 1:1, 64x56 cell (body centred; the blade and the
     swing trails need the room), figure ~30x48, facing right.
 
@@ -929,8 +929,11 @@ def _hero(bob=0, lean=0, crouch=0, legs=(0, 0, 0, 0), lift=0, fhand=(5, 9),
     for (ax, ay, bx, by) in ((-4, -5, 0, -7), (-5, -2, -1, -5), (1, -6, 4, -6)):        # strands
         c.part(_ln([(hc[0] + ax, hc[1] + ay), (hc[0] + bx, hc[1] + by)], 1), PAL.TAN)
     c.part(_ln([(hc[0] + 2, hc[1] - 2), (hc[0] + 4, hc[1] - 2)], 1), PAL.BROWN_DK)      # brow
-    c.dot(hc[0] + 3, hc[1], PAL.INK); c.dot(hc[0] + 3, hc[1] + 1, PAL.INK)
-    c.dot(hc[0] + 4, hc[1], PAL.CREAM)                                                  # catchlight
+    if blink:                                                                           # Batch N: a blink
+        c.part(_ln([(hc[0] + 2, hc[1] + 1), (hc[0] + 4, hc[1] + 1)], 1), PAL.BROWN_DK)
+    else:
+        c.dot(hc[0] + 3, hc[1], PAL.INK); c.dot(hc[0] + 3, hc[1] + 1, PAL.INK)
+        c.dot(hc[0] + 4, hc[1], PAL.CREAM)                                              # catchlight
     c.dot(hc[0] + 4, hc[1] + 4, PAL.TAN)                                                # mouth corner
     # scarf knot over the collar, with a fold
     c.part(_rc(sx - 4, sy - 2, sx + 4, sy + 1), PAL.RED, PAL.PINK, PAL.RED_DK)
@@ -971,16 +974,21 @@ def hero(path, svg):
     land 2 (new - the crouch on landing, drawn instead of stretching pixels).
     Collider stays 32x50, so no physics changes.
     """
+    # Batch N: run 8 -> 12 frames (a full stride every 12, a bob on each
+    # footfall) and idle 4 -> 6 (breathing, scarf drift, a blink)
     run = []
-    for i in range(8):
-        p = math.sin(i * math.pi / 4)
-        q = math.cos(i * math.pi / 4)
-        run.append(_hero(lean=3, bob=(1 if i % 4 == 0 else 0), t=i,
-                         legs=(int(7 * p), int(-7 * p), max(0, int(6 * q)), max(0, int(-6 * q))),
-                         fhand=(4 - int(3 * p), 8), bhand=(-3 + int(4 * p), 8),
-                         sword=40 - int(10 * p), scarf=(-12, 2 + (i % 2))))
+    for i in range(12):
+        a = i * 2 * math.pi / 12
+        p, q = math.sin(a), math.cos(a)
+        run.append(_hero(lean=3, bob=(1 if i % 6 in (0, 1) else 0), t=i,
+                         legs=(int(round(7 * p)), int(round(-7 * p)), max(0, int(round(6 * q))),
+                               max(0, int(round(-6 * q)))),
+                         fhand=(4 - int(round(3 * p)), 8), bhand=(-3 + int(round(4 * p)), 8),
+                         sword=40 - int(round(10 * p)), scarf=(-12, 2 + (i % 3) - 1)))
+    idle = [_hero(t=0), _hero(t=1), _hero(bob=1, t=2), _hero(bob=1, scarf=(-9, 7), t=3, blink=True),
+            _hero(bob=1, t=4), _hero(t=5, scarf=(-9, 5))]
     rows = [
-        [_hero(t=0), _hero(bob=1, t=1), _hero(bob=1, scarf=(-9, 7), t=2), _hero(t=3)],
+        idle,
         run,
         [_hero(crouch=2, fhand=(-4, -10), sword=-130, scarf=(-10, 4), t=0),
          _hero(crouch=3, fhand=(-2, -10), sword=-105, scarf=(-10, 4), t=1),
@@ -1013,6 +1021,22 @@ def hero(path, svg):
          _hero(lie=1), _hero(lie=2), _hero(lie=3)],
         [_hero(crouch=6, legs=(4, -4, 2, 2), fhand=(5, 10), sword=75, scarf=(-9, 2), t=1),   # land
          _hero(crouch=2, legs=(3, -3, 0, 0), fhand=(5, 9), sword=72, scarf=(-9, 5), t=2)],
+        # Batch N, row 9: run-start (2) | skid (3) | turn (2)
+        [_hero(crouch=2, lean=5, legs=(-3, 5, 0, 3), fhand=(2, 8), bhand=(-6, 6), sword=55, scarf=(-11, 4), t=0),
+         _hero(crouch=1, lean=6, legs=(6, -6, 4, 0), fhand=(4, 7), sword=45, scarf=(-12, 3), t=1),
+         _hero(lean=-3, crouch=2, legs=(8, -1, 0, 2), fhand=(6, 4), bhand=(-7, 2), sword=30, scarf=(-4, 2), t=0),
+         _hero(lean=-4, crouch=3, legs=(9, -2, 0, 3), fhand=(7, 3), bhand=(-7, 1), sword=25, scarf=(-3, 1), t=1),
+         _hero(lean=-2, crouch=2, legs=(6, -1, 0, 1), fhand=(6, 6), sword=40, scarf=(-6, 3), t=2),
+         _hero(lean=-1, crouch=1, legs=(1, -1, 0, 0), fhand=(1, 8), bhand=(-2, 8), sword=95, scarf=(-6, 8), t=1),
+         _hero(lean=1, legs=(2, -2, 0, 0), fhand=(3, 8), sword=80, scarf=(-8, 7), t=2)],
+        # Batch N, row 10: wall-slide (2) | fall loop (3)
+        [_hero(lean=-1, crouch=2, legs=(3, -4, 6, 2), lift=2, fhand=(7, -6), bhand=(-4, 6), sword=60,
+               scarf=(-9, -3), t=0),
+         _hero(lean=-1, crouch=2, legs=(3, -4, 5, 3), lift=2, fhand=(7, -5), bhand=(-4, 7), sword=62,
+               scarf=(-10, -4), t=1),
+         _hero(lift=6, legs=(3, -3, 3, 6), fhand=(5, -6), bhand=(-6, -4), sword=-20, scarf=(-8, -5), t=0),
+         _hero(lift=6, legs=(4, -2, 4, 5), fhand=(5, -7), bhand=(-6, -5), sword=-25, scarf=(-9, -6), t=1),
+         _hero(lift=6, legs=(3, -3, 3, 6), fhand=(5, -6), bhand=(-6, -4), sword=-20, scarf=(-8, -4), t=2)],
     ]
     _sheet(rows, 64, 56, path, svg)
 

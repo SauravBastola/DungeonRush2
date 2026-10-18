@@ -440,9 +440,16 @@ void Game::spawnPlayer() {
     //   row 6 (3)  cast
     //   row 7 (7)  die
     // Batch D: hero v2 sheet is 8 x 9 - idle 4, run 8, and row 8 the landing
-    sp.addAnim("idle",   Animation(0, 4, 170));
-    sp.addAnim("run",    Animation(1, 8,  70));
-    sp.addAnim("land",   Animation(8, 2,  70));
+    // Batch N: idle 6 and run 12 frames, and transitions between moves:
+    // row 9 = run-start (0-1), skid (2-4), turn (5-6); row 10 = wall-slide
+    // (0-1), fall loop (2-4).
+    sp.addAnim("idle",     Animation(0, 6, 160));
+    sp.addAnim("run",      Animation(1, 12, 50));
+    sp.addAnim("land",     Animation(8, 2,  70));
+    sp.addAnim("runstart", Animation(9, 2,  60, 0));
+    sp.addAnim("skid",     Animation(9, 3,  80, 2));
+    sp.addAnim("turn",     Animation(9, 2,  55, 5));
+    sp.addAnim("wallslide",Animation(10, 2, 120, 0));
     // Airborne: row 5.  Frames 0-1 are the crouch and take-off, 2-3 the rise
     // and the apex.  There is no dedicated "fall" row on this sheet, so the
     // descent reuses the apex frame (2) and the rise frame (3) — the legs are
@@ -450,7 +457,7 @@ void Game::spawnPlayer() {
     sp.addAnim("jump",   Animation(5, 2,  90));        // cols 0-1: crouch, launch
     sp.addAnim("rise",   Animation(5, 2,  80, 2));     // cols 2-3: lift, apex
     sp.addAnim("apex",   Animation(5, 1, 100, 3));     // col 3: top of the arc
-    sp.addAnim("fall",   Animation(5, 2, 110, 2));     // cols 2-3: descent
+    sp.addAnim("fall",   Animation(10, 3, 110, 2));    // Batch N: a dedicated fall loop
     sp.addAnim("leap",   Animation(5, 1, 100, 1));     // dash pose: stretched
     sp.addAnim("slide",  Animation(4, 1, 100, 1));     // Batch C: thrust crouch, low
     sp.addAnim("parry",  Animation(3, 1, 100, 1));     // Batch C: blade across the body
@@ -745,6 +752,7 @@ void Game::handlePlayerInput() {
     float target = 0;
     if (left)  target = -Config::PLAYER_SPEED * (speedBoostTimer > 0 ? Config::POWERUP_SPEED_MULT : 1.f);
     if (right) target =  Config::PLAYER_SPEED * (speedBoostTimer > 0 ? Config::POWERUP_SPEED_MULT : 1.f);
+    inputDir = (target > 0.f) - (target < 0.f);                  // Batch N: for skid / turn
 
     // ---- Batch C: slide ----
     const bool downKey = keys[SDL_SCANCODE_S] || keys[SDL_SCANCODE_DOWN];
@@ -1056,13 +1064,9 @@ void Game::updatePlayerAnimation() {
     if (diving)             { sp.Play("attackThrust"); return; }
 
     if (!isGrounded) {
-        // Hysteresis: between -40 and +80 px/s the hero is at the apex and
-        // should keep whichever pose it had, instead of flickering.
-        //
-        // Row 5 is the airborne row (see spawnPlayer), so no sword frame can
-        // appear up here.  Within that row only cols 2-3 are actually off the
-        // ground — cols 0-1 are the grounded crouch and take-off — so every
-        // airborne state is framed from col 2 onward.
+        wasRunning = false;
+        if (wallSliding)                { sp.Play("wallslide"); return; }   // Batch N
+        // Hysteresis: between -40 and +80 px/s the hero is at the apex.
         if      (tr.velocity.y < -40.f) sp.Play("rise");
         else if (tr.velocity.y >  80.f) sp.Play("fall");
         else                            sp.Play("apex");
@@ -1070,8 +1074,34 @@ void Game::updatePlayerAnimation() {
     }
 
     if (landT > 0.f)                    { sp.Play("land"); return; }   // Batch D
-    if (std::abs(tr.velocity.x) > 14.f) sp.Play("run");
-    else                                sp.Play("idle");
+    // ---- Batch N: transitions on the ground ----
+    const float avx = std::abs(tr.velocity.x);
+    const int moveDir = tr.velocity.x > 0.f ? 1 : (tr.velocity.x < 0.f ? -1 : 0);
+    if (runStartT > 0.f) runStartT -= lastFrameTime;
+    if (turnT > 0.f) turnT -= lastFrameTime;
+    if (facingRight != lastFacing && avx < 160.f) { turnT = 0.11f; runStartT = 0.f; }   // a pivot
+    lastFacing = facingRight;
+    // skid: still going fast with no input, or input against the motion
+    if (avx > 160.f && (inputDir == 0 || inputDir != moveDir)) {
+        sp.Play("skid"); wasRunning = false;
+        static float dustT = 0.f;                               // braking dust at the leading foot
+        if ((dustT -= lastFrameTime) <= 0.f) {
+            dustT = 0.05f;
+            Particles::emitDust(tr.position.x + (moveDir > 0 ? Config::PLAYER_W : 0.f),
+                                tr.position.y + Config::PLAYER_H - 2.f, 200, 190, 170);
+        }
+        return;
+    }
+    if (turnT > 0.f)                    { sp.Play("turn"); return; }
+    if (avx > 14.f) {
+        if (!wasRunning) runStartT = 0.12f;                  // pushing off from standing
+        wasRunning = true;
+        if (runStartT > 0.f) { sp.Play("runstart"); return; }
+        sp.Play("run");
+    } else {
+        wasRunning = false;
+        sp.Play("idle");
+    }
 }
 
 // Batch C helpers -------------------------------------------------------

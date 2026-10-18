@@ -87,6 +87,10 @@ public:
     int   grapplesUsed = 0;
     // Batch D: the landing crouch (a drawn frame, not a pixel-stretching squash)
     float landT = 0.f;
+    // Batch N: transitions - the input direction, and short run-start / turn timers
+    int   inputDir = 0;
+    float runStartT = 0.f, turnT = 0.f;
+    bool  wasRunning = false, lastFacing = true;
     // Batch G2: red glow at the screen edges when the hero is hurt
     float hurtFlashT = 0.f;
     // Batch H: progress - the furthest stage unlocked (0-based, saved), and
