@@ -97,6 +97,10 @@ void Game::init(const char* title, int width, int height, bool fullscreen) {
     m_window = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                 width, height, flags);
     if (!m_window) { std::cerr << "SDL_CreateWindow: " << SDL_GetError() << "\n"; }
+    // The game never takes typed text, but SDL starts text input with the
+    // window; on macOS that wakes the input-method system, which logs
+    // "error messaging the mach port for IMKCFRunLoopWakeUpReliable".
+    SDL_StopTextInput();
     renderer = SDL_CreateRenderer(m_window, -1,
                                   SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!renderer) renderer = SDL_CreateRenderer(m_window, -1, SDL_RENDERER_SOFTWARE);
