@@ -168,6 +168,16 @@ public:
     void     playAmbient(const char* id);
     int      weatherKind() const;          // 0 none, 1 rain (stage 2), 2 ash (stage 3)
     void     drawWeather();
+    // ---- Batch P2: props that react (lifted out of the props tile layer) ----
+    struct RProp { int id = 0; float x = 0, y = 0; int hp = 1; float sway = 0, swayV = 0, shake = 0;
+                   bool gone = false; int index = 0; float leafT = 0; };
+    std::vector<RProp> rprops;
+    int      propsBroken = 0;
+    int      coinsDropped = 0;            // coins props have dropped (for the harness)
+    void     buildReactiveProps();
+    void     updateReactiveProps();
+    void     drawReactiveProps();
+    void     spawnCoinAt(float cx, float cy);
     void     drawTextA(const char* fontId, const char* text, int x, int y, SDL_Color c, Uint8 alpha, bool centered);
     int      textWidth(const char* fontId, const char* text);
     void pickRidePlatform();

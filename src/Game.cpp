@@ -416,6 +416,7 @@ void Game::loadLevel() {
     checkpointIndex = -1;
     respawnX = Config::PLAYER_X; respawnY = Config::PLAYER_Y;
     state = State::Menu;
+    buildReactiveProps();                         // Batch P2
 }
 
 void Game::spawnPlayer() {
@@ -1702,7 +1703,8 @@ const std::vector<Game::Ach>& Game::achList() {
         { "boss1",       "Giant Slayer",     "Defeat a boss",                      "bosses",    1 },
         { "untouched",   "Untouchable",      "Clear a stage without being hit",    "untouched", 1 },
         { "swift",       "Swift",            "Clear a stage in under 3 minutes",   "fast",      1 },
-        { "champion",    "Champion",         "Beat the final boss",                "win",       1 } };
+        { "champion",    "Champion",         "Beat the final boss",                "win",       1 },
+        { "demolition",  "Demolition",       "Break 25 crates, barrels or bushes", "smashed",   25 } };   // Batch P2
     return A;
 }
 
@@ -2022,6 +2024,130 @@ void Game::drawWeather() {
         }
     }
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+}
+
+// ============================================================================
+// Batch P2: props that react - bushes and grass rustle, crates and barrels
+// break, lanterns swing.  They are lifted out of the props tile layer after
+// a load (prop ids from tools/build_props.py) and drawn in three bands that
+// shift by whole pixels, so they bend without stretching the 1:1 pixels.
+// ============================================================================
+namespace {
+    enum { P_FERN = 0, P_GRASS = 4, P_CRATE = 6, P_CRATES = 7, P_BARREL = 8, P_LANTERN = 9, P_BUSH = 36 };
+    bool isPlant(int id)     { return id == P_FERN || id == P_GRASS || id == P_BUSH; }
+    bool isBreakable(int id) { return id == P_CRATE || id == P_CRATES || id == P_BARREL || id == P_BUSH; }
+    int  propHp(int id)      { return id == P_CRATES ? 3 : (id == P_BUSH ? 1 : 2); }
+}
+
+void Game::spawnCoinAt(float cx, float cy) {
+    ++coinsDropped;
+    auto& coin = manager.addEntity("coin");
+    const int cw = Sprites::COIN.cw, ch = Sprites::COIN.ch;
+    coin.addComponent<TransformComponent>(cx - cw / 2.f, cy - ch / 2.f, cw, ch, 1.f);
+    auto& sp = coin.addComponent<SpriteComponent>(Sprites::COIN.tex, Sprites::COIN.fw, Sprites::COIN.fh,
+                                                  Sprites::COIN.scale, true);
+    Sprites::apply(sp, Sprites::COIN);
+    sp.addAnim("spin", Animation(0, 8, 100));
+    sp.Play("spin");
+    coin.addComponent<ColliderComponent>("coin", cw, ch);
+    coin.getComponent<ColliderComponent>().sensor = true;
+    coin.getComponent<ColliderComponent>().solid  = false;
+    coin.addGroup(groupCoins);
+}
+
+void Game::buildReactiveProps() {
+    rprops.clear();
+    SDL_Texture* propsTex = assets->GetTexture("props");
+    if (!propsTex) return;
+    for (auto* t : manager.getGroup(groupMap)) {
+        if (!t->isActive() || !t->hasComponent<TileComponent>()) continue;
+        auto& tc = t->getComponent<TileComponent>();
+        if (tc.texture != propsTex) continue;
+        const int id = (tc.srcRect.y / 64) * 8 + tc.srcRect.x / 64;
+        if (!(isPlant(id) || isBreakable(id) || id == P_LANTERN)) continue;
+        RProp p; p.id = id; p.x = tc.position.x; p.y = tc.position.y; p.hp = propHp(id);
+        p.index = (int)rprops.size();
+        rprops.push_back(p);
+        t->destroy();                                     // now drawn (and alive) here
+    }
+    rprops.shrink_to_fit();                               // fixed from here on: pointers stay valid
+}
+
+void Game::updateReactiveProps() {
+    if (state != State::Playing || rprops.empty()) return;
+    auto& hero = *manager.getGroup(groupPlayers)[0];
+    auto& ht = hero.getComponent<TransformComponent>();
+    const SDL_Rect& hb = hero.getComponent<ColliderComponent>().collider;
+    const float dt = lastFrameTime;
+    for (auto& p : rprops) {
+        if (p.gone) continue;
+        // a damped spring brings every sway back to rest
+        p.swayV += (-p.sway * 90.f - p.swayV * 9.f) * dt;
+        p.sway  += p.swayV * dt;
+        if (p.shake > 0.f) p.shake -= dt;
+        if (p.leafT > 0.f) p.leafT -= dt;
+        const SDL_Rect body{ (int)p.x + 14, (int)p.y + 22, 36, 42 };
+        const bool touching = SDL_HasIntersection(&hb, &body);
+        // walking through plants rustles them (and sheds a leaf now and then)
+        if (isPlant(p.id) && touching && std::fabs(ht.velocity.x) > 40.f) {
+            p.swayV += ht.velocity.x * 0.05f * dt * 60.f * 0.2f;
+            if (p.leafT <= 0.f) {
+                p.leafT = 0.18f;
+                Particles::emitDust(p.x + 32.f, p.y + 34.f, 62, 154, 66);
+            }
+        }
+        // rushing past a lantern swings it
+        if (p.id == P_LANTERN && std::fabs(ht.position.x + 16.f - (p.x + 32.f)) < 40.f &&
+            std::fabs(ht.velocity.x) > 200.f)
+            p.swayV += (ht.velocity.x > 0 ? 1.f : -1.f) * 6.f;
+        p.swayV = std::max(-60.f, std::min(60.f, p.swayV));
+        // the hero's sword
+        for (auto* h : manager.getGroup(groupHitboxes)) {
+            if (!h->isActive() || !h->hasComponent<HitboxComponent>()) continue;
+            auto& hc = h->getComponent<HitboxComponent>();
+            if (hc.owner != &hero || !SDL_HasIntersection(&hc.box, &body)) continue;
+            const auto key = reinterpret_cast<std::uintptr_t>(&p);
+            if (hc.hit.count(key)) continue;
+            hc.hit.insert(key);
+            const float dir = (hc.box.x + hc.box.w * 0.5f) < p.x + 32.f ? 1.f : -1.f;
+            if (isPlant(p.id)) { p.swayV += dir * 40.f; Particles::emitDust(p.x + 32.f, p.y + 30.f, 90, 197, 79); }
+            if (!isBreakable(p.id)) continue;
+            p.shake = 0.15f;
+            Sfx::play("block");
+            if (--p.hp > 0) continue;
+            p.gone = true;
+            ++propsBroken;
+            lifeAdd("smashed");
+            const bool wood = p.id != P_BUSH;
+            Particles::emitDeathBurst(p.x + 32.f, p.y + 44.f, wood ? 140 : 62, wood ? 90 : 154, wood ? 50 : 66);
+            Sfx::play("hit");
+            // a deterministic share of them hide something
+            const int roll = (int)((unsigned)(p.index * 2654435761u + Level::g_stage * 97u) % 100u);
+            if (wood && roll < 35) { spawnCoinAt(p.x + 24.f, p.y + 40.f); spawnCoinAt(p.x + 40.f, p.y + 40.f); }
+            if (!wood && roll < 30) spawnCoinAt(p.x + 32.f, p.y + 40.f);
+        }
+    }
+}
+
+void Game::drawReactiveProps() {
+    SDL_Texture* tex = assets->GetTexture("props");
+    if (!tex) return;
+    for (auto& p : rprops) {
+        if (p.gone) continue;
+        const int sx = (int)p.x - camera.x, sy = (int)p.y - camera.y;
+        if (sx < -64 || sx > camera.w || sy < -64 || sy > camera.h) continue;
+        const int cx = (p.id % 8) * 64, cy = (p.id / 8) * 64;
+        const int jolt = p.shake > 0.f ? (((int)(p.shake * 60.f)) % 2 ? 1 : -1) : 0;
+        // three bands: the top moves most, the base not at all (whole pixels)
+        const float sw = std::max(-4.f, std::min(4.f, p.sway));          // pixels at the top
+        const int top = (int)std::lround(sw), mid = (int)std::lround(sw * 0.5f);
+        const int bands[3][3] = { { 0, 22, top }, { 22, 20, mid }, { 42, 22, 0 } };
+        for (auto& b : bands) {
+            SDL_Rect src{ cx, cy + b[0], 64, b[1] };
+            SDL_Rect dst{ sx + b[2] + jolt, sy + b[0], 64, b[1] };
+            SDL_RenderCopy(renderer, tex, &src, &dst);
+        }
+    }
 }
 
 void Game::startJump() {
@@ -2425,6 +2551,7 @@ void Game::update() {
     }
     updateHints();                           // Batch K
     updateProgress();                        // Batch L
+    updateReactiveProps();                   // Batch P2
     pickRidePlatform();                      // Batch J: what the hero stands on now
     Physics::stepPlatforms(manager.getGroup(groupPlatforms));
     rideMovingPlatform();                    // ... and ride it exactly
@@ -3174,6 +3301,7 @@ void Game::drawWorld() {
     Ambient::drawSky(renderer, camera, gameTime);
     drawTiles(0.5f, 1.f);
     drawTiles(1.f, 99.f);
+    drawReactiveProps();                                    // Batch P2
     // animated water sits over the water tiles, under everything else
     Parallax::drawWater(renderer, Config::WINDOW_WIDTH,
                         Config::WINDOW_HEIGHT, camera, gameTime);
