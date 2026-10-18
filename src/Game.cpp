@@ -1741,7 +1741,25 @@ void Game::onStageClear() {
     if (Level::g_stage + 1 >= Level::N_STAGES) life["win"] = std::max(1, life["win"]);
     checkAchievements();
     evalTasks(true);
+    // Batch M: stars and bests for the results screen
+    const int st = std::max(0, std::min(2, Level::g_stage));
+    int done = 0; for (int b = tasksDone[st]; b; b >>= 1) done += b & 1;
+    resultStars = 1 + (done >= 2 ? 1 : 0) + (done >= 3 ? 1 : 0);
+    const float prevBest = bestTime(st);
+    newBestTime = prevBest <= 0.f || srun.time < prevBest;
+    if (newBestTime) life["best.time." + std::to_string(st)] = (int)std::lround(srun.time * 10.f);
+    if (resultStars > bestStars(st)) life["best.stars." + std::to_string(st)] = resultStars;
+    resultsT = 0.f; starsShown = 0;
     saveProgress();
+}
+
+int Game::bestStars(int stage) const {
+    auto it = life.find("best.stars." + std::to_string(stage));
+    return it == life.end() ? 0 : it->second;
+}
+float Game::bestTime(int stage) const {
+    auto it = life.find("best.time." + std::to_string(stage));
+    return it == life.end() ? 0.f : it->second / 10.f;
 }
 
 void Game::checkAchievements() {
@@ -1807,7 +1825,7 @@ void Game::saveProgress() {
 }
 
 // A small gold star, drawn in pixels (lit or dim).
-static void drawStar(SDL_Renderer* r, int cx, int cy, bool lit, Uint8 a) {
+static void drawStar(SDL_Renderer* r, int cx, int cy, bool lit, Uint8 a, int ps = 2) {
     const char* S[9] = { "....#....", "...###...", "#########", ".#######.", "..#####..",
                          "..##.##..", ".##...##.", ".#.....#.", "........." };
     for (int y = 0; y < 9; ++y)
@@ -1816,7 +1834,7 @@ static void drawStar(SDL_Renderer* r, int cx, int cy, bool lit, Uint8 a) {
             const bool rim = (y == 2 && (x == 0 || x == 8)) || y == 7;
             if (lit) SDL_SetRenderDrawColor(r, rim ? 255 : 255, rim ? 137 : (y < 3 ? 235 : 200), rim ? 51 : 37, a);
             else     SDL_SetRenderDrawColor(r, 66, 76, 110, a);
-            SDL_Rect px{ cx - 9 + x * 2, cy - 9 + y * 2, 2, 2 };
+            SDL_Rect px{ cx - (9 * ps) / 2 + x * ps, cy - (9 * ps) / 2 + y * ps, ps, ps };
             SDL_RenderFillRect(r, &px);
         }
 }
@@ -3631,9 +3649,12 @@ void Game::drawMenu() {
             : SDL_Color{ 190, 205, 225, 215 };
         drawText("title", buttonLabels[i], bx + bw / 2 + (lerp > 0.1f ? 8 : 0),
                  by + bh / 2, textCol, true);
-        if (nItems == 6 && i == 0)              // Batch H: CONTINUE - which stage
-            drawText("small", (std::string("continue: ") + Level::STAGES[menuStage].name).c_str(),
-                     bx + bw + 16, by + bh / 2, SDL_Color{ 255, 230, 120, 255 }, false);
+        if (nItems == 6 && i == 0) {            // Batch H: CONTINUE - which stage
+            const std::string cap = std::string("continue: ") + Level::STAGES[menuStage].name;
+            drawText("small", cap.c_str(), bx + bw + 16, by + bh / 2 - 9, SDL_Color{ 255, 230, 120, 255 }, false);
+            for (int s2 = 0; s2 < 3; ++s2)          // Batch M: that stage's best stars
+                drawStar(renderer, bx + bw + 24 + s2 * 20, by + bh / 2 + 18, s2 < bestStars(menuStage), 255);
+        }
     }
 
     // ---- Footer hints with key-cap pills ----
@@ -4069,26 +4090,69 @@ void Game::drawGameOverOverlay() {
 }
 
 void Game::drawVictoryOverlay() {
+    // Batch M: a results panel - stats count up, tasks ticked, stars pop in.
     drawScrim(180);
     const int W = Config::WINDOW_WIDTH, H = Config::WINDOW_HEIGHT;
     const bool stageClear = (state == State::LevelComplete);
+    const int st = std::max(0, std::min(2, Level::g_stage));
+    resultsT += lastFrameTime;
+    const int pw = 660, ph = 560, px = (W - pw) / 2, py = (H - ph) / 2;
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, 22, 28, 48, 248);
+    SDL_Rect panel{ px, py, pw, ph }; SDL_RenderFillRect(renderer, &panel);
+    SDL_SetRenderDrawColor(renderer, 255, 200, 37, 220); SDL_RenderDrawRect(renderer, &panel);
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
     char title[96];
-    if (stageClear) std::snprintf(title, sizeof(title), "STAGE %d CLEAR", Level::g_stage + 1);
+    if (stageClear) std::snprintf(title, sizeof(title), "STAGE %d CLEAR", st + 1);
     else            std::snprintf(title, sizeof(title), "VICTORY!");
-    drawText("big",  title, W / 2, H / 2 - 70,
-             SDL_Color{255, 230, 90, 255}, true);
-    char buf[80];
-    std::snprintf(buf, sizeof(buf), "Score %d     Time %02d:%02d     Deaths %d",
-                  gameScore, (int)runTime / 60, (int)runTime % 60, deaths);
-    drawText("body", buf, W / 2, H / 2 + 2, SDL_Color{235,235,240,255}, true);
+    drawText("big", title, W / 2, py + 50, SDL_Color{ 255, 230, 90, 255 }, true);
+    drawText("body", Level::STAGES[st].name, W / 2, py + 100, SDL_Color{ 200, 205, 220, 255 }, true);
+    // stars: one after another, each with a chime
+    const float starAt[3] = { 0.5f, 0.85f, 1.2f };
+    for (int i = 0; i < 3; ++i) {
+        const bool earned = i < resultStars, shown = resultsT >= starAt[i];
+        if (earned && shown && starsShown <= i) { starsShown = i + 1; Sfx::play("coin"); }
+        drawStar(renderer, W / 2 + (i - 1) * 64, py + 160, earned && shown, 255, 5);
+    }
+    // stats, counting up over 1.5 s
+    const float k = std::min(1.f, resultsT / 1.5f);
+    const auto& S = Level::stage();
+    char row[96];
+    const int lx = px + 70, vx = px + pw - 70;
+    int y = py + 222;
+    auto line = [&](const char* label, const char* value) {
+        drawText("body", label, lx, y, SDL_Color{ 200, 210, 225, 255 }, false);
+        const int w = textWidth("body", value);
+        drawText("body", value, vx - w, y, SDL_Color{ 249, 230, 207, 255 }, false);
+        y += 34;
+    };
+    const int t = (int)(srun.time * k);
+    std::snprintf(row, sizeof(row), "%02d:%02d", t / 60, t % 60);                         line("Time", row);
+    std::snprintf(row, sizeof(row), "%d / %d", (int)(srun.coins * k), S.nCoins);          line("Coins", row);
+    std::snprintf(row, sizeof(row), "%d / %d", (int)(srun.kills * k), S.nEnemies);        line("Enemies defeated", row);
+    std::snprintf(row, sizeof(row), "%d", srun.deaths);                                  line("Deaths", row);
+    std::snprintf(row, sizeof(row), "%d", srun.hits);                                    line("Hits taken", row);
+    if (newBestTime && resultsT > 1.6f)
+        drawText("small", "NEW BEST TIME", vx - textWidth("small", "NEW BEST TIME"), py + 205,
+                 SDL_Color{ 255, 200, 37, 255 }, false);
+    // the stage's tasks
+    y += 8;
+    const Task* T = tasksFor(st);
+    for (int i = 0; i < 3; ++i) {
+        const bool done = tasksDone[st] & (1 << i);
+        SDL_Rect box{ lx, y + 3, 14, 14 };
+        SDL_SetRenderDrawColor(renderer, done ? 90 : 70, done ? 197 : 80, done ? 79 : 110, 255);
+        if (done) SDL_RenderFillRect(renderer, &box); else SDL_RenderDrawRect(renderer, &box);
+        drawText("small", T[i].text, lx + 26, y, done ? SDL_Color{ 160, 230, 150, 255 } : SDL_Color{ 170, 178, 196, 255 }, false);
+        y += 24;
+    }
+    // what next
     if (stageClear) {
         char next[128];
-        std::snprintf(next, sizeof(next), "Press Enter for Stage %d: %s",
-                      Level::g_stage + 2, Level::STAGES[Level::g_stage + 1].name);
-        drawText("body", next, W / 2, H / 2 + 42, SDL_Color{200,205,220,230}, true);
+        std::snprintf(next, sizeof(next), "ENTER  Stage %d: %s", st + 2, Level::STAGES[st + 1].name);
+        drawText("body", next, W / 2, py + ph - 34, SDL_Color{ 140, 225, 255, 255 }, true);
     } else {
-        drawText("body", "Press R to play again   |   ESC for menu",
-                 W / 2, H / 2 + 42, SDL_Color{200,205,220,230}, true);
+        drawText("body", "R  play again      ESC  menu", W / 2, py + ph - 34, SDL_Color{ 140, 225, 255, 255 }, true);
     }
 }
 

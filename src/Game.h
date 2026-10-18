@@ -150,6 +150,15 @@ public:
     void     drawToasts();
     void     drawAchievements();
     void     drawTasksPanel();
+    // ---- Batch M: stage results ---------------------------------------------
+    // Stars: 1 for the clear, 2 with two of the stage's tasks done, 3 with all
+    // three.  Bests per stage live in `life` as best.stars.N / best.time.N
+    // (deciseconds), so they are saved with the rest of the progress.
+    float    resultsT = 0.f;
+    int      resultStars = 0, starsShown = 0;
+    bool     newBestTime = false;
+    int      bestStars(int stage) const;
+    float    bestTime(int stage) const;
     void     drawTextA(const char* fontId, const char* text, int x, int y, SDL_Color c, Uint8 alpha, bool centered);
     int      textWidth(const char* fontId, const char* text);
     void pickRidePlatform();
