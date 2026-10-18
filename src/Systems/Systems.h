@@ -158,3 +158,13 @@ namespace CameraSystem {
 void follow(Entity& player, SDL_Rect& camera, float& shake, float& shakeMag);
 
 } // namespace CameraSystem
+
+// Batch E: every sound goes through here, so each play is counted - the
+// harness checks that events really trigger their sound, not just that the
+// files load.
+namespace Sfx {
+void play(const char* id);
+int  count(const std::string& id);
+void resetCounts();
+}
+

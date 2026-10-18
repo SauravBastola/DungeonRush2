@@ -255,7 +255,7 @@ bool applyToPlayer(Entity& player, float amount, int& shieldCharges,
         iframeT = Config::IFRAME_TIME;
         hp.iframes = Config::IFRAME_TIME;
         shake += 6.f;
-        if (auto* s = Game::assets->GetSound("invincible")) Mix_PlayChannel(-1, s, 0);
+        Sfx::play("block");
         auto& tr = player.getComponent<TransformComponent>();
         Particles::emitDust(tr.position.x + tr.width / 2.f,
                             tr.position.y + tr.height / 2.f, 150, 220, 255);
@@ -265,7 +265,7 @@ bool applyToPlayer(Entity& player, float amount, int& shieldCharges,
     hp.damage(amount);
     iframeT = Config::IFRAME_TIME;
     shake += 8.f;
-    if (auto* s = Game::assets->GetSound("hit")) Mix_PlayChannel(-1, s, 0);
+    Sfx::play("hurt");
     return true;
 }
 
@@ -437,7 +437,7 @@ int resolveMelee(std::vector<Entity*>& hitboxes,
                 if (EnemyAI::blocks(*t, ot.position.x + ot.width * 0.5f)) {
                     auto& tt = t->getComponent<TransformComponent>();
                     Particles::emitHitSparks(tt.position.x + tt.width * 0.5f, tt.position.y + 20.f);
-                    if (auto* s = Game::assets->GetSound("invincible")) Mix_PlayChannel(-1, s, 0);
+                    Sfx::play("block");
                     ot.velocity.x += (ot.position.x < tt.position.x ? -1.f : 1.f) * 180.f;
                     continue;
                 }
@@ -472,9 +472,9 @@ int resolveMelee(std::vector<Entity*>& hitboxes,
             Vfx::impactRing(cx, cy, 255, 236, 190, died ? 58.f : 40.f, 0.24f);
             if (died) {
                 Particles::emitDeathBurst(cx, cy, 200, 80, 80);
-                if (auto* s = Game::assets->GetSound("enemyDie")) Mix_PlayChannel(-1, s, 0);
+                Sfx::play("enemyDie");
             } else {
-                if (auto* s = Game::assets->GetSound("hit")) Mix_PlayChannel(-1, s, 0);
+                Sfx::play("hit");
             }
             screenShake += died ? 8.f : 4.f;
             if (events) events->push_back({ cx, cy, (int)hc.damage, died });
@@ -508,7 +508,7 @@ static void detonate(Entity& bomber, Entity& player,
     Particles::emitDeathBurst(bx, by, 255, 170, 60);
     Particles::emitDeathBurst(bx, by, 255, 90, 40);
     screenShake += 16.f;
-    if (auto* s = Game::assets->GetSound("enemyDie")) Mix_PlayChannel(-1, s, 0);
+    Sfx::play("explosion");
 
     if (player.hasComponent<ColliderComponent>()) {
         auto& pc = player.getComponent<ColliderComponent>().collider;
@@ -565,7 +565,7 @@ static void slamLanding(Entity& boss, float& screenShake) {
     if (boss.hasComponent<SpriteComponent>())
         boss.getComponent<SpriteComponent>().squash(1.35f, 0.62f);
     screenShake += 18.f;
-    if (auto* s = Game::assets->GetSound("hit")) Mix_PlayChannel(-1, s, 0);
+    Sfx::play("hit");
 }
 
 void step(std::vector<Entity*>& enemies, Entity& player,
@@ -627,13 +627,17 @@ void step(std::vector<Entity*>& enemies, Entity& player,
                     ai.attackCd <= 0.f) {
                     ai.swingPhase = 1; ai.swingT = 0.f;
                     tr.facingRight = dx < 0;
+                    Sfx::play("skel_tell");
                 }
                 if (ai.swingPhase > 0) {
                     ai.swingT += lastFrameTime;
                     tr.velocity.x *= 0.6f;
                     if (ai.swingPhase == 1) {                                  // the tell
                         if (sp) sp->Play("windup");
-                        if (ai.swingT >= Config::SKEL_WINDUP) { ai.swingPhase = 2; ai.swingT = 0.f; }
+                        if (ai.swingT >= Config::SKEL_WINDUP) {
+                            ai.swingPhase = 2; ai.swingT = 0.f;
+                            Sfx::play("skel_strike");
+                        }
                     } else if (ai.swingPhase == 2) {                           // the strike
                         if (sp) sp->Play("strike");
                         const int dir = tr.facingRight ? 1 : -1;
@@ -707,6 +711,7 @@ void step(std::vector<Entity*>& enemies, Entity& player,
                     tr.facingRight = dx < 0;
                     if (adx < Config::SPITTER_RANGE && std::fabs(dy) < 320.f && ai.attackCd <= 0.f) {
                         ai.swingPhase = 1; ai.swingT = 0.f;
+                        Sfx::play("spit_tell");
                     }
                     if (sp) sp->Play("idle");
                 } else if (ai.swingPhase == 1) {
@@ -723,6 +728,7 @@ void step(std::vector<Entity*>& enemies, Entity& player,
                         auto& seed = Combat::spawnProjectile(*e, Vector2D(vx, vy), Config::SPITTER_DAMAGE,
                                                              "enemy", "fireball", 3.0f);
                         seed.getComponent<ProjectileComponent>().gravity = true;
+                        Sfx::play("spit");
                         ai.swingPhase = 2; ai.swingT = 0.f;
                     }
                 } else {
@@ -750,7 +756,10 @@ void step(std::vector<Entity*>& enemies, Entity& player,
                         tr.velocity.y = std::sin(ai.sinT * 2.f) * 20.f;
                     }
                     tr.facingRight = hx > 0;
-                    if (hd < Config::WISP_LUNGE_RANGE && ai.diveCd <= 0.f) { ai.divePhase = 1; ai.diveT = 0.f; }
+                    if (hd < Config::WISP_LUNGE_RANGE && ai.diveCd <= 0.f) {
+                        ai.divePhase = 1; ai.diveT = 0.f;
+                        Sfx::play("wisp_tell");
+                    }
                     if (sp) sp->Play("float");
                 } else if (ai.divePhase == 1) {                                // the tell
                     ai.diveT += lastFrameTime;
@@ -760,6 +769,7 @@ void step(std::vector<Entity*>& enemies, Entity& player,
                         ai.diveVX = hx / hd * Config::WISP_LUNGE_SPEED;
                         ai.diveVY = hy / hd * Config::WISP_LUNGE_SPEED;
                         ai.divePhase = 2; ai.diveT = 0.f;
+                        Sfx::play("wisp_lunge");
                     }
                 } else if (ai.divePhase == 2) {                                // the lunge
                     ai.diveT += lastFrameTime;
@@ -789,6 +799,7 @@ void step(std::vector<Entity*>& enemies, Entity& player,
                 if (ai.divePhase == 0 && ai.diveCd <= 0.f && adx < Config::BAT_DIVE_RANGE_X &&
                     pt.position.y > tr.position.y + 40.f) {
                     ai.divePhase = 1; ai.diveT = 0.f;
+                    Sfx::play("bat_tell");
                 }
                 if (ai.divePhase == 1) {                                       // the tell
                     ai.diveT += lastFrameTime;
@@ -802,6 +813,7 @@ void step(std::vector<Entity*>& enemies, Entity& player,
                         ai.diveVX = tx / l * Config::BAT_DIVE_SPEED;
                         ai.diveVY = ty / l * Config::BAT_DIVE_SPEED;
                         ai.divePhase = 2; ai.diveT = 0.f;
+                        Sfx::play("bat_dive");
                     }
                     if (e->hasComponent<SpriteComponent>()) e->getComponent<SpriteComponent>().Play("fly");
                     break;
@@ -928,8 +940,7 @@ void step(std::vector<Entity*>& enemies, Entity& player,
                     if (dist < Config::BOMBER_TRIGGER_RANGE) {
                         ai.fuseT = Config::BOMBER_FUSE_TIME;   // light it
                         ai.transition(EnemyAIComponent::State::Attack);
-                        if (auto* s = Game::assets->GetSound("powerup"))
-                            Mix_PlayChannel(-1, s, 0);
+                        Sfx::play("fuse");
                     } else {
                         if (std::abs(tr.position.x - ai.patrolCenter) > Config::ENEMY_PATROL_R)
                             ai.patrolDir = (tr.position.x > ai.patrolCenter) ? -1 : 1;
@@ -965,6 +976,7 @@ void step(std::vector<Entity*>& enemies, Entity& player,
                         case 0:   // waiting for the cooldown
                             if (ai.slamT > Config::BOSS_SLAM_INTERVAL && adx < 420.f) {
                                 ai.slamPhase = 1; ai.slamT = 0.f;
+                                Sfx::play("boss_charge");
                             }
                             break;
                         case 1:   // crouch — the tell
@@ -1141,7 +1153,7 @@ void step(Entity& player,
             bag.score += worth;
             bag.coinsBanked += 1;
             c->destroy();
-            if (auto* s = Game::assets->GetSound("coin")) Mix_PlayChannel(-1, s, 0);
+            Sfx::play("coin");
             Particles::emitDust(pcx, pcy, 255, 230, 90);
         }
     }
@@ -1155,38 +1167,38 @@ void step(Entity& player,
             switch (pu.type) {
                 case PowerUpType::Health:
                     bag.hp = std::min(bag.maxHp, bag.hp + 35.f);
-                    if (auto* s = Game::assets->GetSound("powerup")) Mix_PlayChannel(-1, s, 0);
+                    Sfx::play("powerup");
                     Particles::emitHeal(px, py);
                     break;
                 case PowerUpType::Speed:
                     bag.speedT = Config::POWERUP_DURATION[1];
-                    if (auto* s = Game::assets->GetSound("speedBoost")) Mix_PlayChannel(-1, s, 0);
+                    Sfx::play("speedBoost");
                     break;
                 case PowerUpType::Invincible:
                     bag.invincT = Config::POWERUP_DURATION[2];
-                    if (auto* s = Game::assets->GetSound("invincible")) Mix_PlayChannel(-1, s, 0);
+                    Sfx::play("invincible");
                     break;
                 case PowerUpType::DoubleJump:
                     bag.jumpsLeft = bag.maxJumps;
-                    if (auto* s = Game::assets->GetSound("powerup")) Mix_PlayChannel(-1, s, 0);
+                    Sfx::play("powerup");
                     break;
                 case PowerUpType::Damage:
                     bag.dmgT = 8.f;
-                    if (auto* s = Game::assets->GetSound("powerup")) Mix_PlayChannel(-1, s, 0);
+                    Sfx::play("powerup");
                     break;
                 case PowerUpType::Magnet:
                     bag.magnetT = Config::POWERUP_DURATION[5];
-                    if (auto* s = Game::assets->GetSound("powerup")) Mix_PlayChannel(-1, s, 0);
+                    Sfx::play("powerup");
                     Particles::emitDust(px, py, 120, 190, 255);
                     break;
                 case PowerUpType::Shield:
                     bag.shieldCharges = std::min(bag.shieldCharges + 1, 3);
-                    if (auto* s = Game::assets->GetSound("invincible")) Mix_PlayChannel(-1, s, 0);
+                    Sfx::play("invincible");
                     Particles::emitDust(px, py, 150, 220, 255);
                     break;
                 case PowerUpType::CoinX2:
                     bag.coinMultT = Config::POWERUP_DURATION[7];
-                    if (auto* s = Game::assets->GetSound("powerup")) Mix_PlayChannel(-1, s, 0);
+                    Sfx::play("powerup");
                     Particles::emitDust(px, py, 255, 215, 90);
                     break;
             }
@@ -1208,26 +1220,26 @@ void step(Entity& player,
             if (cx > bag.respawnX + 1.f) {
                 bag.respawnX = cx;
                 bag.respawnY = ft.position.y + ft.height * ft.scale - Config::PLAYER_H - 1.f;
-                if (auto* s = Game::assets->GetSound("powerup")) Mix_PlayChannel(-1, s, 0);
+                Sfx::play("checkpoint");
                 Particles::emitHeal(ft.position.x + 16, ft.position.y + 16);
             }
         } else if (kind == "shrine") {
             bag.hp = bag.maxHp;
             float fx = f->getComponent<TransformComponent>().position.x + 16;
             float fy = f->getComponent<TransformComponent>().position.y + 16;
-            if (auto* s = Game::assets->GetSound("powerup")) Mix_PlayChannel(-1, s, 0);
+            Sfx::play("powerup");
             Particles::emitHeal(fx, fy);
         } else if (kind == "key") {
             bag.keys++;
             bag.score += Config::KEY_SCORE;
             f->destroy();
-            if (auto* s = Game::assets->GetSound("powerup")) Mix_PlayChannel(-1, s, 0);
+            Sfx::play("key");
         } else if (kind == "door") {
             if (bag.keys > 0 && !bag.doorUnlocked) {
                 bag.doorUnlocked = true;
                 bag.keys--;
                 f->destroy();
-                if (auto* s = Game::assets->GetSound("powerup")) Mix_PlayChannel(-1, s, 0);
+                Sfx::play("door");
             }
         }
     }
@@ -1289,3 +1301,22 @@ void follow(Entity& player, SDL_Rect& camera, float& shake, float& shakeMag) {
 }
 
 } // namespace CameraSystem
+
+// ---- Batch E: sound ----------------------------------------------------------
+#include <unordered_map>
+namespace Sfx {
+static std::unordered_map<std::string, int>& counts() {
+    static std::unordered_map<std::string, int> c;
+    return c;
+}
+void play(const char* id) {
+    counts()[id]++;
+    if (auto* s = Game::assets->GetSound(id)) Mix_PlayChannel(-1, s, 0);
+}
+int count(const std::string& id) {
+    auto it = counts().find(id);
+    return it == counts().end() ? 0 : it->second;
+}
+void resetCounts() { counts().clear(); }
+}
+
