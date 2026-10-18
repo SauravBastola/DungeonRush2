@@ -96,6 +96,28 @@ public:
     // Batch J: the moving platform the hero stands on (sticky ride)
     Entity* ridePlat = nullptr;
     float   rideOffX = 0.f;          // hero x - platform x while riding (exact)
+
+    // ---- Batch K: guidance -------------------------------------------------
+    // Hint dock: what to show now, faded in and out; core moves retire once
+    // used three times ("learned", saved).  Mode: 0 Smart, 1 All, 2 Off.
+    enum Learn { L_MOVE, L_JUMP, L_SWORD, L_BOLT, L_DASH, L_SLIDE, L_PARRY, L_GRAPPLE, L_COUNT };
+    int      hintMode = 0;
+    unsigned learned = 0;
+    int      useCount[L_COUNT] = {};
+    void     noteUsed(int what);
+    struct Hint { std::string keys, label; float alpha = 0.f; bool want = false; };
+    std::vector<Hint> hints;                  // stable order; fade state kept per hint
+    std::vector<std::string> shownHints;      // labels wanted this frame (for the harness)
+    void     updateHints();
+    void     drawHintDock();
+    // Tutorial scrolls (stage 1): a signpost that unrolls a parchment near it.
+    struct Sign { int col = 0; float x = 0, y = 0; std::string title, line1, line2; float open = 0.f; };
+    std::vector<Sign> signs;
+    void     buildSigns();
+    void     drawSigns();
+    float    nearestSignOpen() const;
+    void     drawTextA(const char* fontId, const char* text, int x, int y, SDL_Color c, Uint8 alpha, bool centered);
+    int      textWidth(const char* fontId, const char* text);
     void pickRidePlatform();
     void rideMovingPlatform();
     float lastHeroHp = -1.f;

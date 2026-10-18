@@ -311,6 +311,7 @@ void Game::loadStage(int n) {
     stageBannerT = 3.0f;
     m_bossMusicOn = false;
     playMusic("stage" + std::to_string(n + 1), true);          // Batch E
+    buildSigns();                                               // Batch K
 }
 
 void Game::loadLevel() {
@@ -758,6 +759,7 @@ void Game::handlePlayerInput() {
         hpc.iframes = std::max(hpc.iframes, Config::SLIDE_TIME);
         iframeTimer = std::max(iframeTimer, Config::SLIDE_TIME);
         Sfx::play("slide");
+        noteUsed(L_SLIDE);                                          // Batch K
     }
     prevDownKey = downKey;
     if (slideT > 0.f) {
@@ -776,6 +778,10 @@ void Game::handlePlayerInput() {
     }
     if (wallJumpLockT > 0) wallJumpLockT -= lastFrameTime;
     if (landT > 0) landT -= lastFrameTime;                     // Batch D
+    {   // Batch K: two seconds of walking teaches "move"
+        static int walkFrames = 0;
+        if (std::fabs(pTr.velocity.x) > 60.f && isGrounded && ++walkFrames % 40 == 0) noteUsed(L_MOVE);
+    }
     {   // Batch G2: any HP loss (any source) lights the hurt glow
         const float hpNow = manager.getGroup(groupPlayers)[0]->getComponent<HealthComponent>().hp;
         if (lastHeroHp >= 0.f && hpNow < lastHeroHp - 0.5f) hurtFlashT = 0.35f;
@@ -968,8 +974,10 @@ void Game::performAttack(Config::AttackKind kind) {
                                 tr.position.y + tr.height, 255, 220, 160);
         }
         Sfx::play("swing");
+        noteUsed(L_SWORD);                                          // Batch K
     } else {
         const bool heavy = (kind == Config::AttackKind::HeavyBolt);
+        noteUsed(L_BOLT);                                           // Batch K
         Combat::spawnPlayerBolt(p, dir, heavy);
         // a little recoil — the bolt pushes off the caster
         tr.velocity.x -= dir * (heavy ? 90.f : 35.f);
@@ -1122,6 +1130,7 @@ void Game::startParry() {
     auto& hp = p.getComponent<HealthComponent>();
     hp.iframes = std::max(hp.iframes, Config::PARRY_WINDOW);
     Sfx::play("swing");
+    noteUsed(L_PARRY);                                              // Batch K
 }
 
 // The hero's hitbox plus PARRY_REACH px on the side it faces.
@@ -1238,6 +1247,7 @@ void Game::startGrapple() {
     dashActive = false;
     grapplesUsed++;
     Sfx::play("grapple_latch");
+    noteUsed(L_GRAPPLE);                                            // Batch K
 }
 
 void Game::releaseGrapple(bool fling) {
@@ -1369,6 +1379,255 @@ void Game::rideMovingPlatform() {
     p.getComponent<ColliderComponent>().update();         // INV-2
 }
 
+// ============================================================================
+// Batch K: guidance - the hint dock and the tutorial scrolls
+// ============================================================================
+void Game::drawTextA(const char* fontId, const char* text, int x, int y, SDL_Color c, Uint8 alpha,
+                     bool centered) {
+    TTF_Font* f = assets->GetFont(fontId);
+    if (!f || !text || !*text || alpha == 0) return;
+    SDL_Surface* s = TTF_RenderUTF8_Blended(f, text, c);
+    if (!s) return;
+    SDL_Texture* tx = SDL_CreateTextureFromSurface(renderer, s);
+    if (!tx) { SDL_FreeSurface(s); return; }
+    SDL_Rect r{ centered ? x - s->w / 2 : x, centered ? y - s->h / 2 : y, s->w, s->h };
+    SDL_SetTextureBlendMode(tx, SDL_BLENDMODE_BLEND);
+    SDL_SetTextureAlphaMod(tx, alpha);
+    SDL_RenderCopy(renderer, tx, nullptr, &r);
+    SDL_DestroyTexture(tx);
+    SDL_FreeSurface(s);
+}
+
+int Game::textWidth(const char* fontId, const char* text) {
+    TTF_Font* f = assets->GetFont(fontId);
+    int w = 0, h = 0;
+    if (f && text && *text) TTF_SizeUTF8(f, text, &w, &h);
+    return w;
+}
+
+// A move is "learned" once used three times (saved): its hint then retires.
+void Game::noteUsed(int what) {
+    if (what < 0 || what >= L_COUNT) return;
+    if (++useCount[what] >= 3 && !(learned & (1u << what))) {
+        learned |= (1u << what);
+        saveSettings();
+    }
+}
+
+void Game::updateHints() {
+    enum { H_MOVE, H_JUMP, H_SWORD, H_BOLT, H_DASH, H_SLIDE, H_GRAPPLE, H_LETGO, H_WALL, H_PARRY, H_KEY, H_N };
+    if (hints.empty()) {
+        const char* K[H_N][2] = { { "A / D", "Move" }, { "W / Space", "Jump" }, { "J", "Sword" },
+            { "K", "Bolt" }, { "Shift", "Dash" }, { "S", "Slide" }, { "E", "Grapple" },
+            { "W / Space", "Let go" }, { "W / Space", "Wall jump" }, { "U", "Parry" }, { "", "Find the key" } };
+        for (auto& k : K) { Hint h; h.keys = k[0]; h.label = k[1]; hints.push_back(h); }
+    }
+    for (auto& h : hints) h.want = false;
+    shownHints.clear();
+    if (state == State::Playing && hintMode != 2) {
+        auto& p = *manager.getGroup(groupPlayers)[0];
+        auto& tr = p.getComponent<TransformComponent>();
+        const float cx = tr.position.x + Config::PLAYER_W * 0.5f, cy = tr.position.y + Config::PLAYER_H * 0.5f;
+        const bool all = hintMode == 1;
+        auto fresh = [&](int what) { return all || !(learned & (1u << what)); };
+        // context
+        float hx, hy;
+        const bool hookNear = !hooked && nearestHook(hx, hy);
+        bool threat = false;
+        for (auto* e : manager.getGroup(groupEnemies)) {
+            if (!e->isActive() || !e->hasComponent<EnemyAIComponent>()) continue;
+            auto& et = e->getComponent<TransformComponent>();
+            if (std::fabs(et.position.x - cx) > 260.f || std::fabs(et.position.y - cy) > 200.f) continue;
+            auto& ai = e->getComponent<EnemyAIComponent>();
+            using K = EnemyAIComponent::Kind;
+            if ((ai.kind == K::Skeleton && ai.swingPhase == 1) || (ai.kind == K::Spitter && ai.swingPhase == 1) ||
+                ((ai.kind == K::Bat || ai.kind == K::Wisp) && ai.divePhase == 1)) threat = true;
+        }
+        for (auto* pr : manager.getGroup(groupProjectiles)) {
+            if (!pr->isActive() || pr->getComponent<ProjectileComponent>().ownerTag == "player") continue;
+            auto& pt = pr->getComponent<TransformComponent>();
+            const float dx = cx - pt.position.x;
+            if (std::fabs(dx) < 240.f && std::fabs(cy - pt.position.y) < 120.f && dx * pt.velocity.x > 0.f) threat = true;
+        }
+        bool doorNear = false;
+        for (auto* f : manager.getGroup(groupFacilities))
+            if (f->isActive() && f->tag == "door" && keys == 0 &&
+                std::fabs(f->getComponent<TransformComponent>().position.x - cx) < 280.f) doorNear = true;
+        hints[H_LETGO].want   = hooked;
+        hints[H_WALL].want    = wallSliding;
+        hints[H_KEY].want     = doorNear;
+        hints[H_GRAPPLE].want = hookNear && fresh(L_GRAPPLE);
+        hints[H_PARRY].want   = threat && fresh(L_PARRY);
+        hints[H_SLIDE].want   = fresh(L_SLIDE) && isGrounded && std::fabs(tr.velocity.x) > 120.f &&
+                                (all || learned & (1u << L_DASH));          // after the basics
+        // core moves until learned (Smart) or always (All)
+        hints[H_MOVE].want  = fresh(L_MOVE);
+        hints[H_JUMP].want  = fresh(L_JUMP);
+        hints[H_SWORD].want = fresh(L_SWORD);
+        hints[H_BOLT].want  = fresh(L_BOLT) && (all || learned & (1u << L_SWORD));
+        hints[H_DASH].want  = fresh(L_DASH) && (all || learned & (1u << L_JUMP));
+        // at most five: situational hints first, then the core ones
+        int n = 0;
+        const int order[H_N] = { H_LETGO, H_WALL, H_PARRY, H_GRAPPLE, H_KEY, H_SLIDE,
+                                 H_MOVE, H_JUMP, H_SWORD, H_BOLT, H_DASH };
+        for (int i : order) {
+            if (!hints[i].want) continue;
+            if (n >= 5) hints[i].want = false; else { ++n; shownHints.push_back(hints[i].label); }
+        }
+    }
+    const float k = std::min(1.f, lastFrameTime * 6.f);
+    for (auto& h : hints) h.alpha += ((h.want ? 1.f : 0.f) - h.alpha) * k;
+    for (auto& sg : signs) {                       // tutorial scrolls open near their sign
+        float want = 0.f;
+        if (state == State::Playing) {
+            auto& tr = manager.getGroup(groupPlayers)[0]->getComponent<TransformComponent>();
+            if (std::fabs(tr.position.x + 16.f - sg.x) < 150.f && std::fabs(tr.position.y + 50.f - sg.y) < 260.f)
+                want = 1.f;
+        }
+        sg.open += (want - sg.open) * std::min(1.f, lastFrameTime * 7.f);
+        if (sg.open < 0.004f) sg.open = 0.f;
+    }
+}
+
+// The dock: key caps and labels, centred at the bottom, on a soft panel
+// that only spans what is shown; a faint Help / Pause chip in the corner.
+void Game::drawHintDock() {
+    const int W = Config::WINDOW_WIDTH, H = Config::WINDOW_HEIGHT;
+    const SDL_Color capText{ 249, 230, 207, 255 }, label{ 214, 224, 236, 255 };
+    struct Item { const Hint* h; int kw, lw, w; };
+    std::vector<Item> items; int total = 0; float panelA = 0.f;
+    for (auto& h : hints) {
+        if (h.alpha < 0.02f) continue;
+        Item it{ &h, h.keys.empty() ? 0 : textWidth("small", h.keys.c_str()) + 16,
+                 textWidth("small", h.label.c_str()), 0 };
+        it.w = it.kw + (it.kw ? 8 : 0) + it.lw;
+        total += it.w + (items.empty() ? 0 : 22);
+        items.push_back(it);
+        panelA = std::max(panelA, h.alpha);
+    }
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    if (!items.empty()) {
+        const int px = W / 2 - total / 2 - 16, py = H - 50, pw = total + 32, ph = 34;
+        SDL_SetRenderDrawColor(renderer, 18, 22, 38, (Uint8)(170 * panelA));
+        SDL_Rect body{ px + 3, py, pw - 6, ph };     SDL_RenderFillRect(renderer, &body);
+        SDL_Rect side{ px, py + 3, pw, ph - 6 };      SDL_RenderFillRect(renderer, &side);
+        SDL_SetRenderDrawColor(renderer, 120, 200, 255, (Uint8)(70 * panelA));
+        SDL_RenderDrawLine(renderer, px + 4, py + 1, px + pw - 5, py + 1);         // top light
+        int x = W / 2 - total / 2;
+        for (auto& it : items) {
+            const Uint8 a = (Uint8)(255 * it.h->alpha);
+            if (it.kw) {
+                SDL_Rect cap{ x, py + 6, it.kw, 22 };
+                SDL_SetRenderDrawColor(renderer, 44, 52, 80, a);    SDL_RenderFillRect(renderer, &cap);
+                SDL_SetRenderDrawColor(renderer, 160, 175, 205, a); SDL_RenderDrawRect(renderer, &cap);
+                SDL_SetRenderDrawColor(renderer, 255, 255, 255, (Uint8)(60 * it.h->alpha));
+                SDL_RenderDrawLine(renderer, x + 2, py + 7, x + it.kw - 3, py + 7);   // key-cap shine
+                SDL_SetRenderDrawColor(renderer, 20, 24, 40, a);
+                SDL_RenderDrawLine(renderer, x + 1, py + 28, x + it.kw - 2, py + 28); // key-cap depth
+                drawTextA("small", it.h->keys.c_str(), x + it.kw / 2, py + 17, capText, a, true);
+            }
+            drawTextA("small", it.h->label.c_str(), x + it.kw + (it.kw ? 8 : 0), py + 9,
+                      it.h->label == "Find the key" ? SDL_Color{ 255, 220, 120, 255 } : label, a, false);
+            x += it.w + 22;
+        }
+    }
+    if (hintMode != 2 && state == State::Playing) {   // the corner chip
+        // bottom-left (the bottom-right corner belongs to the minimap), on a
+        // small dark pill so it reads over any ground
+        const char* t = "H help   P pause";
+        const int tw = textWidth("small", t);
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(renderer, 18, 22, 38, 150);
+        SDL_Rect pill{ 12, H - 36, tw + 16, 24 };
+        SDL_RenderFillRect(renderer, &pill);
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+        drawTextA("small", t, 20, H - 33, SDL_Color{ 200, 210, 225, 255 }, 190, false);
+    }
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+    // the tutorial scrolls sit in the HUD layer, above fog and atmosphere
+    for (auto& sg : signs) {
+        if (sg.open <= 0.f) continue;
+        const float e = sg.open * sg.open * (3.f - 2.f * sg.open);               // smoothstep unroll
+        const int fullW = 440, h = 96;
+        const int cw = 24 + (int)((fullW - 24) * e);
+        int cx = (int)(sg.x - camera.x);
+        cx = std::max(fullW / 2 + 12, std::min(W - fullW / 2 - 12, cx));
+        const int top = std::max(70, (int)(sg.y - camera.y) - 150);
+        const Uint8 a = (Uint8)std::min(255.f, 255.f * sg.open * 1.4f);
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        SDL_Rect sh{ cx - cw / 2 + 4, top + 6, cw, h };                         // drop shadow
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, (Uint8)(70 * sg.open)); SDL_RenderFillRect(renderer, &sh);
+        SDL_Rect paper{ cx - cw / 2, top, cw, h };
+        SDL_SetRenderDrawColor(renderer, 249, 230, 207, a); SDL_RenderFillRect(renderer, &paper);  // CREAM
+        SDL_SetRenderDrawColor(renderer, 230, 156, 105, a);                                        // TAN_LT
+        SDL_Rect inner{ paper.x + 6, paper.y + 5, paper.w - 12, paper.h - 10 }; SDL_RenderDrawRect(renderer, &inner);
+        SDL_SetRenderDrawColor(renderer, 28, 18, 28, a); SDL_RenderDrawRect(renderer, &paper);    // INK
+        for (int side = 0; side < 2; ++side) {                                                     // the rolls
+            const int rx = side ? paper.x + paper.w - 6 : paper.x - 6;
+            SDL_Rect roll{ rx, top - 6, 12, h + 12 };
+            SDL_SetRenderDrawColor(renderer, 191, 111, 74, a);  SDL_RenderFillRect(renderer, &roll);   // TAN
+            SDL_SetRenderDrawColor(renderer, 230, 156, 105, a);
+            SDL_RenderDrawLine(renderer, rx + 3, top - 4, rx + 3, top + h + 4);                        // shine
+            SDL_SetRenderDrawColor(renderer, 28, 18, 28, a);  SDL_RenderDrawRect(renderer, &roll);
+        }
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+        if (sg.open > 0.7f) {
+            const Uint8 ta = (Uint8)(255 * std::min(1.f, (sg.open - 0.7f) / 0.3f));
+            drawTextA("body", sg.title.c_str(), cx, top + 22, SDL_Color{ 93, 44, 40, 255 }, ta, true);
+            drawTextA("small", sg.line1.c_str(), cx, top + 50, SDL_Color{ 40, 28, 40, 255 }, ta, true);
+            drawTextA("small", sg.line2.c_str(), cx, top + 72, SDL_Color{ 40, 28, 40, 255 }, ta, true);
+        }
+    }
+}
+
+// Tutorial signposts for stage 1, each on flat ground where its move is
+// first needed.  A preferred column slides right to the nearest flat spot.
+void Game::buildSigns() {
+    signs.clear();
+    if (Level::g_stage != 0) return;
+    struct Def { int col; const char* t; const char* a; const char* b; };
+    const Def D[] = {
+        { 7,   "MOVE & JUMP",  "A / D  run        W / Space  jump",      "press jump again in the air to double jump" },
+        { 17,  "FIGHT",        "J  sword - tap three times for a combo", "K  bolt - hold it to charge a piercing shot" },
+        { 33,  "GRAPPLE",      "rings hang over every gap",              "E  hook on, swing with A / D, jump to let go" },
+        { 52,  "DASH & SLIDE", "Shift  dash straight through enemies",   "S  while running: slide under shots" },
+        { 62,  "PARRY",        "U  just as a blow or an arrow lands",    "arrows fly back, attackers stagger" },
+        { 120, "WALLS",        "hold toward a tall wall while falling",  "to slide down it - jump to kick off" },
+        { 156, "THE GATE",     "the way on is locked",                   "find the key, then walk into the gate" } };
+    const auto& S = Level::stage();
+    for (const auto& d : D) {
+        int c = d.col;
+        for (int k = 0; k < 8; ++k, ++c) {
+            if (c <= 0 || c >= Level::WIDTH_TILES - 1) break;
+            const int g = S.groundTop[c];
+            if (g >= 0 && S.groundTop[c - 1] == g && S.groundTop[c + 1] == g) {
+                Sign sg; sg.col = c; sg.x = c * 64.f + 32.f; sg.y = g * 64.f;
+                sg.title = d.t; sg.line1 = d.a; sg.line2 = d.b;
+                signs.push_back(sg);
+                break;
+            }
+        }
+    }
+}
+
+void Game::drawSigns() {
+    SDL_Texture* tex = assets->GetTexture("props");
+    if (!tex) return;
+    for (auto& sg : signs) {
+        const int x = sg.col * 64 - camera.x, y = (int)sg.y - camera.y;
+        if (x < -64 || x > camera.w || y < -64 || y > camera.h + 64) continue;
+        SDL_Rect src{ (10 % 8) * 64, (10 / 8) * 64, 64, 64 };                 // SIGNPOST
+        SDL_Rect dst{ x, y, 64, 64 };
+        SDL_RenderCopy(renderer, tex, &src, &dst);
+    }
+}
+
+float Game::nearestSignOpen() const {
+    float m = 0.f;
+    for (auto& sg : signs) m = std::max(m, sg.open);
+    return m;
+}
+
 void Game::startJump() {
     if (state != State::Playing) return;
     auto& p = *manager.getGroup(groupPlayers)[0];
@@ -1376,6 +1635,7 @@ void Game::startJump() {
     auto& col = p.getComponent<ColliderComponent>();
     // wall jump check
     (void)col;
+    if (state == State::Playing) noteUsed(L_JUMP);                  // Batch K
     if (hooked) {                              // Batch C: jump = let go, with a fling
         releaseGrapple(true);
         return;
@@ -1413,6 +1673,7 @@ void Game::startJump() {
 }
 
 void Game::startDash() {
+    if (state == State::Playing) noteUsed(L_DASH);                  // Batch K
     if (state != State::Playing || dashActive || dashCooldown > 0) return;
     // One dash per jump: on the ground it is always available (subject to the
     // cooldown), in the air you get exactly one and must land to refresh it.
@@ -1561,6 +1822,7 @@ void Game::restartLevel() {
     stageBannerT = 3.0f;
     m_bossMusicOn = false;
     playMusic("stage1", true);                          // Batch E: a new run, stage 1's theme
+    buildSigns();                                       // Batch K
     state = State::Playing;
     isPaused = false;
     pauseSelection = 0;
@@ -1746,6 +2008,7 @@ void Game::update() {
 
     handlePlayerInput();
     stepPlayerPhysics();
+    updateHints();                           // Batch K
     pickRidePlatform();                      // Batch J: what the hero stands on now
     Physics::stepPlatforms(manager.getGroup(groupPlatforms));
     rideMovingPlatform();                    // ... and ride it exactly
@@ -1940,7 +2203,7 @@ void Game::drawSettings() {
     SDL_Rect full{ 0, 0, W, H };
     SDL_RenderFillRect(renderer, &full);
 
-    const int pw = 620, ph = 480;                       // Batch F: two more rows
+    const int pw = 620, ph = 530;                       // Batch F + K: three more rows
     const int px = (W - pw) / 2, py = (H - ph) / 2;
     SDL_SetRenderDrawColor(renderer, 28, 34, 56, 250);
     SDL_Rect panel{ px, py, pw, ph };
@@ -1960,10 +2223,10 @@ void Game::drawSettings() {
 
     // ---- rows ----
     struct Row { const char* label; int y; };
-    const int rowY[6] = { py + 150, py + 200, py + 250, py + 300, py + 350, py + 406 };
-    const char* labels[6] = { "Music", "Effects", "Mute all", "Display", "Pixels", "Back" };
+    const int rowY[7] = { py + 150, py + 200, py + 250, py + 300, py + 350, py + 400, py + 456 };
+    const char* labels[7] = { "Music", "Effects", "Mute all", "Display", "Pixels", "Hints", "Back" };
 
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < 7; i++) {
         bool sel = (settingsSelection == i);
         if (sel) {   // highlight the selected row
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
@@ -1998,6 +2261,11 @@ void Game::drawSettings() {
                      muted ? colRed : colGreen, false);
         } else if (i == 3) {                                       // Batch F
             drawText("body", fullscreen ? "Fullscreen" : "Windowed", px + 300, rowY[i], norm, false);
+        } else if (i == 5) {                                       // Batch K
+            const char* m = hintMode == 0 ? "Smart" : hintMode == 1 ? "All" : "Off";
+            drawText("body", m, px + 300, rowY[i], norm, false);
+            drawText("small", hintMode == 0 ? "only what helps now" : hintMode == 1 ? "always show the keys"
+                              : "no hints", px + 420, rowY[i], dim, false);
         } else if (i == 4) {
             const char* m = scaling == Scaling::Auto ? "Auto" : scaling == Scaling::Sharp ? "Sharp" : "Fill";
             drawText("body", m, px + 300, rowY[i], norm, false);
@@ -2116,14 +2384,15 @@ void Game::handleSettingsInput(SDL_Keycode key) {
     const int step = 8;
     switch (key) {
         case SDLK_UP:    case SDLK_w:
-            settingsSelection = (settingsSelection + 5) % 6; break;
+            settingsSelection = (settingsSelection + 6) % 7; break;
         case SDLK_DOWN:  case SDLK_s:
-            settingsSelection = (settingsSelection + 1) % 6; break;
+            settingsSelection = (settingsSelection + 1) % 7; break;
         case SDLK_LEFT:  case SDLK_a:
             if (settingsSelection == 0) musicVolume = std::max(0,   musicVolume - step);
             if (settingsSelection == 1) sfxVolume   = std::max(0,   sfxVolume   - step);
             if (settingsSelection == 3) setFullscreen(!fullscreen);
             if (settingsSelection == 4) { scaling = (Scaling)(((int)scaling + 2) % 3); applyScaling(); }
+            if (settingsSelection == 5) hintMode = (hintMode + 2) % 3;
             applyVolumes();
             break;
         case SDLK_RIGHT: case SDLK_d:
@@ -2131,13 +2400,15 @@ void Game::handleSettingsInput(SDL_Keycode key) {
             if (settingsSelection == 1) sfxVolume   = std::min(128, sfxVolume   + step);
             if (settingsSelection == 3) setFullscreen(!fullscreen);
             if (settingsSelection == 4) { scaling = (Scaling)(((int)scaling + 1) % 3); applyScaling(); }
+            if (settingsSelection == 5) hintMode = (hintMode + 1) % 3;
             applyVolumes();
             break;
         case SDLK_RETURN: case SDLK_SPACE: case SDLK_KP_ENTER:
             if (settingsSelection == 2) { muted = !muted; applyVolumes(); }
             else if (settingsSelection == 3) setFullscreen(!fullscreen);
             else if (settingsSelection == 4) { scaling = (Scaling)(((int)scaling + 1) % 3); applyScaling(); }
-            else if (settingsSelection == 5) { saveSettings(); state = m_returnState; }
+            else if (settingsSelection == 5) hintMode = (hintMode + 1) % 3;
+            else if (settingsSelection == 6) { saveSettings(); state = m_returnState; }
             break;
         case SDLK_ESCAPE:
             saveSettings();
@@ -2170,6 +2441,8 @@ void Game::loadSettings() {
         if (fs != 0) setFullscreen(true); else applyScaling();
         int us = 0;                                      // Batch H: progress (older saves lack it)
         if (f >> us) unlockedStage = menuStage = std::max(0, std::min(Level::N_STAGES - 1, us));
+        int hm = 0; unsigned lm = 0;                     // Batch K: hints (older saves lack them)
+        if (f >> hm >> lm) { hintMode = std::max(0, std::min(2, hm)); learned = lm; }
     }
     musicVolume = std::max(0, std::min(128, musicVolume));
     sfxVolume   = std::max(0, std::min(128, sfxVolume));
@@ -2182,7 +2455,8 @@ void Game::saveSettings() {
     f << Config::SAVE_MAGIC << "\n"
       << musicVolume << " " << sfxVolume << " " << bestScore << " "
       << (fullscreen ? 1 : 0) << " " << (int)scaling << " "        // Batch F
-      << unlockedStage << "\n";                                     // Batch H
+      << unlockedStage << " "                                       // Batch H
+      << hintMode << " " << learned << "\n";                       // Batch K
 }
 
 void Game::handleEvents() {
@@ -2523,6 +2797,7 @@ void Game::drawWorld() {
         g->getComponent<SpriteComponent>().draw();
     }
     // player
+    drawSigns();                                            // Batch K
     drawGrapple();                                          // Batch C
     for (auto* p : manager.getGroup(groupPlayers)) p->draw();
     drawParryShield();                                      // Batch C
@@ -2731,25 +3006,8 @@ void Game::drawHUD() {
         }
     }
 
-    // bottom bar
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 110);
-    SDL_Rect botBar{ 0, Config::WINDOW_HEIGHT - 36, Config::WINDOW_WIDTH, 36 };
-    SDL_RenderFillRect(renderer, &botBar);
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-    if (auto* f = assets->GetFont("small")) {
-        std::string hint = "[A/D] move  [W/Space/Up] jump  [Shift/L] dash  "
-                           "[J/Z] melee  [K/X] bolt  "
-                           "[P/ESC] pause  [O] settings  [I] stats  [H] help  [M] mute";
-        SDL_Color w{ 200, 200, 200, 200 };
-        SDL_Surface* s = TTF_RenderUTF8_Blended(f, hint.c_str(), w);
-        if (s) {
-            SDL_Texture* t = SDL_CreateTextureFromSurface(renderer, s);
-            SDL_Rect r{ 12, Config::WINDOW_HEIGHT - 28, s->w, s->h };
-            SDL_RenderCopy(renderer, t, nullptr, &r);
-            SDL_DestroyTexture(t); SDL_FreeSurface(s);
-        }
-    }
+    // Batch K: the smart hint dock replaces the old full-width text bar
+    drawHintDock();
 
     // buff timers on the right
     if (auto* f = assets->GetFont("body")) {
