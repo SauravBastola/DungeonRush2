@@ -49,6 +49,7 @@ public:
     int   rowIdx    = 0;
     int   startCol  = 0;
     Uint32 lastStep = 0;
+    Uint32 animClock = 0;          // Batch G: ms of game time this sprite has animated
 
     // Secondary motion, recomputed every update from the animation's position
     // through its loop.  `phase` is the fraction of the way through the
@@ -122,6 +123,10 @@ public:
 
     void flash(float secs = 0.12f) { flashT = secs; }
     void squash(float sx, float sy) { squashX = sx; squashY = sy; }
+    // Batch G: an impact as a whole-pixel offset that eases home - the 1:1
+    // pixel grid never stretches (squash() is kept but no longer used).
+    void nudge(float dx, float dy) { nudgeX = dx; nudgeY = dy; }
+    float nudgeX = 0.f, nudgeY = 0.f;
     void setTint(Uint8 r, Uint8 g, Uint8 b) { tintOn = true; tintR = r; tintG = g; tintB = b; }
     void clearTint() { tintOn = false; tintR = tintG = tintB = 255; }
 
@@ -163,7 +168,7 @@ public:
         bobCycles = it->second.cycles;
         blendFrac = it->second.blend;
         phase    = 0.f;
-        lastStep = SDL_GetTicks();
+        lastStep = animClock;
         clampToTexture();
     }
 
@@ -212,8 +217,13 @@ public:
         // single-cell animation (the boss) has no frame advance to gate on,
         // and gating the phase on it too leaves the loop position pinned at
         // zero -- which silently kills the only motion that sprite has.
+        // Batch G: animation runs on GAME time (lastFrameTime per update), not
+        // the wall clock - it freezes with pause and hit-stop instead of
+        // jumping ahead afterwards, plays at the same speed at 60 fps, and two
+        // runs (or two machines) draw the same frame on the same game frame.
+        animClock += (Uint32)std::lround(lastFrameTime * 1000.f);
         if (animated && speed > 0) {
-            Uint32 now = SDL_GetTicks();
+            Uint32 now = animClock;
             Uint32 elapsed = now - lastStep;
             if (elapsed >= (Uint32)speed) {
                 if (frames > 1) frameIdx = (frameIdx + 1) % frames;
@@ -262,6 +272,8 @@ public:
             destRect.y = (int)(transform->position.y + drawYOff - Game::camera.y
                                + (drawH() - dh));
         }
+        destRect.x += (int)std::lround(nudgeX);                    // Batch G: whole pixels
+        destRect.y += (int)std::lround(nudgeY);
         destRect.w = dw;
         destRect.h = dh;
 
@@ -273,6 +285,10 @@ public:
 
         // ease squash back to neutral so one-shot pulses settle on their own
         squashX += (1.f - squashX) * std::min(1.f, lastFrameTime * 12.f);
+        nudgeX *= std::max(0.f, 1.f - lastFrameTime * 22.f);          // Batch G
+        nudgeY *= std::max(0.f, 1.f - lastFrameTime * 22.f);
+        if (std::fabs(nudgeX) < 0.5f) nudgeX = 0.f;
+        if (std::fabs(nudgeY) < 0.5f) nudgeY = 0.f;
         squashY += (1.f - squashY) * std::min(1.f, lastFrameTime * 12.f);
     }
 

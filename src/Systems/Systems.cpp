@@ -464,7 +464,13 @@ int resolveMelee(std::vector<Entity*>& hitboxes,
             if (t->hasComponent<SpriteComponent>()) {
                 auto& sp = t->getComponent<SpriteComponent>();
                 sp.flash(0.12f);                 // red pop on the struck frame
-                sp.squash(1.22f, 0.80f);         // and a recoil
+                // and a recoil: knocked a few whole pixels away from the blow
+                // (it used to squash 1.22 x 0.80, stretching the 1:1 pixels)
+                float away = 1.f;
+                if (hc.owner && hc.owner->hasComponent<TransformComponent>())
+                    away = (t->getComponent<TransformComponent>().position.x >=
+                            hc.owner->getComponent<TransformComponent>().position.x) ? 1.f : -1.f;
+                sp.nudge(4.f * away, 1.f);
             }
             float cx = tr.position.x + tr.width/2.f;
             float cy = tr.position.y + tr.height/2.f;
@@ -560,10 +566,10 @@ static void slamLanding(Entity& boss, float& screenShake) {
     Particles::emitDust(bx, by, 170, 150, 120);
     Vfx::impactRing(bx, by - 8.f, 255, 210, 140, 130.f, 0.40f);
     Vfx::landDust(bx, by, 2.2f);
-    // The boss sheet is a single frame, so squash is the only way it can
-    // show the impact of its own landing.
+    // Batch G: the impact of its own landing, pressed a few whole pixels into
+    // the ground (it used to squash 1.35 x 0.62, stretching the pixels).
     if (boss.hasComponent<SpriteComponent>())
-        boss.getComponent<SpriteComponent>().squash(1.35f, 0.62f);
+        boss.getComponent<SpriteComponent>().nudge(0.f, 4.f);
     screenShake += 18.f;
     Sfx::play("hit");
 }

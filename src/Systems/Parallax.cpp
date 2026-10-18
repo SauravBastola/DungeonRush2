@@ -3,6 +3,7 @@
 #include "Config.h"
 #include "Level.h"
 #include "Depth.h"
+#include <vector>
 #include <cmath>
 #include <cstdlib>
 
@@ -220,18 +221,31 @@ void Parallax::drawBackdrop(SDL_Renderer* r, int screenW, int screenH,
 
     // ---- ridges ----
     const int step = 4;   // px per column; smooth enough and only ~340 rects
-    for (const auto& R : RIDGES) {
+    // Batch G: the ridges are opaque and drawn far to near, so in each column a
+    // ridge is only visible from its own skyline down to the skyline of the
+    // nearest ridge in front of it.  Filling just that span draws exactly the
+    // same pixels with a fraction of the fill (it used to paint the bottom of
+    // the screen three times over).
+    const int NR = (int)(sizeof(RIDGES) / sizeof(RIDGES[0]));
+    const int cols = (screenW + step - 1) / step;
+    std::vector<int> sky((size_t)NR * cols);
+    for (int k = 0; k < NR; ++k)
+        for (int i = 0; i < cols; ++i) {
+            const float worldX = i * step + camera.x * RIDGES[k].factor;
+            sky[(size_t)k * cols + i] = (int)(screenH * RIDGES[k].baseY + ridgeY(RIDGES[k], worldX)
+                                              - camera.y * RIDGES[k].factor * 0.35f);
+        }
+    for (int k = 0; k < NR; ++k) {
         // R.col is a palette colour; the plane transform is applied here.
-        const SDL_Color c = Depth::apply(THEMES[g_theme].ridge[&R - RIDGES], Depth::RIDGES);
+        const SDL_Color c = Depth::apply(THEMES[g_theme].ridge[k], Depth::RIDGES);
         SDL_SetRenderDrawColor(r, c.r, c.g, c.b, c.a);
-        for (int sx = 0; sx < screenW; sx += step) {
-            float worldX = sx + camera.x * R.factor;
-            float y = screenH * R.baseY
-                    + ridgeY(R, worldX)
-                    - camera.y * R.factor * 0.35f;
-            int iy = (int)y;
-            if (iy >= screenH) continue;
-            fillColumn(r, sx, iy, step, screenH - iy);
+        for (int i = 0; i < cols; ++i) {
+            const int top = sky[(size_t)k * cols + i];
+            if (top >= screenH) continue;
+            int bottom = screenH;
+            for (int j = k + 1; j < NR; ++j)
+                bottom = std::min(bottom, std::max(top, sky[(size_t)j * cols + i]));
+            fillColumn(r, i * step, top, step, bottom - top);
         }
     }
     SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_NONE);
