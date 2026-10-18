@@ -448,12 +448,15 @@ def slime(path, svg):
     frames, twice the active frame (section 3).  Death sinks into a puddle.
     """
     from PIL import Image
+    # Batch N: idle 4 -> 6 (a slow wobble) and hop 4 -> 6: crouch, deeper
+    # crouch (the tell, mouth open), launch stretch, airborne, landing
+    # squash, recover - each step drawn, not stretched.
     poses = [
-        [(26, 20, False), (27, 19, False), (26, 20, False), (25, 21, False)],   # idle
-        [(28, 18, True),  (28, 18, True),  (22, 24, False), (28, 18, False)],   # hop
+        [(26, 20, False), (27, 19, False), (28, 19, False), (27, 19, False), (26, 20, False), (25, 21, False)],
+        [(28, 18, True),  (29, 17, True),  (22, 24, False), (24, 22, False), (29, 17, False), (27, 19, False)],
     ]
     die = [(28, 14, 1), (30, 9, 2), (30, 5, 3), (24, 3, 3)]
-    img = Image.new("RGBA", (4 * 32, 3 * 32), (0, 0, 0, 0))
+    img = Image.new("RGBA", (6 * 32, 3 * 32), (0, 0, 0, 0))
     px = img.load()
 
     def put(cell, col, row):
@@ -599,6 +602,7 @@ def _skel(pose="idle", t=0, bob=0, lean=0, tell=False, swing=0, fall=0):
         w = 6 - i
         c.part(_rc(hx - w + lean // 2, ry, hx + w + lean // 2, ry + 1), B, BH, BS)
     # back arm (reaches forward as a counterbalance on the wind-up)
+    lift = int(tell) if tell else 0                 # Batch N: 1..3, the sword rising
     back = (hx + 13, sy + 2) if tell else ((hx - 14, sy + 3) if swing else (hx - 12, sy + 8))
     c.part(_ln([(hx - 5, sy), back], 2), BS)
     # skull + jaw
@@ -615,9 +619,9 @@ def _skel(pose="idle", t=0, bob=0, lean=0, tell=False, swing=0, fall=0):
             c.dot(sx + dx, skx + dy, PAL.RED)
     # front arm + notched rusty blade
     shx = hx + 4 + lean // 2
-    if tell:                 # sword raised behind the head
-        hand = (shx - 3, sy - 12)
-        tip = (hand[0] - 19, hand[1] + 2)
+    if tell:                 # sword raised behind the head - rising over the tell
+        hand = (shx - 3 + (3 - lift), sy - 4 - lift * 3 + (1 if lift == 3 else 0))
+        tip = (hand[0] - 19, hand[1] + 2 + (3 - lift) * 2)      # full reach; it rises
     elif swing:              # mid swing / follow-through
         hand = (shx + 5, sy + 2)
         tip = (hand[0] + 9, hand[1] + (2 if swing == 1 else 9))
@@ -632,11 +636,15 @@ def _skel(pose="idle", t=0, bob=0, lean=0, tell=False, swing=0, fall=0):
 
 
 def skeleton(path, svg):
-    """enemy_skeleton.png 6x5 of 40x56: idle 4, walk 6, attack 4, hurt 2, die 5."""
+    """enemy_skeleton.png 10x5 of 40x56: idle 6, walk 10, attack 6 (wind-up 3,
+    strike 2, guard 1), hurt 2, die 5 (Batch N)."""
     rows = [
-        [_skel(bob=b) for b in (0, 0, 1, 1)],
-        [_skel(t=i * 1.047, bob=(i % 3 == 1)) for i in range(6)],
-        [_skel(tell=True), _skel(tell=True), _skel(swing=1), _skel(swing=2)],
+        # idle 6 (Batch N): breathing plus a slow weight shift - leaning back
+        # only (leaning forward pushes the blade tip out of the cell)
+        [_skel(bob=b, lean=l) for b, l in ((0, 0), (0, -1), (1, -1), (1, -2), (1, 0), (0, -2))],
+        [_skel(t=i * 2 * math.pi / 10, bob=(i % 5 in (1, 2))) for i in range(10)],   # walk 10
+        # wind-up 3 (raising, raised, cocked) | strike 2 | guard 1
+        [_skel(tell=1), _skel(tell=2), _skel(tell=3), _skel(swing=1), _skel(swing=2), _skel(swing=2, lean=-1)],
         [_skel(lean=-3, bob=1), _skel(lean=-2)],
         [_skel(fall=f) for f in (0, 3, 6, 9, 12)],
     ]
@@ -644,7 +652,13 @@ def skeleton(path, svg):
 
 
 # ---------------------------------------------------------------------- bat
-def _bat(up=True, dead=0):
+_BAT_UP   = [(14, 19), (2, 5), (4, 12), (1, 16), (6, 15), (5, 21), (10, 18), (12, 23)]
+_BAT_DOWN = [(14, 19), (1, 27), (4, 27), (3, 30), (7, 27), (6, 30), (10, 27), (13, 24)]
+
+
+def _bat(up=True, dead=0, k=None):
+    """k (Batch N): wing position 0 = up .. 1 = down, interpolated point by
+    point between the two drawn wings."""
     c = Px(32, 32)
     body, mem, bone = PAL.BROWN_XD, PAL.SLATE, PAL.BROWN_XD
     if dead:
@@ -656,10 +670,10 @@ def _bat(up=True, dead=0):
         if dead < 3:
             c.dot(14, y, PAL.INK); c.dot(18, y, PAL.INK)
         return c.outline()
-    if up:
-        lw = [(14, 19), (2, 5), (4, 12), (1, 16), (6, 15), (5, 21), (10, 18), (12, 23)]
-    else:
-        lw = [(14, 19), (1, 27), (6, 27), (4, 30), (10, 27), (13, 24)]
+    if k is None:
+        k = 0.0 if up else 1.0
+    lw = [(int(round(a[0] + (b[0] - a[0]) * k)), int(round(a[1] + (b[1] - a[1]) * k)))
+          for a, b in zip(_BAT_UP, _BAT_DOWN)]
     rw = [(31 - x, y) for x, y in lw]
     c.part(_pg(lw), mem, PAL.SLATE_LT, PAL.SLATE_XD)
     c.part(_pg(rw), mem, PAL.SLATE_LT, PAL.SLATE_XD)
@@ -675,9 +689,10 @@ def _bat(up=True, dead=0):
 
 
 def bat(path, svg):
-    """enemy_bat.png 3x2 of 32x32: fly 2 (wings up = the hold), die 3."""
-    _sheet([[_bat(True), _bat(False)], [_bat(dead=d) for d in (1, 2, 3)]],
-           32, 32, path, svg)
+    """enemy_bat.png 6x2 of 32x32: fly 6 (a wing cycle), die 3 (Batch N)."""
+    # Batch N: a 6-frame wing cycle - a fast downstroke, a slower recovery
+    _sheet([[_bat(k=k) for k in (0.0, 0.45, 0.85, 1.0, 0.6, 0.25)],
+            [_bat(dead=d) for d in (1, 2, 3)]], 32, 32, path, svg)
 
 
 # --------------------------------------------------------------------- mage

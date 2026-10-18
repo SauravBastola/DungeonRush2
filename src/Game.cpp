@@ -531,13 +531,14 @@ void Game::spawnEnemy(const std::string& kind, int col, int row) {
         case EnemyAIComponent::Kind::Skeleton:
             // ART-11 sheets carry their own motion, and a lean would
             // resample the 1:1 pixels, so every enemy plays with motion 0.
-            sp.addAnim("idle",   Animation(0, 4, 140).motion(0.f, 0.f));
-            sp.addAnim("run",    Animation(1, 6, 100).motion(0.f, 0.f));
-            sp.addAnim("attack", Animation(2, 4, 110).motion(0.f, 0.f));
+            // Batch N: idle 6, walk 10; attack row = wind-up 3 | strike 2 | guard 1
+            sp.addAnim("idle",   Animation(0, 6, 140).motion(0.f, 0.f));
+            sp.addAnim("run",    Animation(1, 10, 70).motion(0.f, 0.f));
+            sp.addAnim("attack", Animation(2, 5, 90).motion(0.f, 0.f));
             // Batch C: the swing in its three phases (tell held, strike, guard)
-            sp.addAnim("windup", Animation(2, 2, 220).motion(0.f, 0.f));
-            sp.addAnim("strike", Animation(2, 1, 120, 2).motion(0.f, 0.f));
-            sp.addAnim("guard",  Animation(2, 1, 120, 3).motion(0.f, 0.f));
+            sp.addAnim("windup", Animation(2, 3, 150).motion(0.f, 0.f));      // 0.45 s = SKEL_WINDUP
+            sp.addAnim("strike", Animation(2, 2, 60, 3).motion(0.f, 0.f));
+            sp.addAnim("guard",  Animation(2, 1, 120, 5).motion(0.f, 0.f));
             sp.addAnim("hurt",   Animation(3, 2, 120).motion(0.f, 0.f));
             sp.addAnim("die",    Animation(4, 5, 160).motion(0.f, 0.f));
             sp.Play("idle");
@@ -547,8 +548,8 @@ void Game::spawnEnemy(const std::string& kind, int col, int row) {
             // tell, stretch, land), die -- so the squash lives in the frames.
             // No bob, lean or cross-fade: a blend superimposes two frames and
             // a lean resamples the pixels, both of which break the 1:1 grid.
-            sp.addAnim("idle", Animation(0, 4, 160).motion(0.f, 0.f));
-            sp.addAnim("jump", Animation(1, 4, 70).motion(0.f, 0.f));
+            sp.addAnim("idle", Animation(0, 6, 140).motion(0.f, 0.f));         // Batch N: 6 + 6
+            sp.addAnim("jump", Animation(1, 6, 60).motion(0.f, 0.f));
             sp.addAnim("die",  Animation(2, 4, 120).motion(0.f, 0.f));
             sp.Play("idle");
             break;
@@ -557,7 +558,7 @@ void Game::spawnEnemy(const std::string& kind, int col, int row) {
             // cells is the worst case for steppiness, so this one leans on
             // the cross-fade hardest: 45% of each step is a blend into the
             // other wing position, plus a strong vertical bob.
-            sp.addAnim("fly", Animation(0, 2, 110).motion(0.f, 0.f));
+            sp.addAnim("fly", Animation(0, 6, 60).motion(0.f, 0.f));           // Batch N: a wing cycle
             sp.addAnim("die", Animation(1, 3, 150).motion(0.f, 0.f));
             sp.Play("fly");
             break;
