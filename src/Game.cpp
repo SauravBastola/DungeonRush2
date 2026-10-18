@@ -231,8 +231,15 @@ float Game::stageSpawnY() const {
 bool Game::sharpFor(Scaling mode, int outW, int outH) {
     if (mode == Scaling::Sharp) return true;
     if (mode == Scaling::Fill)  return false;
+    // Auto (Batch H): fill the screen, unless a whole-number scale already
+    // covers at least 90 % of it - a maximised window or fullscreen fills
+    // (a 2x picture on a Retina screen left wide borders); a window sized to
+    // an exact multiple stays pixel-perfect.
     const int k = std::min(outW / Config::WINDOW_WIDTH, outH / Config::WINDOW_HEIGHT);
-    return k >= 2;                               // Auto: sharp once 2x fits
+    if (k < 1) return false;
+    const double cover = (double)(k * Config::WINDOW_WIDTH) * (k * Config::WINDOW_HEIGHT) /
+                         ((double)outW * outH);
+    return cover >= 0.90;
 }
 
 void Game::applyScaling() {
@@ -271,6 +278,12 @@ bool Game::playMusic(const std::string& name, bool fallback) {
     m_music = next; m_musicFile = pick;
     Mix_PlayMusic(m_music, -1);
     return true;
+}
+
+// Batch H: a fresh run (score 0, full lives) starting at an unlocked stage
+void Game::startRunAt(int stage) {
+    restartLevel();                                    // stage 1, fresh run
+    if (stage > 0 && stage <= unlockedStage) loadStage(stage);
 }
 
 void Game::loadStage(int n) {
@@ -690,6 +703,18 @@ void Game::spawnPlatform(int col, int row, int w, int h,
         Sprites::PLATFORM.tex, Sprites::PLATFORM.fw, Sprites::PLATFORM.fh,
         Sprites::PLATFORM.scale, false);
     Sprites::apply(sp, Sprites::PLATFORM);
+    // Batch H: a moving platform is the metal slab drawn across its whole
+    // width (three-slice) and its collider is the slab you can see (32 px,
+    // not a whole tile with an invisible lower half).  A static ledge is
+    // drawn by the terrain tiles already, so its sprite stays hidden - it
+    // used to leave a stray metal stub on the ledge's left end.
+    if (moving) {
+        sp.sliceW = Sprites::PLATFORM.fw;
+        ph = Sprites::PLATFORM.fh;
+        p.getComponent<TransformComponent>().height = ph;
+    } else {
+        sp.visible = false;
+    }
     p.addComponent<ColliderComponent>("platform", pw, ph);
     if (moving) {
         Vector2D axis = vertical ? Vector2D(0, 1) : Vector2D(1, 0);
@@ -1603,8 +1628,12 @@ void Game::checkLevelState() {
                                                            : State::Victory;
             m_victoryTimer = 9999.f;
             gameScore += Config::BOSS_SCORE;
-    Sfx::play("stage_clear");
-            Sfx::play("powerup");
+            Sfx::play("stage_clear");
+            // Batch H: clearing a stage unlocks the next (all of them on a win)
+            {
+                const int next = std::min(Level::g_stage + 1, Level::N_STAGES - 1);
+                if (next > unlockedStage) { unlockedStage = next; menuStage = next; saveSettings(); }
+            }
             Particles::emitHeal(tr.position.x, tr.position.y);
         }
     }
@@ -1926,7 +1955,7 @@ void Game::drawSettings() {
         } else if (i == 4) {
             const char* m = scaling == Scaling::Auto ? "Auto" : scaling == Scaling::Sharp ? "Sharp" : "Fill";
             drawText("body", m, px + 300, rowY[i], norm, false);
-            drawText("small", scaling == Scaling::Auto ? "sharp at 2x and up"
+            drawText("small", scaling == Scaling::Auto ? "fill; sharp if it fits"
                               : scaling == Scaling::Sharp ? "whole-number scale"
                               : "fill the screen", px + 420, rowY[i], dim, false);
         }
@@ -1994,18 +2023,28 @@ void Game::drawStats() {
 
 void Game::handleMenuInput(SDL_Keycode key) {
     if (state == State::Menu) {
-        if (key == SDLK_UP || key == SDLK_w) menuSelection = (menuSelection + 3) % 4;
-        else if (key == SDLK_DOWN || key == SDLK_s) menuSelection = (menuSelection + 1) % 4;
+        // Batch H: with a later stage unlocked the list starts with CONTINUE;
+        // `act` maps the selection onto the original four actions.
+        const int n = menuItems(), off = n - 4;
+        if (menuSelection >= n) menuSelection = 0;
+        const int act = menuSelection - off;          // -1 = CONTINUE
+        if (key == SDLK_UP || key == SDLK_w) menuSelection = (menuSelection + n - 1) % n;
+        else if (key == SDLK_DOWN || key == SDLK_s) menuSelection = (menuSelection + 1) % n;
+        else if (act == -1 && (key == SDLK_LEFT || key == SDLK_a))
+            menuStage = (menuStage + unlockedStage) % (unlockedStage + 1);
+        else if (act == -1 && (key == SDLK_RIGHT || key == SDLK_d))
+            menuStage = (menuStage + 1) % (unlockedStage + 1);
         else if (key == SDLK_RETURN || key == SDLK_SPACE || key == SDLK_KP_ENTER) {
-            if (menuSelection == 0) { restartLevel(); }
-            else if (menuSelection == 1) {
+            if (act == -1) { startRunAt(menuStage); }
+            else if (act == 0) { restartLevel(); }
+            else if (act == 1) {
                 m_returnState = State::Menu;
                 instructionsScroll = 0;
                 m_instructionsScrollPos = 0.f;
                 state = State::Instructions;
             }
-            else if (menuSelection == 2) { m_returnState = State::Menu; state = State::Settings; }
-            else if (menuSelection == 3) isRunning = false;
+            else if (act == 2) { m_returnState = State::Menu; state = State::Settings; }
+            else if (act == 3) isRunning = false;
         } else if (key == SDLK_ESCAPE) isRunning = false;
     } else if (state == State::Instructions) {
         // Smooth lerped scroll navigation
@@ -2083,6 +2122,8 @@ void Game::loadSettings() {
     if (f >> fs >> sc) {
         scaling = (Scaling)std::max(0, std::min(2, sc));
         if (fs != 0) setFullscreen(true); else applyScaling();
+        int us = 0;                                      // Batch H: progress (older saves lack it)
+        if (f >> us) unlockedStage = menuStage = std::max(0, std::min(Level::N_STAGES - 1, us));
     }
     musicVolume = std::max(0, std::min(128, musicVolume));
     sfxVolume   = std::max(0, std::min(128, sfxVolume));
@@ -2094,7 +2135,8 @@ void Game::saveSettings() {
     if (!f) return;
     f << Config::SAVE_MAGIC << "\n"
       << musicVolume << " " << sfxVolume << " " << bestScore << " "
-      << (fullscreen ? 1 : 0) << " " << (int)scaling << "\n";       // Batch F
+      << (fullscreen ? 1 : 0) << " " << (int)scaling << " "        // Batch F
+      << unlockedStage << "\n";                                     // Batch H
 }
 
 void Game::handleEvents() {
@@ -2758,7 +2800,7 @@ void Game::updateUIAnimations(float dt) {
         m_menuTransition = std::min(1.0f, m_menuTransition + dt * 3.5f);
     }
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < menuItems(); i++) {
         float target = (menuSelection == i) ? 1.0f : 0.0f;
         m_buttonAnim[i] += (target - m_buttonAnim[i]) * std::min(1.0f, 15.0f * dt);
     }
@@ -2918,16 +2960,25 @@ void Game::drawMenu() {
     }
 
     // ---- Pill Buttons with Hover/Selected Slide + Scale Lerp ----
-    const char* buttonLabels[4] = { "PLAY", "HOW TO PLAY", "SETTINGS", "QUIT" };
+    // Batch H: CONTINUE (any unlocked stage, left / right to choose) heads
+    // the list once a later stage is unlocked; PLAY always starts at stage 1.
+    char contLabel[64];
+    std::snprintf(contLabel, sizeof(contLabel), "%s STAGE %d %s",          // shown only once unlocked
+                  menuStage > 0 ? "<" : " ", menuStage + 1, menuStage < unlockedStage ? ">" : " ");
+    const char* labels4[4] = { "PLAY", "HOW TO PLAY", "SETTINGS", "QUIT" };
+    const char* buttonLabels[5] = { contLabel, "NEW GAME", "HOW TO PLAY", "SETTINGS", "QUIT" };
+    const int nItems = menuItems();
+    if (nItems == 4) for (int i = 0; i < 4; i++) buttonLabels[i] = labels4[i];
     const int baseY = (bestScore > 0) ? 255 : 245;
+    const int gap = (nItems == 5) ? 60 : 68;
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < nItems; i++) {
         float lerp = m_buttonAnim[i];
         int slideX = (int)(lerp * 14.f);
         int bw = 320 + (int)(lerp * 24.f);
         int bh = 52 + (int)(lerp * 4.f);
         int bx = W / 2 - bw / 2 + slideX;
-        int by = baseY + i * 68 - (int)(lerp * 2.f);
+        int by = baseY + i * gap - (int)(lerp * 2.f);
 
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
@@ -2981,6 +3032,9 @@ void Game::drawMenu() {
             : SDL_Color{ 190, 205, 225, 215 };
         drawText("title", buttonLabels[i], bx + bw / 2 + (lerp > 0.1f ? 8 : 0),
                  by + bh / 2, textCol, true);
+        if (nItems == 5 && i == 0)              // Batch H: CONTINUE - which stage
+            drawText("small", (std::string("continue: ") + Level::STAGES[menuStage].name).c_str(),
+                     bx + bw + 16, by + bh / 2, SDL_Color{ 255, 230, 120, 255 }, false);
     }
 
     // ---- Footer hints with key-cap pills ----
@@ -2990,16 +3044,20 @@ void Game::drawMenu() {
         // Only keys the menu actually handles.  "O Settings" and "I Stats"
         // were advertised here but handleMenuInput ignores both, so the bar
         // was teaching dead keys (R-14).
-        const Hint hints[] = {
+        const Hint all[] = {
             { "W / S", "Select" },
+            { "A / D", "Stage" },             // Batch H: only with CONTINUE
             { "ENTER", "Confirm" },
             { "ESC", "Quit" },
         };
-        const int nHints = (int)(sizeof(hints) / sizeof(hints[0]));
+        // Batch H: the "A / D  Stage" hint only when there is a stage to pick
+        Hint hints[4]; int nHints = 0;
+        for (const auto& h : all)
+            if (unlockedStage > 0 || std::string(h.key) != "A / D") hints[nHints++] = h;
 
         TTF_Font* fSmall = assets->GetFont("small");
         int totalW = 0;
-        int kw[3]{}, dw[3]{};
+        int kw[4]{}, dw[4]{};
         for (int i = 0; i < nHints; i++) {
             int th = 0;
             if (fSmall) {

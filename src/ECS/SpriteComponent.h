@@ -292,8 +292,27 @@ public:
         squashY += (1.f - squashY) * std::min(1.f, lastFrameTime * 12.f);
     }
 
+    // Batch H: three-slice drawing (left cap, middle repeated, right cap) for
+    // a sheet whose first three cells are those pieces - the moving platform.
+    // It used to draw only the first cell, a 64 px stub on a 192 px platform.
+    int sliceW = 0;
+    void drawSliced() {
+        const int x0 = (int)transform->position.x - Game::camera.x;
+        const int y0 = (int)transform->position.y - Game::camera.y;
+        const int w  = (int)transform->width;
+        const int cw = sliceW, ch = frameH;
+        for (int x = 0; x < w; x += cw) {
+            const int cell = (x == 0) ? 0 : (x + cw >= w ? 2 : 1);
+            SDL_Rect src{ cell * frameW, 0, frameW, frameH };
+            SDL_Rect dst{ x0 + x, y0, std::min(cw, w - x), ch };
+            if (dst.w < cw) src.w = (int)(frameW * dst.w / (float)cw);
+            TextureManager::Draw(texture, src, dst, SDL_FLIP_NONE);
+        }
+    }
+
     void draw() override {
         if (!texture || !visible) return;
+        if (sliceW > 0) { drawSliced(); return; }
         if (alpha <= 0.01f) return;
         if (blinkT > 0 && (((int)(blinkT * 20)) & 1)) return;
 

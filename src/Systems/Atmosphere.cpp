@@ -252,11 +252,23 @@ void Atmosphere::drawGrass(SDL_Renderer* r, const SDL_Rect& camera) {
     // was spawned.
     for (auto* p : manager.getGroup(Game::groupPlatforms)) {
         if (!p->isActive() || !p->hasComponent<TransformComponent>()) continue;
+        // Batch H: moving platforms are bare metal - no grass on them (the
+        // strip was also drawn past the 64 px slab, floating in the air).
+        if (p->hasComponent<MovingPlatformComponent>()) continue;
         auto& tr = p->getComponent<TransformComponent>();
         float wx = tr.position.x, wy = tr.position.y;
         if (wx + tr.width  < camera.x || wx > camera.x + camera.w) continue;
-        float sx = wx - camera.x, sy = wy - camera.y;
+        // Batch H: round exactly as the platform sprite does, so the grass
+        // and the slab never part by a pixel while it moves...
+        const float sx = (float)((int)wx - camera.x), sy = (float)((int)wy - camera.y);
         if (sy < -40.f || sy > camera.h + 40.f) continue;
+        // ...and pick the blades from where the platform was BUILT, not where
+        // it is now.  Hashing the live x re-randomised every blade each time
+        // a moving platform slid a pixel - the jagged flicker.
+        int home = (int)wx;
+        if (p->hasComponent<MovingPlatformComponent>())
+            home = (int)p->getComponent<MovingPlatformComponent>().startPos.x;
+        wx = (float)home;
 
         float w = windAt(wx, g_time);
         int tiles = (int)(tr.width / T);

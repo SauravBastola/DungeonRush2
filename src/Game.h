@@ -87,6 +87,12 @@ public:
     float landT = 0.f;
     // Batch G2: red glow at the screen edges when the hero is hurt
     float hurtFlashT = 0.f;
+    // Batch H: progress - the furthest stage unlocked (0-based, saved), and
+    // the stage the menu's CONTINUE will start
+    int unlockedStage = 0;
+    int menuStage = 0;
+    int menuItems() const { return unlockedStage > 0 ? 5 : 4; }
+    void startRunAt(int stage);
     float lastHeroHp = -1.f;
     void addShake(float m) { m_shakeMag += m; }
     float dashTrailTimer = 0.f;     // paces the dash afterimages
@@ -249,7 +255,7 @@ private:
     float m_menuTime = 0.f;
     float m_menuTransition = 0.f;
     float m_instructionsScrollPos = 0.f;
-    float m_buttonAnim[4] = { 0.f, 0.f, 0.f, 0.f };
+    float m_buttonAnim[5] = { 0.f, 0.f, 0.f, 0.f, 0.f };
 
     struct Firefly {
         float x, y;
@@ -283,8 +289,8 @@ public:
     Scaling scaling = Scaling::Auto;
     void setFullscreen(bool on);
     void applyScaling();
-    // Pure rule (the harness checks it): sharp (whole-number) scaling when the
-    // output can fit at least 2x, otherwise fill; Sharp/Fill force it.
+    // Pure rule (the harness checks it): Auto fills the screen unless a
+    // whole-number scale covers >= 90 % of it; Sharp/Fill force it.
     static bool sharpFor(Scaling mode, int outW, int outH);
 private:
     bool m_bossMusicOn = false;
