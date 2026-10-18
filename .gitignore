@@ -12,3 +12,4 @@ lib/
 .workbuddy-ai/
 artifacts/
 dungeonrush.save
+*.progress
