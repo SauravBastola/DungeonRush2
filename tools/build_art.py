@@ -727,8 +727,11 @@ def _mage(orb=3, sway=0, arm=0, die=0):
 
 def mage(path, svg):
     """enemy_mage.png 4x3 of 40x56: idle 4, cast 4 (orb grows 3 frames), die 4."""
-    _sheet([[_mage(sway=s) for s in (0, 1, 0, -1)],
-            [_mage(orb=4, arm=2), _mage(orb=5, arm=4), _mage(orb=6, arm=4), _mage(orb=3, arm=0)],
+    # Batch N: idle 6 (sway, the orb pulsing), cast 6 (it grows over four
+    # steps, holds, releases)
+    _sheet([[_mage(sway=s, orb=o) for s, o in ((0, 3), (1, 3), (1, 4), (0, 4), (-1, 3), (-1, 4))],
+            [_mage(orb=4, arm=1), _mage(orb=4, arm=2), _mage(orb=5, arm=3), _mage(orb=6, arm=4),
+             _mage(orb=6, arm=4, sway=1), _mage(orb=3, arm=0)],
             [_mage(die=d) for d in (1, 2, 3, 4)]], 40, 56, path, svg)
 
 
@@ -770,9 +773,11 @@ def _archer(draw=0, bob=0, loosed=False, die=0):
 
 def enemy_archer(path, svg):
     """enemy_archer.png 4x4 of 40x56: idle 4, aim 3, shoot 3, die 4."""
+    # Batch N: the draw in 4 steps (full draw pulls the string further), the
+    # release easing back over 4
     _sheet([[_archer(bob=b) for b in (0, 0, 1, 1)],
-            [_archer(draw=1), _archer(draw=2), _archer(draw=2)],
-            [_archer(draw=2, loosed=True), _archer(draw=1, loosed=True), _archer()],
+            [_archer(draw=1), _archer(draw=2), _archer(draw=3), _archer(draw=3, bob=1)],
+            [_archer(draw=3, loosed=True), _archer(draw=2, loosed=True), _archer(draw=1, loosed=True), _archer()],
             [_archer(die=d) for d in (1, 2, 3, 4)]], 40, 56, path, svg)
 
 
@@ -808,7 +813,7 @@ def _bomber(step=0, spark=0, boom=0):
 def enemy_bomber(path, svg):
     """enemy_bomber.png 4x3 of 32x32: walk 4, fuse 3 (spark doubles), die 4."""
     _sheet([[_bomber(step=i, spark=0) for i in range(4)],
-            [_bomber(spark=1), _bomber(spark=2), _bomber(spark=3)],
+            [_bomber(spark=1), _bomber(spark=2), _bomber(spark=1), _bomber(spark=3), _bomber(spark=2)],   # flicker
             [_bomber(boom=b) for b in (1, 2, 3, 4)]], 32, 32, path, svg)
 
 
@@ -860,10 +865,11 @@ def _boss(t=0.0, bob=0, charge=0, arms=0, hurt=0, die=0):
 
 def boss(path, svg):
     """enemy_boss.png 6x5 of 96x104: idle 4, walk 6, attack 5, hurt 2, die 6."""
-    _sheet([[_boss(bob=b) for b in (0, 1, 2, 1)],
-            [_boss(t=i * 1.047, bob=i % 2) for i in range(6)],
+    # Batch N: idle 6, walk 8, and a held crouch at full charge before the slam
+    _sheet([[_boss(bob=b) for b in (0, 1, 2, 2, 1, 0)],
+            [_boss(t=i * 2 * math.pi / 8, bob=i % 2) for i in range(8)],
             [_boss(charge=1, arms=1), _boss(charge=2, arms=1), _boss(charge=3, arms=1),
-             _boss(charge=0, arms=0, bob=3), _boss(bob=1)],
+             _boss(charge=3, arms=1, bob=2), _boss(charge=0, arms=0, bob=3), _boss(bob=1)],
             [_boss(hurt=1, bob=2), _boss(hurt=1)],
             [_boss(die=d) for d in (0, 1, 2, 3, 4, 6)]], 96, 104, path, svg)
 
@@ -1095,9 +1101,10 @@ def _spitter(sway=0, swell=0, mouth=0, glow=False, wilt=0):
 def enemy_spitter(path, svg):
     """enemy_spitter.png 4x4 of 40x48: idle 4, tell 3 (pod swells, mouth glows),
     spit 2, die 4.  Collider 30x38."""
-    _sheet([[_spitter(sway=s) for s in (0, 1, 0, -1)],
+    # Batch N: idle 6, tell 4 (swells, then holds glowing)
+    _sheet([[_spitter(sway=s) for s in (0, 1, 1, 0, -1, -1)],
             [_spitter(swell=1, mouth=1, glow=True), _spitter(swell=2, mouth=1, glow=True),
-             _spitter(swell=3, mouth=2, glow=True)],
+             _spitter(swell=3, mouth=2, glow=True), _spitter(swell=3, mouth=2, glow=True, sway=-1)],
             [_spitter(swell=0, mouth=2, sway=-2), _spitter(swell=1, mouth=1, sway=-1)],
             [_spitter(wilt=w) for w in (1, 2, 3, 3)]], 40, 48, path, svg)
 
@@ -1134,8 +1141,9 @@ def _wisp(t=0, flare=False, lunge=False, fade=0):
 def enemy_wisp(path, svg):
     """enemy_wisp.png 4x4 of 32x32: float 4, tell 2 (flares violet-white),
     lunge 2, die 3.  Collider 22x24."""
-    _sheet([[_wisp(t=i) for i in range(4)],
-            [_wisp(t=0, flare=True), _wisp(t=1, flare=True)],
+    # Batch N: float 6, tell 3
+    _sheet([[_wisp(t=i) for i in range(6)],
+            [_wisp(t=0, flare=True), _wisp(t=1, flare=True), _wisp(t=2, flare=True)],
             [_wisp(t=0, lunge=True), _wisp(t=1, lunge=True)],
             [_wisp(fade=f) for f in (1, 2, 3)]], 32, 32, path, svg)
 

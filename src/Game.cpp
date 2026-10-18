@@ -509,15 +509,15 @@ void Game::spawnEnemy(const std::string& kind, int col, int row) {
     Sprites::apply(sp, *spec);
     switch (k) {
         case EnemyAIComponent::Kind::Spitter:          // Batch C4
-            sp.addAnim("idle",  Animation(0, 4, 180).motion(0.f, 0.f));
-            sp.addAnim("tell",  Animation(1, 3, 200).motion(0.f, 0.f));
+            sp.addAnim("idle",  Animation(0, 6, 140).motion(0.f, 0.f));       // Batch N
+            sp.addAnim("tell",  Animation(1, 4, 150).motion(0.f, 0.f));       // 0.6 s = SPITTER_TELL
             sp.addAnim("spit",  Animation(2, 2, 120).motion(0.f, 0.f));
             sp.addAnim("die",   Animation(3, 4, 150).motion(0.f, 0.f));
             sp.Play("idle");
             break;
         case EnemyAIComponent::Kind::Wisp:             // Batch C4
-            sp.addAnim("float", Animation(0, 4, 110).motion(0.f, 0.f));
-            sp.addAnim("tell",  Animation(1, 2, 90).motion(0.f, 0.f));
+            sp.addAnim("float", Animation(0, 6, 90).motion(0.f, 0.f));        // Batch N
+            sp.addAnim("tell",  Animation(1, 3, 170).motion(0.f, 0.f));       // ~ WISP_TELL
             sp.addAnim("lunge", Animation(2, 2, 90).motion(0.f, 0.f));
             sp.addAnim("die",   Animation(3, 3, 120).motion(0.f, 0.f));
             sp.Play("float");
@@ -564,8 +564,8 @@ void Game::spawnEnemy(const std::string& kind, int col, int row) {
             break;
         case EnemyAIComponent::Kind::Mage:
             // mage.png is one row of 4 - the cast is a fast flicker on row 0
-            sp.addAnim("idle",   Animation(0, 4, 160).motion(0.f, 0.f));
-            sp.addAnim("attack", Animation(1, 4, 120).motion(0.f, 0.f));
+            sp.addAnim("idle",   Animation(0, 6, 140).motion(0.f, 0.f));      // Batch N: 6 + 6
+            sp.addAnim("attack", Animation(1, 6, 80).motion(0.f, 0.f));
             sp.addAnim("die",    Animation(2, 4, 150).motion(0.f, 0.f));
             sp.Play("idle");
             break;
@@ -573,14 +573,14 @@ void Game::spawnEnemy(const std::string& kind, int col, int row) {
             // "shoot" is played while the AI is AIMING, so it shows the
             // aim row -- the bow-drawn tell; row 2 is the release.
             sp.addAnim("idle",  Animation(0, 4, 160).motion(0.f, 0.f));
-            sp.addAnim("shoot", Animation(1, 3, 120).motion(0.f, 0.f));
-            sp.addAnim("loose", Animation(2, 3, 90).motion(0.f, 0.f));
+            sp.addAnim("shoot", Animation(1, 4, 110).motion(0.f, 0.f));       // Batch N: draw 4 ~ aim time
+            sp.addAnim("loose", Animation(2, 4, 70).motion(0.f, 0.f));
             sp.addAnim("die",   Animation(3, 4, 150).motion(0.f, 0.f));
             sp.Play("idle");
             break;
         case EnemyAIComponent::Kind::Bomber:
             sp.addAnim("walk", Animation(0, 4, 110).motion(0.f, 0.f));
-            sp.addAnim("fuse", Animation(1, 3, 110).motion(0.f, 0.f));
+            sp.addAnim("fuse", Animation(1, 5, 90).motion(0.f, 0.f));         // Batch N: a flickering spark
             sp.addAnim("die",  Animation(2, 4, 110).motion(0.f, 0.f));
             sp.Play("walk");
             break;
@@ -591,9 +591,9 @@ void Game::spawnEnemy(const std::string& kind, int col, int row) {
             // existing squash/stretch and hit flash.  `frames = 1` means the
             // loop position is just the phase, so cycles=1 gives one breath
             // per `speed` ms.
-            sp.addAnim("idle",   Animation(0, 4, 220).motion(0.f, 0.f));
-            sp.addAnim("run",    Animation(1, 6, 120).motion(0.f, 0.f));
-            sp.addAnim("attack", Animation(2, 5, 140).motion(0.f, 0.f));
+            sp.addAnim("idle",   Animation(0, 6, 180).motion(0.f, 0.f));      // Batch N: 6, 8, 6
+            sp.addAnim("run",    Animation(1, 8, 95).motion(0.f, 0.f));
+            sp.addAnim("attack", Animation(2, 6, 117).motion(0.f, 0.f));
             sp.addAnim("hurt",   Animation(3, 2, 120).motion(0.f, 0.f));
             sp.addAnim("die",    Animation(4, 6, 150).motion(0.f, 0.f));
             sp.Play("idle");
