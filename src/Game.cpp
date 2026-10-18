@@ -116,8 +116,7 @@ void Game::init(const char* title, int width, int height, bool fullscreen) {
     loadLevel();
     spawnPlayer();
 
-    m_music = Mix_LoadMUS(assetPath("sounds/background_music.wav").c_str());
-    if (m_music) Mix_PlayMusic(m_music, -1);
+    playMusic("stage1", true);                        // Batch E
     isRunning = true;
 }
 
@@ -222,6 +221,28 @@ float Game::stageSpawnY() const {
 
 // Batch B: tear the world down to the player and build stage `n`.  Score,
 // lives and the run clock carry over; key, door, checkpoints do not.
+// Batch E ----------------------------------------------------------------
+std::string Game::assetFile(const std::string& rel) const { return assetPath(rel); }
+
+bool Game::playMusic(const std::string& name, bool fallback) {
+    std::string pick;
+    for (const char* ext : { ".ogg", ".mp3", ".wav" }) {
+        const std::string rel = "sounds/music/" + name + ext;
+        if (SDL_RWops* f = SDL_RWFromFile(assetPath(rel).c_str(), "rb")) { SDL_RWclose(f); pick = rel; break; }
+    }
+    if (pick.empty()) {
+        if (!fallback) return false;
+        pick = "sounds/background_music.wav";
+    }
+    if (pick == m_musicFile && m_music) return true;          // already playing
+    Mix_Music* next = Mix_LoadMUS(assetPath(pick).c_str());
+    if (!next) { std::cerr << "[music] could not load " << pick << ": " << Mix_GetError() << "\n"; return false; }
+    if (m_music) { Mix_HaltMusic(); Mix_FreeMusic(m_music); }
+    m_music = next; m_musicFile = pick;
+    Mix_PlayMusic(m_music, -1);
+    return true;
+}
+
 void Game::loadStage(int n) {
     if (n < 0 || n >= Level::N_STAGES) return;
     for (std::size_t g : { groupMap, groupColliders, groupEnemies, groupCoins, groupPowerups,
@@ -245,6 +266,8 @@ void Game::loadStage(int n) {
     respawnX = stageSpawnX(); respawnY = stageSpawnY();
     respawn();
     stageBannerT = 3.0f;
+    m_bossMusicOn = false;
+    playMusic("stage" + std::to_string(n + 1), true);          // Batch E
 }
 
 void Game::loadLevel() {
@@ -1409,6 +1432,8 @@ void Game::restartLevel() {
     respawnX = stageSpawnX(); respawnY = stageSpawnY();
     respawn();
     stageBannerT = 3.0f;
+    m_bossMusicOn = false;
+    playMusic("stage1", true);                          // Batch E: a new run, stage 1's theme
     state = State::Playing;
     isPaused = false;
     pauseSelection = 0;
@@ -1535,6 +1560,12 @@ void Game::checkLevelState() {
 void Game::update() {
     updateUIAnimations(lastFrameTime);
     if (state == State::Playing && stageBannerT > 0.f) stageBannerT -= lastFrameTime;
+    // Batch E: the boss theme takes over inside the arena (if there is one)
+    if (state == State::Playing && !m_bossMusicOn) {
+        auto& ptr = manager.getGroup(groupPlayers)[0]->getComponent<TransformComponent>();
+        if (ptr.position.x >= Level::stage().zoneArena * (float)Config::TILE_SIZE)
+            m_bossMusicOn = playMusic("boss", false) || true;   // stop re-checking either way
+    }
     if (state == State::Menu || state == State::Instructions) {
         handlePlayerInput();
         manager.refresh();

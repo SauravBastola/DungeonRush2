@@ -264,6 +264,15 @@ private:
 
     SDL_Window* m_window = nullptr;
     Mix_Music*  m_music = nullptr;
+public:
+    // Batch E: per-stage music.  sounds/music/<name>.ogg|.mp3|.wav if it exists;
+    // stages fall back to sounds/background_music.wav, 'boss' only switches in
+    // when its file is there.  m_musicFile is the file playing now.
+    std::string m_musicFile;
+    bool playMusic(const std::string& name, bool fallback);
+    std::string assetFile(const std::string& rel) const;   // absolute path, as the game sees it
+private:
+    bool m_bossMusicOn = false;
     float       m_shake = 0.f;
     float       m_shakeMag = 0.f;
     float       m_fallSpeed = 0.f;   // previous frame's vy, for landing impact
